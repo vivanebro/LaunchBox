@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabaseClient';
 import HelpButton from '@/components/HelpButton';
 
 // Error Boundary Component
@@ -89,10 +90,10 @@ export default function Layout({ children, currentPageName }) {
       }
 
       try {
-        const isAuthenticated = await base44.auth.isAuthenticated();
-        
-        if (!isAuthenticated) {
-          base44.auth.redirectToLogin(window.location.pathname + window.location.search);
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          window.location.href = createPageUrl('Welcome');
           return;
         }
       } catch (error) {
