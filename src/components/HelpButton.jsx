@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageCircle, Calendar, MessageSquare, X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { base44 } from '@/api/base44Client';
+import supabaseClient from '@/lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function HelpButton() {
@@ -36,7 +36,7 @@ export default function HelpButton() {
     
     setSending(true);
     try {
-      await base44.entities.HelpRequest.create({ message: message.trim() });
+      await supabaseClient.entities.HelpRequest.create({ message: message.trim() });
       setSent(true);
       setTimeout(() => {
         setMessage('');

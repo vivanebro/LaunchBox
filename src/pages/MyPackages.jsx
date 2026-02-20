@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { base44 } from '@/api/base44Client';
+import supabaseClient from '@/lib/supabaseClient';
 import { Trash2, Edit, Loader2, Package as PackageIcon, AlertCircle, Eye, Share2, Copy, Check, X, Code } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -24,9 +24,9 @@ export default function MyPackages() {
   const loadPackages = async () => {
     setLoading(true);
     try {
-      const currentUser = await base44.auth.me();
-      const fetchedPackages = await base44.entities.PackageConfig.filter(
-        { created_by: currentUser.email },
+      const currentUser = await supabaseClient.auth.me();
+      const fetchedPackages = await supabaseClient.entities.PackageConfig.filter(
+        { created_by: currentUser.id },
         '-created_date'
       );
       setPackages(fetchedPackages);
@@ -46,7 +46,7 @@ export default function MyPackages() {
     
     setDeleting(id);
     try {
-      await base44.entities.PackageConfig.delete(id);
+      await supabaseClient.entities.PackageConfig.delete(id);
       await loadPackages();
     } catch (error) {
       console.error('Error deleting package:', error);
@@ -107,7 +107,7 @@ export default function MyPackages() {
         package_set_name: `${packageData.package_set_name || packageData.business_name || 'Untitled'} (Copy)`
       };
       
-      await base44.entities.PackageConfig.create(duplicatedPackage);
+      await supabaseClient.entities.PackageConfig.create(duplicatedPackage);
       await loadPackages();
     } catch (error) {
       console.error('Error duplicating package:', error);
@@ -128,7 +128,7 @@ export default function MyPackages() {
     }
     
     try {
-      await base44.entities.PackageConfig.update(pkgId, {
+      await supabaseClient.entities.PackageConfig.update(pkgId, {
         package_set_name: editedName.trim()
       });
       await loadPackages();

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
+import supabaseClient from '@/lib/supabaseClient';
 
 import StepIndicator from '../components/builder/StepIndicator';
 import Step1PackageName from '../components/builder/Step1PackageName';
@@ -107,7 +107,7 @@ export default function PackageBuilder() {
 
         if (editingPackageId) {
           try {
-            await base44.entities.PackageConfig.update(editingPackageId, cleanConfig);
+            await supabaseClient.entities.PackageConfig.update(editingPackageId, cleanConfig);
             localStorage.setItem('packageConfig', JSON.stringify(cleanConfig));
             localStorage.removeItem('editingPackageId');
             window.location.href = createPageUrl('Results') + `?packageId=${editingPackageId}`;

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical } from 'lucide-react';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
+import supabaseClient from '@/lib/supabaseClient';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
@@ -110,7 +110,7 @@ export default function Results() {
       if (idFromUrl) {
         try {
           // Try loading with user auth first
-          loadedConfig = await base44.entities.PackageConfig.get(idFromUrl);
+          loadedConfig = await supabaseClient.entities.PackageConfig.get(idFromUrl);
           if (loadedConfig) {
             loadedConfig.id = idFromUrl;
           }
@@ -119,7 +119,7 @@ export default function Results() {
           // If in preview mode and we can't load (e.g. not authenticated), try filter
           if (isPreview) {
             try {
-              const results = await base44.entities.PackageConfig.filter({ id: idFromUrl });
+              const results = await supabaseClient.entities.PackageConfig.filter({ id: idFromUrl });
               if (results && results.length > 0) {
                 loadedConfig = results[0];
                 loadedConfig.id = idFromUrl;
@@ -907,16 +907,16 @@ export default function Results() {
 
       if (savedPackageId) {
         try {
-          await base44.entities.PackageConfig.update(savedPackageId, configToSave);
+          await supabaseClient.entities.PackageConfig.update(savedPackageId, configToSave);
         } catch (updateError) {
           // If update fails (e.g. package was deleted), create a new one
           console.warn('Update failed, creating new package:', updateError);
-          const newPackage = await base44.entities.PackageConfig.create(configToSave);
+          const newPackage = await supabaseClient.entities.PackageConfig.create(configToSave);
           savedPackageId = newPackage.id;
           setPackageId(savedPackageId);
         }
       } else {
-        const newPackage = await base44.entities.PackageConfig.create(configToSave);
+        const newPackage = await supabaseClient.entities.PackageConfig.create(configToSave);
         savedPackageId = newPackage.id;
         setPackageId(savedPackageId);
       }
@@ -3390,15 +3390,15 @@ export default function Results() {
 
                         if (packageId) {
                           try {
-                            await base44.entities.PackageConfig.update(packageId, configToSave);
+                            await supabaseClient.entities.PackageConfig.update(packageId, configToSave);
                           } catch (updateError) {
                             console.warn('Update failed, creating new package:', updateError);
-                            const newPackage = await base44.entities.PackageConfig.create(configToSave);
+                            const newPackage = await supabaseClient.entities.PackageConfig.create(configToSave);
                             savedPackageId = newPackage.id;
                             setPackageId(savedPackageId);
                           }
                         } else {
-                          const newPackage = await base44.entities.PackageConfig.create(configToSave);
+                          const newPackage = await supabaseClient.entities.PackageConfig.create(configToSave);
                           savedPackageId = newPackage.id;
                           setPackageId(savedPackageId);
                         }

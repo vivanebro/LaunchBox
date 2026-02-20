@@ -65,7 +65,7 @@ const createEntityHelper = (tableName, isServiceRole = false) => {
         .order(column, { ascending: !isDescending });
 
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
 
     /**
@@ -84,17 +84,25 @@ const createEntityHelper = (tableName, isServiceRole = false) => {
 
     /**
      * Filter records
+     * @param {object} filters - Key/value pairs to filter by
+     * @param {string} [orderBy] - Column to order by (prefix with '-' for descending)
      */
-    filter: async (filters) => {
+    filter: async (filters, orderBy = null) => {
       let query = client.from(tableName).select('*');
 
       Object.entries(filters).forEach(([key, value]) => {
         query = query.eq(key, value);
       });
 
+      if (orderBy) {
+        const isDescending = orderBy.startsWith('-');
+        const column = isDescending ? orderBy.slice(1) : orderBy;
+        query = query.order(column, { ascending: !isDescending });
+      }
+
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
 
     /**
