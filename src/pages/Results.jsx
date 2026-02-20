@@ -580,7 +580,12 @@ export default function Results() {
 
     setUploadingLogo(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const file_url = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
       updateConfigMultiple({ logo_url: file_url, logo_height: (configRef.current || config).logo_height || 80 });
     } catch (error) {
       console.error('Error uploading logo:', error);
