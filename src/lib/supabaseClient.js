@@ -12,13 +12,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Service role client for elevated permissions
-export const supabaseServiceRole = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+// Service role client — only created when key is available (server-side / env var set)
+export const supabaseServiceRole = supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
+  : supabase;
 
 // Helper functions to match Base44 SDK patterns
 
