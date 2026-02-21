@@ -94,10 +94,12 @@ export default function Results() {
     let idFromUrl = urlParams.get('packageId');
     setIsPreviewMode(isPreview);
     if (isPreview && idFromUrl) {
-      logPackageView(idFromUrl).then(viewId => {
+      window.__analyticsViewId = null;
+      window.__analyticsPending = logPackageView(idFromUrl).then(viewId => {
         window.__analyticsViewId = viewId;
         const cleanup = startTimeTracking(viewId);
         window.__analyticsCleanup = cleanup;
+        return viewId;
       });
     }
     if (idFromUrl) {
@@ -2412,7 +2414,9 @@ export default function Results() {
                     if (!finalLink) {
                       e.preventDefault();
                     }
-                    if (window.__analyticsViewId) { logButtonClick(window.__analyticsViewId, pkg.tier); }
+                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier); };
+                    if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
+                    else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
                   }}
                 >
                   {config.button_links?.[modeKey]?.[pkg.tier + '_label'] || "Get Custom Offer"}
@@ -2515,7 +2519,9 @@ export default function Results() {
               if (!finalLink) {
                 e.preventDefault();
               }
-              if (window.__analyticsViewId) { logButtonClick(window.__analyticsViewId, pkg.tier); }
+              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier); };
+                    if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
+                    else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
             }}
           >
             Get Started
@@ -2577,7 +2583,9 @@ export default function Results() {
                     if (!finalLink) {
                       e.preventDefault();
                     }
-                    if (window.__analyticsViewId) { logButtonClick(window.__analyticsViewId, pkg.tier); }
+                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier); };
+                    if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
+                    else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
                   }}
                 >
                   {config.button_links?.[modeKey]?.[pkg.tier + '_label'] || "Get Custom Offer"}
@@ -2671,7 +2679,9 @@ export default function Results() {
               if (!finalLink) {
                 e.preventDefault();
               }
-              if (window.__analyticsViewId) { logButtonClick(window.__analyticsViewId, pkg.tier); }
+              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier); };
+                    if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
+                    else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
             }}
           >
             Get Started
