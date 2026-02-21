@@ -70,7 +70,7 @@ export default function Analytics() {
     setLoading(true);
     try {
       const currentUser = await base44.auth.me();
-      const pkgs = await base44.entities.PackageConfig.filter({ created_by: currentUser.id }, '-created_date');
+      const pkgs = await base44.entities.PackageConfig.filter({ created_by: currentUser.id }, '-created_date') || [];
       setPackages(pkgs);
       if (pkgs.length > 0) {
         const data = await fetchAnalyticsForPackages(pkgs.map(p => p.id));
