@@ -94,11 +94,12 @@ export default function Results() {
     let idFromUrl = urlParams.get('packageId');
     setIsPreviewMode(isPreview);
     if (isPreview && idFromUrl) {
-      const viewId = await logPackageView(idFromUrl);
-      window.__analyticsViewId = viewId;
       const startTime = Date.now();
-      window.addEventListener('beforeunload', () => {
-        updateTimeSpent(viewId, Math.round((Date.now() - startTime) / 1000));
+      logPackageView(idFromUrl).then(viewId => {
+        window.__analyticsViewId = viewId;
+        window.addEventListener('beforeunload', () => {
+          updateTimeSpent(viewId, Math.round((Date.now() - startTime) / 1000));
+        });
       });
     }
     if (idFromUrl) {
