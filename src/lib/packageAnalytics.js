@@ -59,7 +59,9 @@ export const startTimeTracking = (viewId) => {
 export const logButtonClick = async (viewId, tier) => {
   if (!viewId) return;
   try {
-    await supabase.from('package_views').update({ button_clicked: true, button_tier: tier }).eq('id', viewId);
+    const { data } = await supabase.from('package_views').select('click_count').eq('id', viewId).single();
+    const newCount = (data?.click_count || 0) + 1;
+    await supabase.from('package_views').update({ button_clicked: true, button_tier: tier, click_count: newCount }).eq('id', viewId);
   } catch (e) { console.error('Analytics: failed to log button click', e); }
 };
 
