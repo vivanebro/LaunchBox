@@ -110,7 +110,7 @@ export default function Results() {
       if (idFromUrl) {
         try {
           // Try loading with user auth first
-          loadedConfig = await supabaseClient.entities.PackageConfig.get(idFromUrl);
+          loadedConfig = await supabaseClient.asServiceRole.entities.PackageConfig.get(idFromUrl);
           if (loadedConfig) {
             loadedConfig.id = idFromUrl;
           }
@@ -119,7 +119,7 @@ export default function Results() {
           // If in preview mode and we can't load (e.g. not authenticated), try filter
           if (isPreview) {
             try {
-              const results = await supabaseClient.entities.PackageConfig.filter({ id: idFromUrl });
+              const results = await supabaseClient.asServiceRole.entities.PackageConfig.filter({ id: idFromUrl });
               if (results && results.length > 0) {
                 loadedConfig = results[0];
                 loadedConfig.id = idFromUrl;
