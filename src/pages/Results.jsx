@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
-import { logPackageView, updateTimeSpent, logButtonClick } from '@/lib/packageAnalytics';
+import { logPackageView, startTimeTracking, logButtonClick } from '@/lib/packageAnalytics';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
@@ -94,12 +94,10 @@ export default function Results() {
     let idFromUrl = urlParams.get('packageId');
     setIsPreviewMode(isPreview);
     if (isPreview && idFromUrl) {
-      const startTime = Date.now();
       logPackageView(idFromUrl).then(viewId => {
         window.__analyticsViewId = viewId;
-        window.addEventListener('beforeunload', () => {
-          updateTimeSpent(viewId, Math.round((Date.now() - startTime) / 1000));
-        });
+        const cleanup = startTimeTracking(viewId);
+        window.__analyticsCleanup = cleanup;
       });
     }
     if (idFromUrl) {

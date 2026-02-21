@@ -26,6 +26,36 @@ export const updateTimeSpent = async (viewId, seconds) => {
   } catch (e) { console.error('Analytics: failed to update time spent', e); }
 };
 
+export const startTimeTracking = (viewId) => {
+  if (!viewId) return;
+  const startTime = Date.now();
+  let lastSent = 0;
+
+  const sendUpdate = () => {
+    const seconds = Math.round((Date.now() - startTime) / 1000);
+    if (seconds !== lastSent) {
+      lastSent = seconds;
+      updateTimeSpent(viewId, seconds);
+    }
+  };
+
+  // Heartbeat every 30s
+  const interval = setInterval(sendUpdate, 30000);
+
+  // Also try on visibility change (tab switch, phone lock)
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'hidden') sendUpdate();
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  // Cleanup
+  return () => {
+    clearInterval(interval);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    sendUpdate(); // final send
+  };
+};
+
 export const logButtonClick = async (viewId, tier) => {
   if (!viewId) return;
   try {
