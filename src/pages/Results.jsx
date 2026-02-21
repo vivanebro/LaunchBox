@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
+import { logPackageView, updateTimeSpent, logButtonClick } from '@/lib/packageAnalytics';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
@@ -92,6 +93,14 @@ export default function Results() {
     const isPreview = urlParams.get('preview') === 'true';
     let idFromUrl = urlParams.get('packageId');
     setIsPreviewMode(isPreview);
+    if (isPreview && idFromUrl) {
+      const viewId = await logPackageView(idFromUrl);
+      window.__analyticsViewId = viewId;
+      const startTime = Date.now();
+      window.addEventListener('beforeunload', () => {
+        updateTimeSpent(viewId, Math.round((Date.now() - startTime) / 1000));
+      });
+    }
     if (idFromUrl) {
       setPackageId(idFromUrl);
     }
@@ -2396,7 +2405,7 @@ export default function Results() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`w-full font-semibold rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:opacity-90 ${previewPackages.length === 4 ? 'h-10 text-sm' : 'h-12'}`}
-                  style={{ 
+                  style={{
                     background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)`,
                     textDecoration: 'none'
                   }}
@@ -2404,6 +2413,7 @@ export default function Results() {
                     if (!finalLink) {
                       e.preventDefault();
                     }
+                    if (window.__analyticsViewId) { logButtonClick(window.__analyticsViewId, pkg.tier); }
                   }}
                 >
                   {config.button_links?.[modeKey]?.[pkg.tier + '_label'] || "Get Custom Offer"}
@@ -2498,7 +2508,7 @@ export default function Results() {
             target="_blank"
             rel="noopener noreferrer"
             className={`w-full font-semibold rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:opacity-90 ${previewPackages.length === 4 ? 'h-10 text-sm' : 'h-12'}`}
-            style={{ 
+            style={{
               background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)`,
               textDecoration: 'none'
             }}
@@ -2506,6 +2516,7 @@ export default function Results() {
               if (!finalLink) {
                 e.preventDefault();
               }
+              if (window.__analyticsViewId) { logButtonClick(window.__analyticsViewId, pkg.tier); }
             }}
           >
             Get Started
@@ -2567,6 +2578,7 @@ export default function Results() {
                     if (!finalLink) {
                       e.preventDefault();
                     }
+                    if (window.__analyticsViewId) { logButtonClick(window.__analyticsViewId, pkg.tier); }
                   }}
                 >
                   {config.button_links?.[modeKey]?.[pkg.tier + '_label'] || "Get Custom Offer"}
@@ -2660,6 +2672,7 @@ export default function Results() {
               if (!finalLink) {
                 e.preventDefault();
               }
+              if (window.__analyticsViewId) { logButtonClick(window.__analyticsViewId, pkg.tier); }
             }}
           >
             Get Started
