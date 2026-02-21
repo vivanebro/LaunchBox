@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Upload, Loader2 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 
 const COLOR_PRESETS = [
   { name: 'Red', color: '#ff0044' },
@@ -33,7 +32,12 @@ export default function Step11Branding({ data, onChange, onNext }) {
 
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const file_url = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
       onChange({ logo_url: file_url });
     } catch (error) {
       console.error('Error uploading logo:', error);

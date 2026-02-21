@@ -2,8 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare, BarChart2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
-import { supabase } from '@/lib/supabaseClient';
+import supabaseClient, { supabase } from '@/lib/supabaseClient';
 import HelpButton from '@/components/HelpButton';
 
 // Error Boundary Component
@@ -105,7 +104,7 @@ export default function Layout({ children, currentPageName }) {
 
     const checkAdmin = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await supabaseClient.auth.me();
         setIsAdmin(user?.role === 'admin');
       } catch (error) {
         console.warn('Layout: Admin check failed:', error);

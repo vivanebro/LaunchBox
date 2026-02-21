@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { base44 } from '@/api/base44Client';
+import supabaseClient from '@/lib/supabaseClient';
 import { Users, Package, LayoutTemplate, TrendingUp, Clock, Shield, Loader2, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import RetentionHeatmap from '@/components/admin/RetentionHeatmap';
@@ -60,7 +60,7 @@ export default function Admin() {
   const checkAdminAndLoadData = async () => {
     setLoading(true);
     try {
-      const user = await base44.auth.me();
+      const user = await supabaseClient.auth.me();
       
       if (user.role !== 'admin') {
         setIsAdmin(false);
@@ -80,10 +80,10 @@ export default function Admin() {
   const loadAdminStats = async () => {
     try {
       // Get all users
-      const users = await base44.entities.User.list();
+      const users = await supabaseClient.entities.User.list();
       
       // Get all packages
-      const packages = await base44.entities.PackageConfig.list('-created_date');
+      const packages = await supabaseClient.entities.PackageConfig.list('-created_date');
 
       // Calculate stats
       const totalUsers = users.length;
@@ -170,8 +170,8 @@ export default function Admin() {
 
   const loadRetentionStats = async () => {
     try {
-      const users = await base44.entities.User.list();
-      const packages = await base44.entities.PackageConfig.list();
+      const users = await supabaseClient.entities.User.list();
+      const packages = await supabaseClient.entities.PackageConfig.list();
 
       // Calculate cohorts
       const cohorts = calculateCohorts(users, packages);

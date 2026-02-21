@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { User, Mail, Calendar, Save, Loader2 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import supabaseClient from '@/lib/supabaseClient';
 
 export default function Settings() {
   const [user, setUser] = useState(null);
@@ -17,7 +17,7 @@ export default function Settings() {
   const loadUser = async () => {
     setLoading(true);
     try {
-      const currentUser = await base44.auth.me();
+      const currentUser = await supabaseClient.auth.me();
       setUser(currentUser);
     } catch (error) {
       console.error('Error loading user:', error);
@@ -28,7 +28,7 @@ export default function Settings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await base44.auth.updateMe({ full_name: user.full_name });
+      await supabaseClient.entities.User.update(user.id, { full_name: user.full_name });
       alert('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -38,7 +38,7 @@ export default function Settings() {
   };
 
   const handleLogout = () => {
-    base44.auth.logout();
+    supabaseClient.auth.signOut();
   };
 
   if (loading) {

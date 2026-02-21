@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { base44 } from '@/api/base44Client';
+import supabaseClient from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,14 +21,14 @@ export default function HelpRequests() {
 
   const loadData = async () => {
     setLoading(true);
-    const user = await base44.auth.me();
+    const user = await supabaseClient.auth.me();
     if (user.role !== 'admin') {
       setIsAdmin(false);
       setLoading(false);
       return;
     }
     setIsAdmin(true);
-    const data = await base44.entities.HelpRequest.list('-created_date');
+    const data = await supabaseClient.entities.HelpRequest.list('-created_date');
     setRequests(data);
     setLoading(false);
   };
@@ -36,7 +36,7 @@ export default function HelpRequests() {
   const toggleStatus = async (req) => {
     setUpdatingId(req.id);
     const newStatus = req.status === 'new' ? 'responded' : 'new';
-    await base44.entities.HelpRequest.update(req.id, { status: newStatus });
+    await supabaseClient.entities.HelpRequest.update(req.id, { status: newStatus });
     setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: newStatus } : r));
     setUpdatingId(null);
   };

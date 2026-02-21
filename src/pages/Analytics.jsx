@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, Clock, MousePointerClick, Smartphone, Monitor, Tablet, TrendingUp, Package } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import supabaseClient from '@/lib/supabaseClient';
 import { fetchAnalyticsForPackages } from '@/lib/packageAnalytics';
 import { createPageUrl } from '@/utils';
 
@@ -69,8 +69,8 @@ export default function Analytics() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const currentUser = await base44.auth.me();
-      const pkgs = await base44.entities.PackageConfig.filter({ created_by: currentUser.id }, '-created_date') || [];
+      const currentUser = await supabaseClient.auth.me();
+      const pkgs = await supabaseClient.entities.PackageConfig.filter({ created_by: currentUser.id }, '-created_date') || [];
       setPackages(pkgs);
       if (pkgs.length > 0) {
         const data = await fetchAnalyticsForPackages(pkgs.map(p => p.id));
