@@ -56,12 +56,15 @@ export const startTimeTracking = (viewId) => {
   };
 };
 
-export const logButtonClick = async (viewId, tier) => {
+export const logButtonClick = async (viewId, tier, tierLabel, modeLabel) => {
   if (!viewId) return;
   try {
-    const { data } = await supabase.from('package_views').select('click_count').eq('id', viewId).single();
-    const newCount = (data?.click_count || 0) + 1;
-    await supabase.from('package_views').update({ button_clicked: true, button_tier: tier, click_count: newCount }).eq('id', viewId);
+    await supabase.rpc('increment_click_count', {
+      view_id: viewId,
+      tier: tier,
+      tier_label: tierLabel,
+      mode_label: modeLabel
+    });
   } catch (e) { console.error('Analytics: failed to log button click', e); }
 };
 
@@ -82,10 +85,16 @@ export const fetchAnalyticsForPackages = async (packageIds) => {
         return views.filter(v => v.viewed_at?.startsWith(dayStr)).length;
       });
       const tierClicks = {};
-      for (const click of clicks) { if (click.button_tier) tierClicks[click.button_tier] = (tierClicks[click.button_tier] || 0) + 1; }
+      const tierLabels = {};
+      for (const click of clicks) {
+        if (click.button_tier) {
+          tierClicks[click.button_tier] = (tierClicks[click.button_tier] || 0) + (click.click_count || 1);
+          if (click.clicked_tier_label) tierLabels[click.button_tier] = click.clicked_tier_label;
+        }
+      }
       const deviceBreakdown = { mobile: 0, tablet: 0, desktop: 0 };
       for (const v of views) { const d = v.device_type || 'desktop'; deviceBreakdown[d] = (deviceBreakdown[d] || 0) + 1; }
-      result[id] = { views: views.length, avgTime, clicks: clicks.length, lastViewed: views[0]?.viewed_at || null, tierClicks, deviceBreakdown, weeklyViews };
+      result[id] = { views: views.length, avgTime, clicks: clicks.length, lastViewed: views[0]?.viewed_at || null, tierClicks, tierLabels, deviceBreakdown, weeklyViews };
     }
     return result;
   } catch (e) { console.error('Analytics: failed to fetch analytics', e); return {}; }

@@ -187,7 +187,7 @@ export default function Analytics() {
                           <div className="flex gap-1 flex-wrap">
                             {Object.entries(a.tierClicks).map(([tier, count]) => (
                               <span key={tier} className="px-2 py-0.5 rounded-full text-xs font-semibold text-white capitalize"
-                                style={{ backgroundColor: pkg.brand_color || '#ff0044' }}>{tier}: {count}</span>
+                                style={{ backgroundColor: pkg.brand_color || '#ff0044' }}>{a.tierLabels?.[tier] || tier}: {count}</span>
                             ))}
                           </div>
                         )}
