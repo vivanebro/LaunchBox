@@ -7,6 +7,7 @@ import supabaseClient from '@/lib/supabaseClient';
 import { Trash2, Edit, Loader2, Package as PackageIcon, AlertCircle, Eye, Share2, Copy, Check, X, Code } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { fetchAnalyticsForPackages } from '@/lib/packageAnalytics';
 
 export default function MyPackages() {
   const [packages, setPackages] = useState([]);
@@ -16,6 +17,7 @@ export default function MyPackages() {
   const [duplicating, setDuplicating] = useState(null);
   const [editingName, setEditingName] = useState(null);
   const [editedName, setEditedName] = useState('');
+  const [analytics, setAnalytics] = useState({});
 
   useEffect(() => {
     loadPackages();
@@ -30,6 +32,11 @@ export default function MyPackages() {
         '-created_date'
       );
       setPackages(fetchedPackages);
+      if (fetchedPackages.length > 0) {
+        const ids = fetchedPackages.map(p => p.id);
+        const analyticsData = await fetchAnalyticsForPackages(ids);
+        setAnalytics(analyticsData);
+      }
     } catch (error) {
       console.error('Error loading packages:', error);
     }
@@ -410,6 +417,28 @@ export default function MyPackages() {
                           </Tooltip>
                         </div>
                       </div>
+
+                      {/* Analytics strip — only show if package has been viewed */}
+                      {analytics[pkg.id]?.views > 0 && (
+                        <div className="pt-3 mt-3 border-t border-gray-100 flex items-center gap-4">
+                          <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                            <span>👁</span>
+                            <span className="font-semibold text-gray-700">{analytics[pkg.id].views}</span>
+                            <span>views</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                            <span>⏱</span>
+                            <span className="font-semibold text-gray-700">
+                              {analytics[pkg.id].avgTime < 60
+                                ? `${analytics[pkg.id].avgTime}s`
+                                : `${Math.floor(analytics[pkg.id].avgTime / 60)}m`}
+                            </span>
+                          </div>
+                          <div className="ml-auto text-base">
+                            {(new Date() - new Date(analytics[pkg.id].lastViewed)) < 7 * 24 * 60 * 60 * 1000 ? '🔥' : '😴'}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 );
