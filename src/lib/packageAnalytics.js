@@ -28,31 +28,60 @@ export const updateTimeSpent = async (viewId, seconds) => {
 
 export const startTimeTracking = (viewId) => {
   if (!viewId) return;
-  const startTime = Date.now();
-  let lastSent = 0;
 
-  const sendUpdate = () => {
-    const seconds = Math.round((Date.now() - startTime) / 1000);
-    if (seconds !== lastSent) {
-      lastSent = seconds;
-      updateTimeSpent(viewId, seconds);
+  let activeSeconds = 0;
+  let isActive = false;
+  let activityTimeout = null;
+  let countingInterval = null;
+
+  const IDLE_THRESHOLD = 60000; // pause after 60s no activity
+
+  const onActivity = () => {
+    if (!isActive) {
+      isActive = true;
     }
+    // Reset idle timer
+    clearTimeout(activityTimeout);
+    activityTimeout = setTimeout(() => {
+      isActive = false;
+    }, IDLE_THRESHOLD);
   };
 
-  // Heartbeat every 30s
-  const interval = setInterval(sendUpdate, 30000);
+  // Count active seconds
+  countingInterval = setInterval(() => {
+    if (isActive && document.visibilityState === 'visible') {
+      activeSeconds += 1;
+      // Send update every 30s
+      if (activeSeconds % 30 === 0) {
+        updateTimeSpent(viewId, activeSeconds);
+      }
+    }
+  }, 1000);
 
-  // Also try on visibility change (tab switch, phone lock)
+  // Listen for user activity
+  const events = ['mousemove', 'scroll', 'keydown', 'touchstart', 'click'];
+  events.forEach(e => window.addEventListener(e, onActivity, { passive: true }));
+
+  // Trigger initial activity
+  onActivity();
+
+  // Send on visibility change
   const onVisibilityChange = () => {
-    if (document.visibilityState === 'hidden') sendUpdate();
+    if (document.visibilityState === 'hidden') {
+      updateTimeSpent(viewId, activeSeconds);
+      isActive = false;
+    } else {
+      onActivity();
+    }
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
 
-  // Cleanup
   return () => {
-    clearInterval(interval);
+    clearInterval(countingInterval);
+    clearTimeout(activityTimeout);
+    events.forEach(e => window.removeEventListener(e, onActivity));
     document.removeEventListener('visibilitychange', onVisibilityChange);
-    sendUpdate(); // final send
+    updateTimeSpent(viewId, activeSeconds);
   };
 };
 
