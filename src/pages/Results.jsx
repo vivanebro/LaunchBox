@@ -94,12 +94,18 @@ export default function Results() {
     let idFromUrl = urlParams.get('packageId');
     setIsPreviewMode(isPreview);
     if (isPreview && idFromUrl) {
-      window.__analyticsViewId = null;
-      window.__analyticsPending = logPackageView(idFromUrl).then(viewId => {
-        window.__analyticsViewId = viewId;
-        const cleanup = startTimeTracking(viewId);
-        window.__analyticsCleanup = cleanup;
-        return viewId;
+      // Only track if viewer is NOT the owner (not logged in)
+      supabaseClient.auth.me().then(() => {
+        // logged in = owner, don't track
+      }).catch(() => {
+        // not logged in = real client, track it
+        window.__analyticsViewId = null;
+        window.__analyticsPending = logPackageView(idFromUrl).then(viewId => {
+          window.__analyticsViewId = viewId;
+          const cleanup = startTimeTracking(viewId);
+          window.__analyticsCleanup = cleanup;
+          return viewId;
+        });
       });
     }
     if (idFromUrl) {
@@ -2416,6 +2422,7 @@ export default function Results() {
                     }
                     const tierLabel = pkg.name || pkg.tier;
                     const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
+                    console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
                     const packageIdForClick = packageId;
                     const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
@@ -2524,6 +2531,7 @@ export default function Results() {
               }
               const tierLabel = pkg.name || pkg.tier;
               const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
+              console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
               const packageIdForClick = packageId;
               const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
@@ -2591,6 +2599,7 @@ export default function Results() {
                     }
                     const tierLabel = pkg.name || pkg.tier;
                     const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
+                    console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
                     const packageIdForClick = packageId;
                     const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
@@ -2690,6 +2699,7 @@ export default function Results() {
               }
               const tierLabel = pkg.name || pkg.tier;
               const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
+              console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
               const packageIdForClick = packageId;
               const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
