@@ -2416,7 +2416,8 @@ export default function Results() {
                     }
                     const tierLabel = pkg.name || pkg.tier;
                     const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
-                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel); };
+                    const packageIdForClick = packageId;
+                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
                   }}
@@ -2523,7 +2524,8 @@ export default function Results() {
               }
               const tierLabel = pkg.name || pkg.tier;
               const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
-              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel); };
+              const packageIdForClick = packageId;
+              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
             }}
@@ -2589,7 +2591,8 @@ export default function Results() {
                     }
                     const tierLabel = pkg.name || pkg.tier;
                     const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
-                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel); };
+                    const packageIdForClick = packageId;
+                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
                   }}
@@ -2687,7 +2690,8 @@ export default function Results() {
               }
               const tierLabel = pkg.name || pkg.tier;
               const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
-              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel); };
+              const packageIdForClick = packageId;
+              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
             }}

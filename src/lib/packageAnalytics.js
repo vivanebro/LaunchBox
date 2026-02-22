@@ -56,45 +56,63 @@ export const startTimeTracking = (viewId) => {
   };
 };
 
-export const logButtonClick = async (viewId, tier, tierLabel, modeLabel) => {
-  if (!viewId) return;
+export const logButtonClick = async (viewId, tier, tierLabel, modeLabel, packageId) => {
+  if (!viewId || !packageId) return;
   try {
-    await supabase.rpc('increment_click_count', {
+    await supabase.from('package_clicks').insert([{
+      package_id: packageId,
       view_id: viewId,
-      tier: tier,
+      tier,
       tier_label: tierLabel,
-      mode_label: modeLabel
-    });
+      pricing_mode_label: modeLabel
+    }]);
   } catch (e) { console.error('Analytics: failed to log button click', e); }
 };
 
 export const fetchAnalyticsForPackages = async (packageIds) => {
   if (!packageIds || packageIds.length === 0) return {};
   try {
-    const { data, error } = await supabase.from('package_views').select('*').in('package_id', packageIds).order('viewed_at', { ascending: false });
-    if (error) throw error;
+    const [viewsRes, clicksRes] = await Promise.all([
+      supabase.from('package_views').select('*').in('package_id', packageIds).order('viewed_at', { ascending: false }),
+      supabase.from('package_clicks').select('*').in('package_id', packageIds)
+    ]);
+    if (viewsRes.error) throw viewsRes.error;
+    const views = viewsRes.data || [];
+    const clicks = clicksRes.data || [];
+
     const result = {};
     for (const id of packageIds) {
-      const views = data.filter(v => v.package_id === id);
-      const clicks = views.filter(v => v.button_clicked);
-      const avgTime = views.length > 0 ? Math.round(views.reduce((sum, v) => sum + (v.time_spent_seconds || 0), 0) / views.length) : 0;
+      const pkgViews = views.filter(v => v.package_id === id);
+      const pkgClicks = clicks.filter(c => c.package_id === id);
+      const avgTime = pkgViews.length > 0
+        ? Math.round(pkgViews.reduce((sum, v) => sum + (v.time_spent_seconds || 0), 0) / pkgViews.length)
+        : 0;
       const now = new Date();
       const weeklyViews = Array(7).fill(0).map((_, i) => {
         const day = new Date(now); day.setDate(now.getDate() - (6 - i));
         const dayStr = day.toISOString().split('T')[0];
-        return views.filter(v => v.viewed_at?.startsWith(dayStr)).length;
+        return pkgViews.filter(v => v.viewed_at?.startsWith(dayStr)).length;
       });
       const tierClicks = {};
       const tierLabels = {};
-      for (const click of clicks) {
-        if (click.button_tier) {
-          tierClicks[click.button_tier] = (tierClicks[click.button_tier] || 0) + (click.click_count || 1);
-          if (click.clicked_tier_label) tierLabels[click.button_tier] = click.clicked_tier_label;
-        }
+      for (const click of pkgClicks) {
+        const key = click.tier || 'unknown';
+        tierClicks[key] = (tierClicks[key] || 0) + 1;
+        if (click.tier_label) tierLabels[key] = click.tier_label;
       }
       const deviceBreakdown = { mobile: 0, tablet: 0, desktop: 0 };
-      for (const v of views) { const d = v.device_type || 'desktop'; deviceBreakdown[d] = (deviceBreakdown[d] || 0) + 1; }
-      result[id] = { views: views.length, avgTime, clicks: clicks.length, lastViewed: views[0]?.viewed_at || null, tierClicks, tierLabels, deviceBreakdown, weeklyViews };
+      for (const v of pkgViews) { const d = v.device_type || 'desktop'; deviceBreakdown[d] = (deviceBreakdown[d] || 0) + 1; }
+
+      result[id] = {
+        views: pkgViews.length,
+        avgTime,
+        clicks: pkgClicks.length,
+        lastViewed: pkgViews[0]?.viewed_at || null,
+        tierClicks,
+        tierLabels,
+        deviceBreakdown,
+        weeklyViews
+      };
     }
     return result;
   } catch (e) { console.error('Analytics: failed to fetch analytics', e); return {}; }
