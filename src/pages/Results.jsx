@@ -2420,11 +2420,13 @@ export default function Results() {
                     if (!finalLink) {
                       e.preventDefault();
                     }
+                    const currentMode = getCurrentModeKey();
+                    const uniqueTierKey = `${pkg.tier}_${currentMode}`;
                     const tierLabel = pkg.name || pkg.tier;
                     const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
                     console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
                     const packageIdForClick = packageId;
-                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
+                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, uniqueTierKey, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
                   }}
@@ -2529,11 +2531,13 @@ export default function Results() {
               if (!finalLink) {
                 e.preventDefault();
               }
+              const currentMode = getCurrentModeKey();
+              const uniqueTierKey = `${pkg.tier}_${currentMode}`;
               const tierLabel = pkg.name || pkg.tier;
               const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
               console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
               const packageIdForClick = packageId;
-              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
+              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, uniqueTierKey, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
             }}
@@ -2597,11 +2601,13 @@ export default function Results() {
                     if (!finalLink) {
                       e.preventDefault();
                     }
+                    const currentMode = getCurrentModeKey();
+                    const uniqueTierKey = `${pkg.tier}_${currentMode}`;
                     const tierLabel = pkg.name || pkg.tier;
                     const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
                     console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
                     const packageIdForClick = packageId;
-                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
+                    const doClick = (viewId) => { if (viewId) logButtonClick(viewId, uniqueTierKey, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
                   }}
@@ -2697,11 +2703,13 @@ export default function Results() {
               if (!finalLink) {
                 e.preventDefault();
               }
+              const currentMode = getCurrentModeKey();
+              const uniqueTierKey = `${pkg.tier}_${currentMode}`;
               const tierLabel = pkg.name || pkg.tier;
               const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
               console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
               const packageIdForClick = packageId;
-              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, pkg.tier, tierLabel, modeLabel, packageIdForClick); };
+              const doClick = (viewId) => { if (viewId) logButtonClick(viewId, uniqueTierKey, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
             }}
