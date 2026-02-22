@@ -199,6 +199,37 @@ export default function MyPackages() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <AnimatePresence>
               {packages.map((pkg) => {
+                const a = analytics[pkg.id] || {};
+                const hoursAgo = a.lastViewed ? (Date.now() - new Date(a.lastViewed)) / 3600000 : Infinity;
+                const daysAgo = hoursAgo / 24;
+                const showNudge1 = a.clicks === 0 && hoursAgo > 24 && hoursAgo < 168;
+                const showNudge2 = daysAgo >= 7 && a.views > 0;
+                const showNudge3 = a.clicks === 0 && a.avgTime >= 120 && hoursAgo < 168;
+
+                const Nudge = ({ id, text, emoji }) => {
+                  const [dismissed, setDismissed] = React.useState(
+                    sessionStorage.getItem(id) === 'dismissed'
+                  );
+                  if (dismissed) return null;
+                  return (
+                    <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex items-start justify-between gap-2">
+                      <span className="text-xs text-amber-700 leading-relaxed">
+                        {emoji} {text}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sessionStorage.setItem(id, 'dismissed');
+                          setDismissed(true);
+                        }}
+                        className="text-amber-300 hover:text-amber-500 flex-shrink-0 text-lg leading-none mt-0.5"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                };
+
                 return (
                   <motion.div
                     key={pkg.id}
@@ -438,6 +469,29 @@ export default function MyPackages() {
                             {(new Date() - new Date(analytics[pkg.id].lastViewed)) < 7 * 24 * 60 * 60 * 1000 ? '🔥' : '😴'}
                           </div>
                         </div>
+                      )}
+
+                      {/* Nudges */}
+                      {showNudge3 && (
+                        <Nudge
+                          id={`nudge3_${pkg.id}`}
+                          emoji="📞"
+                          text="They spent over 2 minutes reading this but didn't click anything. They probably have questions, give them a call!"
+                        />
+                      )}
+                      {showNudge1 && !showNudge3 && (
+                        <Nudge
+                          id={`nudge1_${pkg.id}`}
+                          emoji="👋"
+                          text="They viewed this in the last 24 hours but didn't click anything. Now is the best time to reach out!"
+                        />
+                      )}
+                      {showNudge2 && (
+                        <Nudge
+                          id={`nudge2_${pkg.id}`}
+                          emoji="🔁"
+                          text="They haven't viewed this in over 7 days. It might be worth sending the link again!"
+                        />
                       )}
                     </div>
                   </motion.div>
