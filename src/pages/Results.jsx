@@ -79,6 +79,8 @@ export default function Results() {
   const [packageToDelete, setPackageToDelete] = useState(null);
   const [lastDeletedTier, setLastDeletedTier] = useState(null);
   const toggleEditRef = useRef(null);
+  const exportRef = React.useRef(null);
+  const [exporting, setExporting] = React.useState(false);
 
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
@@ -3285,7 +3287,7 @@ export default function Results() {
             transition={{ duration: 0.3 }}
             className="mb-12"
           >
-            {renderCurrentDesign()}
+            <div ref={exportRef}>{renderCurrentDesign()}</div>
 
             {packages.length < 4 && (
               <div className="flex justify-center mt-8">
@@ -3368,11 +3370,12 @@ export default function Results() {
 
         <div className="flex justify-center gap-4 flex-wrap">
           <button
-            onClick={() => exportPackageAsImages(config, config.package_set_name || config.business_name || 'package')}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
+            onClick={() => exportPackageAsImages(exportRef, config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting)}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
-            Export image
+            {exporting ? 'Exporting...' : 'Export image'}
           </button>
           <Button
             onClick={handleSave}

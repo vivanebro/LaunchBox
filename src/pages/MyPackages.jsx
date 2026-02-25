@@ -69,14 +69,10 @@ export default function MyPackages() {
     window.open(previewUrl, '_blank');
   };
 
-  const handleExport = async (pkg) => {
-    try {
-      const fullConfig = await supabaseClient.entities.PackageConfig.get(pkg.id);
-      await exportPackageAsImages(fullConfig, pkg.package_set_name || pkg.business_name || 'package');
-    } catch (e) {
-      console.error('Export failed', e);
-      alert('Export failed. Please try again.');
-    }
+  const handleExport = (pkg) => {
+    const previewUrl = `${window.location.origin}/results?id=${pkg.id}&preview=true`;
+    window.open(previewUrl, '_blank');
+    alert('The package will open in a new tab. Use the Export Image button there to download it.');
   };
 
   const handleCopyLink = async (pkg) => {
