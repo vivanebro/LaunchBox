@@ -2552,6 +2552,13 @@ export default function Results() {
               </div>
 
               <div className="mb-2">
+                {config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0 && (
+                  <div className="flex items-center justify-center mb-1">
+                    <span className="text-lg text-gray-400 line-through">
+                      {currencySymbol}{config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`].toLocaleString()}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-baseline gap-1 justify-center">
                   <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-2xl' : 'text-4xl'}`}>
                     {currencySymbol}{(pkg.price || 0).toLocaleString()}
@@ -2729,6 +2736,13 @@ export default function Results() {
               </div>
 
               <div className="mb-4">
+                {config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0 && (
+                  <div className="flex items-center justify-center mb-1">
+                    <span className="text-lg text-white/50 line-through">
+                      {currencySymbol}{config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`].toLocaleString()}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-baseline gap-1 justify-center">
                   <div className={`font-bold ${previewPackages.length === 4 ? 'text-3xl' : 'text-5xl'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</div>
                   <span className={`text-white/70 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
