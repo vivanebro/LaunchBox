@@ -1757,7 +1757,7 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'md:grid-cols-1 max-w-2xl mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         
@@ -2068,7 +2068,7 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'md:grid-cols-1 max-w-2xl mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
 
