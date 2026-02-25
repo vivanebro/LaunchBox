@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import supabaseClient from '@/lib/supabaseClient';
 import { Trash2, Edit, Loader2, Package as PackageIcon, AlertCircle, Eye, Share2, Copy, Check, X, Code, Download } from 'lucide-react';
-import { exportPackageAsImages } from '@/lib/exportPackageImage';
+import { exportFromConfig } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { fetchAnalyticsForPackages } from '@/lib/packageAnalytics';
@@ -69,10 +69,14 @@ export default function MyPackages() {
     window.open(previewUrl, '_blank');
   };
 
-  const handleExport = (pkg) => {
-    const previewUrl = `${window.location.origin}/results?id=${pkg.id}&preview=true`;
-    window.open(previewUrl, '_blank');
-    alert('The package will open in a new tab. Use the Export Image button there to download it.');
+  const handleExport = async (pkg) => {
+    try {
+      const fullConfig = await supabaseClient.entities.PackageConfig.get(pkg.id);
+      await exportFromConfig(fullConfig, pkg.package_set_name || pkg.business_name || 'package');
+    } catch (e) {
+      console.error('Export failed', e);
+      alert('Export failed. Please try again.');
+    }
   };
 
   const handleCopyLink = async (pkg) => {
