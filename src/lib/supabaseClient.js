@@ -44,6 +44,8 @@ const TABLE_COLUMNS = {
     'package_descriptions', 'button_links', 'active_packages',
     'core_deliverables', 'extras_bonuses', 'niches',
     'currentDesign', 'pricingMode', 'popularPackageIndex', 'popularBadgeText',
+    'original_price_starter', 'original_price_growth', 'original_price_premium', 'original_price_elite',
+    'original_price_starter_retainer', 'original_price_growth_retainer', 'original_price_premium_retainer', 'original_price_elite_retainer',
   ]),
   users: new Set([
     'id', 'email', 'full_name', 'role', 'created_date', 'updated_date',
