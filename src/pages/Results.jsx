@@ -1888,17 +1888,16 @@ export default function Results() {
                   </div>
                 </div>
                 
-                <div className="mb-2">
+                <div className="mb-2 group/origprice">
                   {/* Original/strikethrough price */}
-                  {/* Original/strikethrough price */}
-                  <div className="h-8 flex items-center justify-center mb-1 group/origprice">
+                  <div className="h-8 flex items-center justify-center mb-1">
                     {originalPrice > 0 ? (
                       <div className="flex items-center gap-2">
                         <span className="text-lg text-gray-400 line-through">
                           ${originalPrice.toLocaleString()}
                         </span>
                         <button
-                          onClick={() => updateConfig(originalPriceKey, null)}
+                          onClick={() => { updateConfig(originalPriceKey, null); setTimeout(() => handleSave(), 300); }}
                           className="opacity-0 group-hover/origprice:opacity-100 text-xs text-red-400 hover:text-red-600 transition-opacity"
                         >
                           ✕
@@ -1906,7 +1905,7 @@ export default function Results() {
                       </div>
                     ) : !isPreviewMode ? (
                       <button
-                        onClick={() => updateConfig(originalPriceKey, Math.round(pkg.price * 1.2))}
+                        onClick={() => { updateConfig(originalPriceKey, Math.round(pkg.price * 1.2)); setTimeout(() => handleSave(), 300); }}
                         className="opacity-0 group-hover/origprice:opacity-100 text-xs text-gray-400 hover:text-gray-600 underline transition-opacity"
                       >
                         + Add original price
@@ -2222,16 +2221,16 @@ export default function Results() {
                   </div>
                 </div>
                 
-                <div className="mb-6">
+                <div className="mb-6 group/origprice">
                   {/* Original/strikethrough price */}
-                  <div className="h-8 flex items-center justify-center mb-1 group/origprice">
+                  <div className="h-8 flex items-center justify-center mb-1">
                     {originalPrice > 0 ? (
                       <div className="flex items-center gap-2">
                         <span className="text-lg text-white/50 line-through">
                           ${originalPrice.toLocaleString()}
                         </span>
                         <button
-                          onClick={() => updateConfig(originalPriceKey, null)}
+                          onClick={() => { updateConfig(originalPriceKey, null); setTimeout(() => handleSave(), 300); }}
                           className="opacity-0 group-hover/origprice:opacity-100 text-xs text-red-300 hover:text-red-100 transition-opacity"
                         >
                           ✕
@@ -2239,7 +2238,7 @@ export default function Results() {
                       </div>
                     ) : !isPreviewMode ? (
                       <button
-                        onClick={() => updateConfig(originalPriceKey, Math.round(pkg.price * 1.2))}
+                        onClick={() => { updateConfig(originalPriceKey, Math.round(pkg.price * 1.2)); setTimeout(() => handleSave(), 300); }}
                         className="opacity-0 group-hover/origprice:opacity-100 text-xs text-white/40 hover:text-white/70 underline transition-opacity"
                       >
                         + Add original price
