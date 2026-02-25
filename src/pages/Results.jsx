@@ -1887,6 +1887,38 @@ export default function Results() {
                 </div>
                 
                 <div className="mb-2">
+                  {/* Original/strikethrough price */}
+                  {(config[`original_price_${tierName}`] || (!isPreviewMode && config[`original_price_${tierName}`] !== undefined)) && (
+                    <div className="flex items-center justify-center mb-1">
+                      <EditablePrice
+                        value={config[`original_price_${tierName}`] || 0}
+                        onSave={(val) => updateConfig(`original_price_${tierName}`, val)}
+                        className="text-lg text-gray-400 line-through inline-block"
+                        darkMode={false}
+                        brandColor={brandColor}
+                      />
+                    </div>
+                  )}
+                  {!isPreviewMode && !config[`original_price_${tierName}`] && (
+                    <div className="text-center mb-1">
+                      <button
+                        onClick={() => updateConfig(`original_price_${tierName}`, Math.round(pkg.price * 1.2))}
+                        className="text-xs text-gray-400 hover:text-gray-600 underline"
+                      >
+                        + Add original price
+                      </button>
+                    </div>
+                  )}
+                  {!isPreviewMode && config[`original_price_${tierName}`] > 0 && (
+                    <div className="text-center mb-1">
+                      <button
+                        onClick={() => updateConfig(`original_price_${tierName}`, null)}
+                        className="text-xs text-gray-400 hover:text-red-400 underline"
+                      >
+                        Remove original price
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-1 justify-center">
                     <EditablePrice
                       value={pkg.price}
@@ -2195,6 +2227,38 @@ export default function Results() {
                 </div>
                 
                 <div className="mb-6">
+                  {/* Original/strikethrough price */}
+                  {(config[`original_price_${tierName}`] || (!isPreviewMode && config[`original_price_${tierName}`] !== undefined)) && (
+                    <div className="flex items-center justify-center mb-1">
+                      <EditablePrice
+                        value={config[`original_price_${tierName}`] || 0}
+                        onSave={(val) => updateConfig(`original_price_${tierName}`, val)}
+                        className="text-lg text-white/50 line-through inline-block"
+                        darkMode={true}
+                        brandColor={brandColor}
+                      />
+                    </div>
+                  )}
+                  {!isPreviewMode && !config[`original_price_${tierName}`] && (
+                    <div className="text-center mb-1">
+                      <button
+                        onClick={() => updateConfig(`original_price_${tierName}`, Math.round(pkg.price * 1.2))}
+                        className="text-xs text-white/40 hover:text-white/70 underline"
+                      >
+                        + Add original price
+                      </button>
+                    </div>
+                  )}
+                  {!isPreviewMode && config[`original_price_${tierName}`] > 0 && (
+                    <div className="text-center mb-1">
+                      <button
+                        onClick={() => updateConfig(`original_price_${tierName}`, null)}
+                        className="text-xs text-white/40 hover:text-red-300 underline"
+                      >
+                        Remove original price
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-1 justify-center">
                     <EditablePrice
                       value={pkg.price}
