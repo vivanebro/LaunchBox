@@ -960,15 +960,28 @@ export default function Results() {
 
   const silentSave = async () => {
     try {
+      if (!packageId) return;
       const latestConfig = configRef.current || config;
-      const { id: _id, created_date, updated_date, created_by, ...configToSave } = latestConfig;
+      const {
+        id: _id,
+        created_date,
+        updated_date,
+        created_by,
+        created_by_id,
+        entity_name,
+        app_id,
+        is_sample,
+        is_deleted,
+        deleted_date,
+        environment,
+        ...configToSave
+      } = latestConfig;
       configToSave.currentDesign = currentDesign;
       configToSave.pricingMode = pricingMode;
       configToSave.popularPackageIndex = popularPackageIndex;
       configToSave.popularBadgeText = popularBadgeText;
-      if (packageId) {
-        await supabaseClient.entities.PackageConfig.update(packageId, configToSave);
-      }
+      await supabaseClient.entities.PackageConfig.update(packageId, configToSave);
+      console.log('Silent save success');
     } catch (e) {
       console.error('Silent save failed', e);
     }
