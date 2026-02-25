@@ -2452,6 +2452,9 @@ export default function Results() {
             const renderPreviewDesign1 = () => {
     const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
+    const hasAnyOriginalPrice = previewPackages.some(p =>
+      config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
+    );
 
     return (
               <div className={`grid gap-4 ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
@@ -2461,8 +2464,8 @@ export default function Results() {
         const trimmedLink = buttonLink?.trim() || '';
         const hasValidLink = trimmedLink !== '';
         const finalLink = hasValidLink ? (
-          trimmedLink.startsWith('http://') || trimmedLink.startsWith('https://') 
-            ? trimmedLink 
+          trimmedLink.startsWith('http://') || trimmedLink.startsWith('https://')
+            ? trimmedLink
             : `https://${trimmedLink}`
         ) : null;
 
@@ -2552,11 +2555,13 @@ export default function Results() {
               </div>
 
               <div className="mb-2">
-                {config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0 && (
-                  <div className="flex items-center justify-center mb-1">
-                    <span className="text-lg text-gray-400 line-through">
-                      {currencySymbol}{config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`].toLocaleString()}
-                    </span>
+                {hasAnyOriginalPrice && (
+                  <div className="h-7 flex items-center justify-center mb-1">
+                    {config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0 && (
+                      <span className="text-lg text-gray-400 line-through">
+                        {currencySymbol}{config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`].toLocaleString()}
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="flex items-baseline gap-1 justify-center">
@@ -2644,6 +2649,9 @@ export default function Results() {
   const renderPreviewDesign2 = () => {
     const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
+    const hasAnyOriginalPrice = previewPackages.some(p =>
+      config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
+    );
 
     return (
     <div className={`grid gap-4 ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
@@ -2736,11 +2744,13 @@ export default function Results() {
               </div>
 
               <div className="mb-4">
-                {config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0 && (
-                  <div className="flex items-center justify-center mb-1">
-                    <span className="text-lg text-white/50 line-through">
-                      {currencySymbol}{config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`].toLocaleString()}
-                    </span>
+                {hasAnyOriginalPrice && (
+                  <div className="h-7 flex items-center justify-center mb-1">
+                    {config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0 && (
+                      <span className="text-lg text-white/50 line-through">
+                        {currencySymbol}{config[`original_price_${pkg.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`].toLocaleString()}
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="flex items-baseline gap-1 justify-center">
