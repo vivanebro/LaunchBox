@@ -2375,7 +2375,7 @@ export default function Results() {
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
 
     return (
-              <div className={`grid gap-4 ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+              <div className={`grid gap-4 ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
                 {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
@@ -2560,7 +2560,7 @@ export default function Results() {
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
 
     return (
-    <div className={`grid gap-4 ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-4 ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
