@@ -76,6 +76,7 @@ export default function Results() {
   const [tempLabelRetainer, setTempLabelRetainer] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [packageToDelete, setPackageToDelete] = useState(null);
+  const [lastDeletedTier, setLastDeletedTier] = useState(null);
   const toggleEditRef = useRef(null);
 
   const brandColor = config?.brand_color || '#ff0044';
@@ -1055,13 +1056,14 @@ export default function Results() {
     const currentConfig = configRef.current || config;
     const currentActive = currentConfig.active_packages?.[modeKey] || ['starter', 'growth', 'premium'];
 
-    if (currentActive.length <= 2) {
+    if (currentActive.length <= 1) {
       setShowDeleteModal(false);
       setPackageToDelete(null);
       return;
     }
 
     const updatedActive = currentActive.filter(t => t !== tierToDelete);
+    setLastDeletedTier(tierToDelete);
 
     const updatedActivePackages = {
       onetime: modeKey === 'onetime' ? updatedActive : (currentConfig.active_packages?.onetime || ['starter', 'growth', 'premium']),
@@ -1102,7 +1104,9 @@ export default function Results() {
     }
 
     const availableTiers = ['starter', 'growth', 'premium', 'elite'];
-    const nextTier = availableTiers.find(t => !currentActive.includes(t));
+    const nextTier = (lastDeletedTier && !currentActive.includes(lastDeletedTier))
+      ? lastDeletedTier
+      : availableTiers.find(t => !currentActive.includes(t));
 
     if (nextTier) {
       const updatedActive = [...currentActive, nextTier];
@@ -1753,7 +1757,7 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'md:grid-cols-1 max-w-2xl mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         
@@ -1768,7 +1772,7 @@ export default function Results() {
             }`}
             style={pkg.popular ? { borderColor: brandColor } : {}}
           >
-            {packages.length > 2 && (
+            {packages.length > 1 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2064,7 +2068,7 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'md:grid-cols-1 max-w-2xl mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
 
@@ -2081,7 +2085,7 @@ export default function Results() {
             }`}
             style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})` } : {}}
           >
-            {packages.length > 2 && (
+            {packages.length > 1 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
