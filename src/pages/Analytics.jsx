@@ -121,7 +121,7 @@ export default function Analytics() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
               <StatCard icon={Eye} label="Total Views" value={totalViews} sub="All time" color="#ff0044" />
               <StatCard icon={MousePointerClick} label="Button Clicks" value={totalClicks} sub="Get Started clicks" color="#6366f1" />
-              <StatCard icon={Clock} label="Total Time on Page" value={formatTime(Object.values(analytics).reduce((s,a) => s + (a.avgTime||0), 0))} sub="Across all packages" color="#f59e0b" />
+              <StatCard icon={Clock} label="Avg Time on Page" value={formatTime(avgTimeAll)} sub="Across all packages" color="#f59e0b" />
               <StatCard icon={TrendingUp} label="Views This Week" value={weeklyTotal} sub={`${hotPackages.length} hot packages 🔥`} color="#10b981" />
             </div>
 
@@ -170,7 +170,7 @@ export default function Analytics() {
                         </div>
                         <div className="text-center">
                           <p className="text-xl font-bold text-gray-900">{formatTime(a.avgTime)}</p>
-                          <p className="text-xs text-gray-400">Time spent</p>
+                          <p className="text-xs text-gray-400">Avg time</p>
                         </div>
                         <div className="text-center">
                           <p className="text-xl font-bold text-gray-900">{a.clicks || 0}</p>
