@@ -1760,7 +1760,9 @@ export default function Results() {
     <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
-        
+        const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
+        const originalPrice = config[originalPriceKey];
+
         return (
           <motion.div
             key={index}
@@ -1888,37 +1890,29 @@ export default function Results() {
                 
                 <div className="mb-2">
                   {/* Original/strikethrough price */}
-                  {(config[`original_price_${tierName}`] || (!isPreviewMode && config[`original_price_${tierName}`] !== undefined)) && (
-                    <div className="flex items-center justify-center mb-1">
-                      <EditablePrice
-                        value={config[`original_price_${tierName}`] || 0}
-                        onSave={(val) => updateConfig(`original_price_${tierName}`, val)}
-                        className="text-lg text-gray-400 line-through inline-block"
-                        darkMode={false}
-                        brandColor={brandColor}
-                      />
-                    </div>
-                  )}
-                  {!isPreviewMode && !config[`original_price_${tierName}`] && (
-                    <div className="text-center mb-1">
+                  {/* Original/strikethrough price */}
+                  <div className="h-8 flex items-center justify-center mb-1 group/origprice">
+                    {originalPrice > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg text-gray-400 line-through">
+                          ${originalPrice.toLocaleString()}
+                        </span>
+                        <button
+                          onClick={() => updateConfig(originalPriceKey, null)}
+                          className="opacity-0 group-hover/origprice:opacity-100 text-xs text-red-400 hover:text-red-600 transition-opacity"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : !isPreviewMode ? (
                       <button
-                        onClick={() => updateConfig(`original_price_${tierName}`, Math.round(pkg.price * 1.2))}
-                        className="text-xs text-gray-400 hover:text-gray-600 underline"
+                        onClick={() => updateConfig(originalPriceKey, Math.round(pkg.price * 1.2))}
+                        className="opacity-0 group-hover/origprice:opacity-100 text-xs text-gray-400 hover:text-gray-600 underline transition-opacity"
                       >
                         + Add original price
                       </button>
-                    </div>
-                  )}
-                  {!isPreviewMode && config[`original_price_${tierName}`] > 0 && (
-                    <div className="text-center mb-1">
-                      <button
-                        onClick={() => updateConfig(`original_price_${tierName}`, null)}
-                        className="text-xs text-gray-400 hover:text-red-400 underline"
-                      >
-                        Remove original price
-                      </button>
-                    </div>
-                  )}
+                    ) : <div />}
+                  </div>
                   <div className="flex items-baseline gap-1 justify-center">
                     <EditablePrice
                       value={pkg.price}
@@ -2103,6 +2097,8 @@ export default function Results() {
     <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
+        const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
+        const originalPrice = config[originalPriceKey];
 
         return (
           <motion.div
@@ -2228,37 +2224,28 @@ export default function Results() {
                 
                 <div className="mb-6">
                   {/* Original/strikethrough price */}
-                  {(config[`original_price_${tierName}`] || (!isPreviewMode && config[`original_price_${tierName}`] !== undefined)) && (
-                    <div className="flex items-center justify-center mb-1">
-                      <EditablePrice
-                        value={config[`original_price_${tierName}`] || 0}
-                        onSave={(val) => updateConfig(`original_price_${tierName}`, val)}
-                        className="text-lg text-white/50 line-through inline-block"
-                        darkMode={true}
-                        brandColor={brandColor}
-                      />
-                    </div>
-                  )}
-                  {!isPreviewMode && !config[`original_price_${tierName}`] && (
-                    <div className="text-center mb-1">
+                  <div className="h-8 flex items-center justify-center mb-1 group/origprice">
+                    {originalPrice > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg text-white/50 line-through">
+                          ${originalPrice.toLocaleString()}
+                        </span>
+                        <button
+                          onClick={() => updateConfig(originalPriceKey, null)}
+                          className="opacity-0 group-hover/origprice:opacity-100 text-xs text-red-300 hover:text-red-100 transition-opacity"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : !isPreviewMode ? (
                       <button
-                        onClick={() => updateConfig(`original_price_${tierName}`, Math.round(pkg.price * 1.2))}
-                        className="text-xs text-white/40 hover:text-white/70 underline"
+                        onClick={() => updateConfig(originalPriceKey, Math.round(pkg.price * 1.2))}
+                        className="opacity-0 group-hover/origprice:opacity-100 text-xs text-white/40 hover:text-white/70 underline transition-opacity"
                       >
                         + Add original price
                       </button>
-                    </div>
-                  )}
-                  {!isPreviewMode && config[`original_price_${tierName}`] > 0 && (
-                    <div className="text-center mb-1">
-                      <button
-                        onClick={() => updateConfig(`original_price_${tierName}`, null)}
-                        className="text-xs text-white/40 hover:text-red-300 underline"
-                      >
-                        Remove original price
-                      </button>
-                    </div>
-                  )}
+                    ) : <div />}
+                  </div>
                   <div className="flex items-baseline gap-1 justify-center">
                     <EditablePrice
                       value={pkg.price}
