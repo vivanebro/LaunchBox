@@ -122,12 +122,15 @@ export default function Analytics() {
   };
 
   const AnimatedNumber = ({ value }) => {
-    const [display, setDisplay] = React.useState(0);
+    const [display, setDisplay] = React.useState(value || 0);
+    const prevValue = React.useRef(value);
+
     React.useEffect(() => {
+      if (prevValue.current === value) return;
+      prevValue.current = value;
       const target = value || 0;
-      if (target === 0) { setDisplay(0); return; }
-      let start = 0;
-      const step = Math.ceil(target / 20);
+      let start = display;
+      const step = Math.ceil(Math.abs(target - start) / 20);
       const timer = setInterval(() => {
         start += step;
         if (start >= target) { setDisplay(target); clearInterval(timer); }
@@ -135,6 +138,7 @@ export default function Analytics() {
       }, 30);
       return () => clearInterval(timer);
     }, [value]);
+
     return <>{display}</>;
   };
 
