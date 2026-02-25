@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download } from 'lucide-react';
-import { exportFromResultsPage } from '@/lib/exportPackageImage';
+import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 import { logPackageView, startTimeTracking, logButtonClick } from '@/lib/packageAnalytics';
@@ -3370,7 +3370,7 @@ export default function Results() {
 
         <div className="flex justify-center gap-4 flex-wrap">
           <button
-            onClick={() => exportFromResultsPage(exportRef, config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, setPricingMode)}
+            onClick={() => exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, setPricingMode })}
             disabled={exporting}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
           >

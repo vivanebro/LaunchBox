@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import supabaseClient from '@/lib/supabaseClient';
-import { Trash2, Edit, Loader2, Package as PackageIcon, AlertCircle, Eye, Share2, Copy, Check, X, Code, Download } from 'lucide-react';
-import { exportFromConfig } from '@/lib/exportPackageImage';
+import { Trash2, Edit, Loader2, Package as PackageIcon, AlertCircle, Eye, Share2, Copy, Check, X, Code } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { fetchAnalyticsForPackages } from '@/lib/packageAnalytics';
@@ -67,16 +66,6 @@ export default function MyPackages() {
     localStorage.setItem('packageConfig', JSON.stringify(pkg));
     const previewUrl = createPageUrl('Results') + `?preview=true&packageId=${pkg.id}`;
     window.open(previewUrl, '_blank');
-  };
-
-  const handleExport = async (pkg) => {
-    try {
-      const fullConfig = await supabaseClient.entities.PackageConfig.get(pkg.id);
-      await exportFromConfig(fullConfig, pkg.package_set_name || pkg.business_name || 'package');
-    } catch (e) {
-      console.error('Export failed', e);
-      alert('Export failed. Please try again.');
-    }
   };
 
   const handleCopyLink = async (pkg) => {
@@ -369,23 +358,7 @@ export default function MyPackages() {
                           </Button>
                         </div>
 
-                        <div className="grid grid-cols-5 gap-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                onClick={() => handleExport(pkg)}
-                                variant="outline"
-                                className="h-10 border-2 border-purple-200 text-purple-600 hover:bg-purple-50 rounded-full text-sm"
-                                title="Export as image"
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Export image</p>
-                            </TooltipContent>
-                          </Tooltip>
-
+                        <div className="grid grid-cols-4 gap-2">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
