@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
@@ -1087,31 +1087,41 @@ export default function Results() {
   // Available package tiers
   const availableTiers = ['starter', 'growth', 'premium', 'elite'];
   const activePackages = config.active_packages?.[modeKey] || ['starter', 'growth', 'premium'];
+  const getPackageDescription = (tier, fallback) => {
+    const descriptions = config.package_descriptions?.[modeKey];
+    if (!descriptions || typeof descriptions !== 'object') return fallback;
+
+    if (Object.prototype.hasOwnProperty.call(descriptions, tier)) {
+      return descriptions[tier] === null ? null : (descriptions[tier] ?? fallback);
+    }
+
+    return fallback;
+  };
 
   const packages = activePackages.map((tier, index) => {
     const tierData = {
       starter: {
         name: config.package_names?.[modeKey]?.starter || 'Starter',
         price: pricingMode === 'one-time' ? config.price_starter : config.price_starter_retainer,
-        description: config.package_descriptions?.[modeKey]?.starter || 'For individuals just starting out who need essential features',
+        description: getPackageDescription('starter', 'For individuals just starting out who need essential features'),
         duration: config.package_durations?.[modeKey]?.starter || getDurationForTier('starter')
       },
       growth: {
         name: config.package_names?.[modeKey]?.growth || 'Growth',
         price: pricingMode === 'one-time' ? config.price_growth : config.price_growth_retainer,
-        description: config.package_descriptions?.[modeKey]?.growth || 'For growing businesses that want to scale their content',
+        description: getPackageDescription('growth', 'For growing businesses that want to scale their content'),
         duration: config.package_durations?.[modeKey]?.growth || getDurationForTier('growth')
       },
       premium: {
         name: config.package_names?.[modeKey]?.premium || 'Premium',
         price: pricingMode === 'one-time' ? config.price_premium : config.price_premium_retainer,
-        description: config.package_descriptions?.[modeKey]?.premium || 'For established brands that need complete solutions',
+        description: getPackageDescription('premium', 'For established brands that need complete solutions'),
         duration: config.package_durations?.[modeKey]?.premium || getDurationForTier('premium')
       },
       elite: {
         name: config.package_names?.[modeKey]?.elite || 'Elite',
         price: pricingMode === 'one-time' ? (config.price_elite || 0) : (config.price_elite_retainer || 0),
-        description: config.package_descriptions?.[modeKey]?.elite || 'For enterprise clients that need the ultimate solution',
+        description: getPackageDescription('elite', 'For enterprise clients that need the ultimate solution'),
         duration: config.package_durations?.[modeKey]?.elite || getDurationForTier('elite')
       }
     }[tier];
@@ -1310,7 +1320,7 @@ export default function Results() {
         }}
       >
         {value || <span className="text-gray-400 italic">{placeholder}</span>}
-        <Edit2 className={`w-3 h-3 absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
+        <Edit2 className={`w-4 h-4 absolute right-3 -top-1 opacity-0 group-hover:opacity-100 ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
       </div>
     );
   };
@@ -2045,19 +2055,42 @@ export default function Results() {
                   </p>
                 )}
 
-                <div 
-                  className="mb-6 p-4 rounded-xl"
-                  style={{ backgroundColor: `${brandColor}15` }}
-                >
-                  <EditableText
-                    value={pkg.description}
-                    onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                    className="text-sm text-gray-700"
-                    multiline={true}
-                    placeholder="Describe who this package is best for"
-                    brandColor={brandColor}
-                  />
-                </div>
+                {pkg.description !== null ? (
+                  <div
+                    className="mb-6 p-4 rounded-xl relative group/desc"
+                    style={{ backgroundColor: `${brandColor}15` }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updatePackageDescription(tierName, null);
+                      }}
+                      className="absolute top-2 right-2 opacity-0 group-hover/desc:opacity-100 transition-opacity text-red-400 hover:text-red-600"
+                      title="Delete description"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <EditableText
+                      value={pkg.description}
+                      onSave={(newValue) => updatePackageDescription(tierName, newValue)}
+                      className="text-sm text-gray-700"
+                      multiline={true}
+                      placeholder="Describe who this package is best for"
+                      brandColor={brandColor}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updatePackageDescription(tierName, '');
+                    }}
+                    className="mb-6 text-sm font-medium underline"
+                    style={{ color: brandColor }}
+                  >
+                    + Add description
+                  </button>
+                )}
 
                 <div className={`space-y-3 mb-6`}>
                   <p className="text-sm font-semibold text-gray-500 uppercase">Deliverables</p>
@@ -2380,20 +2413,42 @@ export default function Results() {
                   </p>
                 )}
 
-                <div 
-                  className="mb-6 p-4 rounded-xl"
-                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-                >
-                  <EditableText
-                    value={pkg.description}
-                    onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                    className="text-sm text-white"
-                    multiline={true}
-                    placeholder="Describe who this package is best for"
-                    darkMode={true}
-                    brandColor={brandColor}
-                  />
-                </div>
+                {pkg.description !== null ? (
+                  <div
+                    className="mb-6 p-4 rounded-xl relative group/desc"
+                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updatePackageDescription(tierName, null);
+                      }}
+                      className="absolute top-2 right-2 opacity-0 group-hover/desc:opacity-100 transition-opacity text-red-200 hover:text-red-100"
+                      title="Delete description"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <EditableText
+                      value={pkg.description}
+                      onSave={(newValue) => updatePackageDescription(tierName, newValue)}
+                      className="text-sm text-white"
+                      multiline={true}
+                      placeholder="Describe who this package is best for"
+                      darkMode={true}
+                      brandColor={brandColor}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updatePackageDescription(tierName, '');
+                    }}
+                    className="mb-6 text-sm font-medium underline text-white/80 hover:text-white"
+                  >
+                    + Add description
+                  </button>
+                )}
 
                 <div className={`space-y-3 mb-6`}>
                   <p className="text-sm font-semibold text-white/70 uppercase">Deliverables</p>
@@ -2635,12 +2690,14 @@ export default function Results() {
                 </p>
               )}
 
-              <div 
-                className={`p-3 rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
-                style={{ backgroundColor: `${brandColor}15` }}
-              >
-                <p className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
-              </div>
+              {pkg.description !== null && (
+                <div
+                  className={`p-3 rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
+                  style={{ backgroundColor: `${brandColor}15` }}
+                >
+                  <p className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
+                </div>
+              )}
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
@@ -2818,12 +2875,14 @@ export default function Results() {
                 </p>
               )}
 
-              <div 
-                className={`rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-              >
-                <p className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
-              </div>
+              {pkg.description !== null && (
+                <div
+                  className={`rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
+                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+                >
+                  <p className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
+                </div>
+              )}
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
