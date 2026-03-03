@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
@@ -38,6 +39,8 @@ const roundToNearest50IfNeeded = (price) => {
   }
   return Math.ceil(price / 50) * 50;
 };
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Currency symbol helper
 const getCurrencySymbol = (currency) => {
@@ -81,6 +84,8 @@ export default function Results() {
   const toggleEditRef = useRef(null);
   const exportRef = React.useRef(null);
   const [exporting, setExporting] = React.useState(false);
+  const [exportingPdf, setExportingPdf] = React.useState(false);
+  const [showPdfOptions, setShowPdfOptions] = React.useState(false);
 
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
@@ -1162,6 +1167,12 @@ export default function Results() {
   };
 
   const previewPackages = packages;
+  const disablePreviewAnimations = isPreviewMode || exporting || exportingPdf;
+  const getPreviewMotionProps = (index) => (
+    disablePreviewAnimations
+      ? { initial: false, animate: { opacity: 1, y: 0 }, transition: { duration: 0 } }
+      : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { delay: index * 0.1 } }
+  );
 
   const EditableText = ({ value, onSave, className, multiline, placeholder, darkMode, brandColor }) => {
     const safeValue = value || '';
@@ -2476,9 +2487,7 @@ export default function Results() {
           return (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              {...getPreviewMotionProps(index)}
               className={`relative bg-white rounded-3xl border-2 border-gray-200 shadow-lg flex flex-col ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
             >
               <div className={`flex-grow flex flex-col items-center justify-center ${previewPackages.length === 4 ? 'py-6' : 'py-12'}`}>
@@ -2530,9 +2539,7 @@ export default function Results() {
         return (
         <motion.div
           key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
+          {...getPreviewMotionProps(index)}
           className={`relative bg-white rounded-3xl border-2 flex flex-col ${
             pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
           } ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
@@ -2673,9 +2680,7 @@ export default function Results() {
           return (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              {...getPreviewMotionProps(index)}
               className={`relative rounded-3xl text-white shadow-2xl flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
             >
               <div className={`flex-grow flex flex-col items-center justify-center ${previewPackages.length === 4 ? 'py-6' : 'py-12'}`}>
@@ -2723,9 +2728,7 @@ export default function Results() {
         return (
         <motion.div
           key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
+          {...getPreviewMotionProps(index)}
           className={`relative rounded-3xl text-white shadow-2xl flex flex-col ${
             pkg.popular
               ? ''
@@ -2855,6 +2858,28 @@ export default function Results() {
     return (
       <div className="min-h-screen py-6 md:py-12" style={{ backgroundColor: '#F5F5F7' }}>
         <div className="max-w-7xl mx-auto px-4 md:px-6">
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={() =>
+                exportPackageAsImages({
+                  exportRef,
+                  packageName: config.package_set_name || config.business_name || 'package',
+                  config,
+                  pricingMode,
+                  setExporting,
+                  setIsPreviewMode,
+                  setPricingMode
+                })
+              }
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              {exporting ? 'Exporting...' : 'Download image'}
+            </button>
+          </div>
+
+          <div ref={exportRef}>
           <div className="text-center">
             {config.logo_url && (
               <img 
@@ -2913,6 +2938,7 @@ export default function Results() {
               <p className="text-sm text-gray-700 italic">{config.urgency}</p>
             )}
           </div>
+          </div>
         </div>
       </div>
     );
@@ -2937,6 +2963,113 @@ export default function Results() {
       localStorage.setItem('editingPackageId', packageId);
     }
     window.location.href = createPageUrl('PackageBuilder');
+  };
+
+  const downloadAsPdf = async (orientation = 'portrait') => {
+    if (!exportRef?.current) return;
+
+    const safeName = (config?.package_set_name || config?.business_name || 'package')
+      .replace(/[^a-z0-9]/gi, '_')
+      .toLowerCase();
+
+    setExportingPdf(true);
+    try {
+      // Match PNG export behavior exactly by capturing preview-mode UI.
+      const wasPreviewMode = isPreviewMode;
+      if (!wasPreviewMode) {
+        setIsPreviewMode(true);
+        await wait(300);
+      }
+
+      const imgData = await toPng(exportRef.current, { pixelRatio: 2 });
+      const [{ jsPDF }] = await Promise.all([import('jspdf')]);
+
+      const image = new Image();
+      const imageLoaded = new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+      });
+      image.src = imgData;
+      await imageLoaded;
+
+      const pdfOrientation = orientation === 'landscape' ? 'l' : 'p';
+      const pdf = new jsPDF(pdfOrientation, 'mm', 'a4');
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const contentWidthMm = pageWidth - margin * 2;
+      const contentHeightMm = pageHeight - margin * 2;
+
+      if (orientation === 'landscape') {
+        // Always keep landscape export on a single page without cropping.
+        const scale = Math.min(contentWidthMm / image.width, contentHeightMm / image.height);
+        const renderWidth = image.width * scale;
+        const renderHeight = image.height * scale;
+        const x = margin + (contentWidthMm - renderWidth) / 2;
+        const y = margin + (contentHeightMm - renderHeight) / 2;
+        pdf.addImage(imgData, 'PNG', x, y, renderWidth, renderHeight);
+        pdf.save(`${safeName}_${orientation}.pdf`);
+        return;
+      }
+
+      const fullRenderHeightMm = (image.height * contentWidthMm) / image.width;
+
+      // If it fits on one page, render once with original proportions.
+      if (fullRenderHeightMm <= contentHeightMm) {
+        const y = margin + (contentHeightMm - fullRenderHeightMm) / 2;
+        pdf.addImage(imgData, 'PNG', margin, y, contentWidthMm, fullRenderHeightMm);
+      } else {
+        // Slice into multiple pages instead of squeezing vertically.
+        const pxPerMm = image.width / contentWidthMm;
+        const pageSliceHeightPx = Math.floor(contentHeightMm * pxPerMm);
+        let renderedHeightPx = 0;
+        let pageIndex = 0;
+
+        while (renderedHeightPx < image.height) {
+          const remainingPx = image.height - renderedHeightPx;
+          const sliceHeightPx = Math.min(pageSliceHeightPx, remainingPx);
+
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = image.width;
+          sliceCanvas.height = sliceHeightPx;
+          const sliceCtx = sliceCanvas.getContext('2d');
+
+          if (!sliceCtx) break;
+
+          sliceCtx.drawImage(
+            image,
+            0,
+            renderedHeightPx,
+            image.width,
+            sliceHeightPx,
+            0,
+            0,
+            image.width,
+            sliceHeightPx
+          );
+
+          const sliceData = sliceCanvas.toDataURL('image/png');
+          const sliceHeightMm = sliceHeightPx / pxPerMm;
+
+          if (pageIndex > 0) {
+            pdf.addPage();
+          }
+
+          pdf.addImage(sliceData, 'PNG', margin, margin, contentWidthMm, sliceHeightMm);
+          renderedHeightPx += sliceHeightPx;
+          pageIndex += 1;
+        }
+      }
+
+      pdf.save(`${safeName}_${orientation}.pdf`);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      alert('Failed to export PDF.');
+    } finally {
+      setIsPreviewMode(false);
+      setExportingPdf(false);
+    }
   };
 
   return (
@@ -3377,6 +3510,38 @@ export default function Results() {
             <Download className="w-4 h-4" />
             {exporting ? 'Exporting...' : 'Export image'}
           </button>
+          <div className="relative">
+            <button
+              onClick={() => !exportingPdf && setShowPdfOptions((prev) => !prev)}
+              disabled={exportingPdf}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              {exportingPdf ? 'Exporting PDF...' : 'Export PDF'}
+            </button>
+            {showPdfOptions && !exportingPdf && (
+              <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden z-20 min-w-[180px]">
+                <button
+                  onClick={async () => {
+                    setShowPdfOptions(false);
+                    await downloadAsPdf('portrait');
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Portrait
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowPdfOptions(false);
+                    await downloadAsPdf('landscape');
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100"
+                >
+                  Landscape
+                </button>
+              </div>
+            )}
+          </div>
           <Button
             onClick={handleSave}
             disabled={saving}
