@@ -9,6 +9,7 @@ export const exportPackageAsImages = async ({
   pricingMode,
   setExporting,
   setIsPreviewMode,
+  isPreviewMode = false,
   setPricingMode,
 }) => {
   if (!exportRef?.current) return;
@@ -16,6 +17,7 @@ export const exportPackageAsImages = async ({
   const safeName = (packageName || 'package').replace(/[^a-z0-9]/gi, '_').toLowerCase();
   const hasBoth = config?.pricing_availability === 'both';
   const originalMode = pricingMode;
+  const originalPreviewMode = Boolean(isPreviewMode);
 
   setExporting(true);
 
@@ -38,7 +40,7 @@ export const exportPackageAsImages = async ({
       await wait(100);
     }
   } finally {
-    setIsPreviewMode(false);
+    setIsPreviewMode(originalPreviewMode);
     setExporting(false);
   }
 };

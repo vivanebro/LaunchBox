@@ -79,8 +79,11 @@ export default function Results() {
   const [tempLabelOnetime, setTempLabelOnetime] = useState('');
   const [tempLabelRetainer, setTempLabelRetainer] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showExitEditModeModal, setShowExitEditModeModal] = useState(false);
   const [packageToDelete, setPackageToDelete] = useState(null);
   const [lastDeletedTier, setLastDeletedTier] = useState(null);
+  const pendingNavigationRef = useRef(null);
+  const bypassExitWarningRef = useRef(false);
   const toggleEditRef = useRef(null);
   const exportRef = React.useRef(null);
   const [exporting, setExporting] = React.useState(false);
@@ -957,6 +960,7 @@ export default function Results() {
       const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${savedPackageId}`;
       window.open(previewUrl, '_blank');
 
+      bypassExitWarningRef.current = true;
       window.location.href = createPageUrl('MyPackages');
 
     } catch (error) {
@@ -1002,6 +1006,48 @@ export default function Results() {
   const prevDesign = () => {
     setCurrentDesign((prev) => (prev - 1 + 2) % 2);
   };
+
+  useEffect(() => {
+    if (!config || isPreviewMode) return;
+
+    const shouldWarnOnExit = () => !bypassExitWarningRef.current;
+
+    const handleBeforeUnload = (event) => {
+      if (!shouldWarnOnExit()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    const handleDocumentClick = (event) => {
+      if (!shouldWarnOnExit()) return;
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (!(event.target instanceof Element)) return;
+
+      const link = event.target.closest('a[href]');
+      if (!link) return;
+      if (link.target === '_blank' || link.hasAttribute('download')) return;
+
+      const nextUrl = new URL(link.href, window.location.href);
+      const currentUrl = new URL(window.location.href);
+      const isSamePage = nextUrl.pathname === currentUrl.pathname && nextUrl.search === currentUrl.search && nextUrl.hash === currentUrl.hash;
+
+      if (isSamePage) return;
+      if (nextUrl.origin !== currentUrl.origin) return;
+
+      event.preventDefault();
+      pendingNavigationRef.current = nextUrl.toString();
+      setShowExitEditModeModal(true);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('click', handleDocumentClick, true);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [config, isPreviewMode]);
 
   if (!config) {
     return (
@@ -2852,7 +2898,30 @@ export default function Results() {
     return previewDesigns[0]();
   };
 
+  const goBackToWizard = () => {
+    bypassExitWarningRef.current = true;
+    const latestConfig = configRef.current || config;
+    localStorage.setItem('packageConfig', JSON.stringify(latestConfig));
+    localStorage.setItem('editingFromResults', 'true');
+    if (packageId) {
+      localStorage.setItem('editingPackageId', packageId);
+    }
+    window.location.href = createPageUrl('PackageBuilder');
+  };
 
+  const confirmExitEditMode = () => {
+    const pendingUrl = pendingNavigationRef.current;
+    setShowExitEditModeModal(false);
+    pendingNavigationRef.current = null;
+    bypassExitWarningRef.current = true;
+
+    if (pendingUrl) {
+      window.location.href = pendingUrl;
+      return;
+    }
+
+    goBackToWizard();
+  };
 
   if (isPreviewMode) {
     return (
@@ -2868,6 +2937,7 @@ export default function Results() {
                   pricingMode,
                   setExporting,
                   setIsPreviewMode,
+                  isPreviewMode,
                   setPricingMode
                 })
               }
@@ -2955,28 +3025,18 @@ export default function Results() {
     { name: 'Indigo', color: '#6366F1' }
   ];
 
-  const goBackToWizard = () => {
-    const latestConfig = configRef.current || config;
-    localStorage.setItem('packageConfig', JSON.stringify(latestConfig));
-    localStorage.setItem('editingFromResults', 'true');
-    if (packageId) {
-      localStorage.setItem('editingPackageId', packageId);
-    }
-    window.location.href = createPageUrl('PackageBuilder');
-  };
-
   const downloadAsPdf = async (orientation = 'portrait') => {
     if (!exportRef?.current) return;
 
     const safeName = (config?.package_set_name || config?.business_name || 'package')
       .replace(/[^a-z0-9]/gi, '_')
       .toLowerCase();
+    const originalPreviewMode = isPreviewMode;
 
     setExportingPdf(true);
     try {
       // Match PNG export behavior exactly by capturing preview-mode UI.
-      const wasPreviewMode = isPreviewMode;
-      if (!wasPreviewMode) {
+      if (!originalPreviewMode) {
         setIsPreviewMode(true);
         await wait(300);
       }
@@ -3067,7 +3127,7 @@ export default function Results() {
       console.error('Error exporting PDF:', error);
       alert('Failed to export PDF.');
     } finally {
-      setIsPreviewMode(false);
+      setIsPreviewMode(originalPreviewMode);
       setExportingPdf(false);
     }
   };
@@ -3078,7 +3138,10 @@ export default function Results() {
         <div className="flex items-center gap-4 mb-8">
           {config?.from_template && (
             <Button
-              onClick={() => { window.location.href = createPageUrl('Templates'); }}
+              onClick={() => {
+                pendingNavigationRef.current = createPageUrl('Templates');
+                setShowExitEditModeModal(true);
+              }}
               variant="ghost"
               className="text-gray-600 hover:text-gray-900 hover:bg-white rounded-full"
             >
@@ -3087,7 +3150,10 @@ export default function Results() {
             </Button>
           )}
           <Button
-            onClick={goBackToWizard}
+            onClick={() => {
+              pendingNavigationRef.current = null;
+              setShowExitEditModeModal(true);
+            }}
             variant="outline"
             className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-full font-medium"
           >
@@ -3503,7 +3569,7 @@ export default function Results() {
 
         <div className="flex justify-center gap-4 flex-wrap">
           <button
-            onClick={() => exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, setPricingMode })}
+            onClick={() => exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, isPreviewMode, setPricingMode })}
             disabled={exporting}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
           >
@@ -3637,6 +3703,58 @@ export default function Results() {
         )}
       </AnimatePresence>
 
+      {/* Exit Edit Mode Warning Modal */}
+      <AnimatePresence>
+        {showExitEditModeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowExitEditModeModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.3 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border-2 border-gray-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div
+                  className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+                  style={{ backgroundColor: '#FEF3C7' }}
+                >
+                  <X className="w-8 h-8 text-amber-500" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Exit Edit Mode?</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  You are about to leave this page. Any unsaved edits may be lost.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 rounded-2xl border-2 border-gray-300 hover:bg-gray-50 font-semibold"
+                  onClick={() => setShowExitEditModeModal(false)}
+                >
+                  Stay Editing
+                </Button>
+                <Button
+                  className="flex-1 h-12 rounded-2xl text-white font-semibold"
+                  style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                  onClick={confirmExitEditMode}
+                >
+                  Exit Edit Mode
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Custom Links Modal */}
       <AnimatePresence>
         {showLinksModal && (
@@ -3749,6 +3867,7 @@ export default function Results() {
                         const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${savedPackageId}`;
                         window.open(previewUrl, '_blank');
                         
+                        bypassExitWarningRef.current = true;
                         window.location.href = createPageUrl('MyPackages');
                       } catch (error) {
                         console.error('Error saving package:', error);
