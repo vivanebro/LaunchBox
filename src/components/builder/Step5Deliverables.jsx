@@ -55,6 +55,11 @@ export default function Step5Deliverables({ data, onChange, onNext }) {
   const [editValue, setEditValue] = React.useState('');
   const inputRef = React.useRef(null);
 
+  React.useEffect(() => {
+    const existing = data.core_deliverables || [];
+    setDeliverables(existing.map(d => ({ ...d, id: d.id || `${Date.now()}-${Math.random()}` })));
+  }, [data.core_deliverables]);
+
   const updateParentConfig = (newDeliverables) => {
     const filteredDeliverables = newDeliverables.filter(d => d.type.trim());
     

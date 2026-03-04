@@ -260,6 +260,7 @@ export default function Results() {
         if (loadedConfig.pricing_label_retainer === undefined) loadedConfig.pricing_label_retainer = 'monthly';
         if (loadedConfig.pricing_button_label_onetime === undefined) loadedConfig.pricing_button_label_onetime = 'One-time Project';
         if (loadedConfig.pricing_button_label_retainer === undefined) loadedConfig.pricing_button_label_retainer = 'Monthly Retainer';
+        if (loadedConfig.retainer_discount_text === undefined) loadedConfig.retainer_discount_text = '15% off one-time price';
         if (loadedConfig.starter_duration === undefined) loadedConfig.starter_duration = null;
         if (loadedConfig.growth_duration === undefined) loadedConfig.growth_duration = null;
         if (loadedConfig.premium_duration === undefined) loadedConfig.premium_duration = null;
@@ -528,6 +529,7 @@ export default function Results() {
             pricing_label_retainer: 'monthly',
             pricing_button_label_onetime: 'One-time Project',
             pricing_button_label_retainer: 'Monthly Retainer',
+            retainer_discount_text: '15% off one-time price',
             starter_duration: null,
             growth_duration: null,
             premium_duration: null,
@@ -1223,6 +1225,7 @@ export default function Results() {
   };
 
   const previewPackages = packages;
+  const retainerDiscountText = config.retainer_discount_text ?? '15% off one-time price';
   const disablePreviewAnimations = isPreviewMode || exporting || exportingPdf;
   const getPreviewMotionProps = (index) => (
     disablePreviewAnimations
@@ -2011,36 +2014,75 @@ export default function Results() {
                       </button>
                     ) : <div />}
                   </div>
-                  <div className="flex items-baseline gap-1 justify-center">
-                    <EditablePrice
-                      value={pkg.price}
-                      onSave={(newPrice) => {
-                        if (pricingMode === 'one-time') {
-                          const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
-                          updateConfigMultiple({
-                            [`price_${tierName}`]: newPrice,
-                            [`price_${tierName}_retainer`]: retainerPrice
-                          });
-                        } else {
-                          updateConfig(`price_${tierName}_retainer`, newPrice);
-                        }
-                      }}
-                      className={`font-bold inline-block ${packages.length === 4 ? 'text-3xl' : 'text-4xl'}`}
-                      style={{ color: brandColor }}
-                      brandColor={brandColor}
-                    />
-                    <span className="text-base text-gray-500">
-                      / <EditableText
-                        value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
-                        onSave={(newValue) => {
-                          const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
-                          updateConfig(field, newValue);
+                  <div>
+                    <div className="flex items-baseline gap-1 justify-center">
+                      <EditablePrice
+                        value={pkg.price}
+                        onSave={(newPrice) => {
+                          if (pricingMode === 'one-time') {
+                            const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
+                            updateConfigMultiple({
+                              [`price_${tierName}`]: newPrice,
+                              [`price_${tierName}_retainer`]: retainerPrice
+                            });
+                          } else {
+                            updateConfig(`price_${tierName}_retainer`, newPrice);
+                          }
                         }}
-                        className="inline text-base"
-                        placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                        className={`font-bold inline-block ${packages.length === 4 ? 'text-3xl' : 'text-4xl'}`}
+                        style={{ color: brandColor }}
                         brandColor={brandColor}
                       />
-                    </span>
+                      <span className="text-base text-gray-500">
+                        / <EditableText
+                          value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                          onSave={(newValue) => {
+                            const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
+                            updateConfig(field, newValue);
+                          }}
+                          className="inline text-base"
+                          placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                          brandColor={brandColor}
+                        />
+                      </span>
+                    </div>
+                    {pricingMode === 'retainer' && (
+                      <div className="mt-1 flex justify-center">
+                        {retainerDiscountText?.trim() ? (
+                          <div className="relative group/discount inline-block">
+                            <EditableText
+                              value={retainerDiscountText}
+                              onSave={(newValue) => updateConfig('retainer_discount_text', newValue)}
+                              className="text-xs text-gray-500 text-center"
+                              placeholder="15% off one-time price"
+                              multiline={false}
+                              darkMode={false}
+                              brandColor={brandColor}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateConfig('retainer_discount_text', '');
+                              }}
+                              className="absolute -right-1 -top-1 opacity-0 group-hover/discount:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                              title="Delete discount text"
+                              aria-label="Delete discount text"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => updateConfig('retainer_discount_text', '15% off one-time price')}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline"
+                          >
+                            + Add discount text
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {pricingMode === 'one-time' && (
@@ -2367,37 +2409,76 @@ export default function Results() {
                       </button>
                     ) : <div />}
                   </div>
-                  <div className="flex items-baseline gap-1 justify-center">
-                    <EditablePrice
-                      value={pkg.price}
-                      onSave={(newPrice) => {
-                        if (pricingMode === 'one-time') {
-                          const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
-                          updateConfigMultiple({
-                            [`price_${tierName}`]: newPrice,
-                            [`price_${tierName}_retainer`]: retainerPrice
-                          });
-                        } else {
-                          updateConfig(`price_${tierName}_retainer`, newPrice);
-                        }
-                      }}
-                      className={`font-bold text-white inline-block ${packages.length === 4 ? 'text-4xl' : 'text-5xl'}`}
-                      darkMode={true}
-                      brandColor={brandColor}
-                    />
-                    <span className="text-base text-white/70">
-                      / <EditableText
-                        value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
-                        onSave={(newValue) => {
-                          const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
-                          updateConfig(field, newValue);
+                  <div>
+                    <div className="flex items-baseline gap-1 justify-center">
+                      <EditablePrice
+                        value={pkg.price}
+                        onSave={(newPrice) => {
+                          if (pricingMode === 'one-time') {
+                            const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
+                            updateConfigMultiple({
+                              [`price_${tierName}`]: newPrice,
+                              [`price_${tierName}_retainer`]: retainerPrice
+                            });
+                          } else {
+                            updateConfig(`price_${tierName}_retainer`, newPrice);
+                          }
                         }}
-                        className="inline text-base"
-                        placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                        className={`font-bold text-white inline-block ${packages.length === 4 ? 'text-4xl' : 'text-5xl'}`}
                         darkMode={true}
                         brandColor={brandColor}
                       />
-                    </span>
+                      <span className="text-base text-white/70">
+                        / <EditableText
+                          value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                          onSave={(newValue) => {
+                            const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
+                            updateConfig(field, newValue);
+                          }}
+                          className="inline text-base"
+                          placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                          darkMode={true}
+                          brandColor={brandColor}
+                        />
+                      </span>
+                    </div>
+                    {pricingMode === 'retainer' && (
+                      <div className="mt-1 flex justify-center">
+                        {retainerDiscountText?.trim() ? (
+                          <div className="relative group/discount inline-block">
+                            <EditableText
+                              value={retainerDiscountText}
+                              onSave={(newValue) => updateConfig('retainer_discount_text', newValue)}
+                              className="text-xs text-white/70 text-center"
+                              placeholder="15% off one-time price"
+                              multiline={false}
+                              darkMode={true}
+                              brandColor={brandColor}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateConfig('retainer_discount_text', '');
+                              }}
+                              className="absolute -right-1 -top-1 opacity-0 group-hover/discount:opacity-100 text-white/50 hover:text-red-300 transition-opacity"
+                              title="Delete discount text"
+                              aria-label="Delete discount text"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => updateConfig('retainer_discount_text', '15% off one-time price')}
+                            className="text-xs text-white/50 hover:text-white/70 underline"
+                          >
+                            + Add discount text
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {pricingMode === 'one-time' && (
@@ -2675,13 +2756,18 @@ export default function Results() {
                     )}
                   </div>
                 )}
-                <div className="flex items-baseline gap-1 justify-center">
-                  <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-2xl' : 'text-4xl'}`}>
-                    {currencySymbol}{(pkg.price || 0).toLocaleString()}
+                <div>
+                  <div className="flex items-baseline gap-1 justify-center">
+                    <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-2xl' : 'text-4xl'}`}>
+                      {currencySymbol}{(pkg.price || 0).toLocaleString()}
+                    </div>
+                    <span className={`text-gray-500 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
+                      / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                    </span>
                   </div>
-                  <span className={`text-gray-500 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
-                    / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
-                  </span>
+                  {pricingMode === 'retainer' && retainerDiscountText?.trim() && (
+                    <p className="text-xs text-gray-500 text-center mt-1">{retainerDiscountText}</p>
+                  )}
                 </div>
               </div>
               {pricingMode === 'one-time' && (
@@ -2862,11 +2948,16 @@ export default function Results() {
                     )}
                   </div>
                 )}
-                <div className="flex items-baseline gap-1 justify-center">
-                  <div className={`font-bold ${previewPackages.length === 4 ? 'text-3xl' : 'text-5xl'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</div>
-                  <span className={`text-white/70 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
-                    / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
-                  </span>
+                <div>
+                  <div className="flex items-baseline gap-1 justify-center">
+                    <div className={`font-bold ${previewPackages.length === 4 ? 'text-3xl' : 'text-5xl'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</div>
+                    <span className={`text-white/70 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
+                      / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                    </span>
+                  </div>
+                  {pricingMode === 'retainer' && retainerDiscountText?.trim() && (
+                    <p className="text-xs text-white/70 text-center mt-1">{retainerDiscountText}</p>
+                  )}
                 </div>
               </div>
               {pricingMode === 'one-time' && (

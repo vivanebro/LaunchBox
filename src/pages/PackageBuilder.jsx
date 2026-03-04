@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Undo2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 
@@ -56,6 +56,23 @@ export default function PackageBuilder() {
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
+  const undoHistoryRef = useRef([]);
+
+  const cloneState = (value) => {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(value);
+    }
+    return JSON.parse(JSON.stringify(value));
+  };
+
+  const pushUndoState = (nextStep = step, nextConfig = config) => {
+    undoHistoryRef.current.push({
+      step: nextStep,
+      config: cloneState(nextConfig)
+    });
+  };
+
+  const canUndo = undoHistoryRef.current.length > 0;
 
   const brandColor = config?.brand_color || '#ff0044';
 
@@ -72,6 +89,13 @@ export default function PackageBuilder() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const isUndoShortcut = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z';
+      if (isUndoShortcut && undoHistoryRef.current.length > 0) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
       if (e.key === 'Enter' && !e.shiftKey && canProceed()) {
         e.preventDefault();
         handleNext();
@@ -83,11 +107,18 @@ export default function PackageBuilder() {
   }, [step, config]);
 
   const updateConfig = (updates) => {
-    setConfig(prev => ({ ...prev, ...updates }));
+    setConfig((prev) => {
+      const hasChanges = Object.keys(updates).some((key) => prev[key] !== updates[key]);
+      if (!hasChanges) return prev;
+
+      pushUndoState(step, prev);
+      return { ...prev, ...updates };
+    });
   };
 
   const handleNext = async () => {
     if (step < TOTAL_STEPS) {
+      pushUndoState(step, config);
       setStep(step + 1);
     } else {
       // Final step - save and go to results
@@ -133,8 +164,22 @@ export default function PackageBuilder() {
 
   const handleBack = () => {
     if (step > 1) {
+      pushUndoState(step, config);
       setStep(step - 1);
     }
+  };
+
+  const handleStepClick = (targetStep) => {
+    if (targetStep === step) return;
+    pushUndoState(step, config);
+    setStep(targetStep);
+  };
+
+  const handleUndo = () => {
+    const previous = undoHistoryRef.current.pop();
+    if (!previous) return;
+    setStep(previous.step);
+    setConfig(previous.config);
   };
 
   const canProceed = () => {
@@ -206,20 +251,8 @@ export default function PackageBuilder() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F5F5F7' }}>
       <div className="max-w-4xl mx-auto px-6 py-12">
-        {/* Back Button */}
-        {step > 1 && (
-          <Button
-            onClick={handleBack}
-            variant="ghost"
-            className="mb-8 text-gray-600 hover:text-gray-900 hover:bg-white rounded-full"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-        )}
-
         {/* Step Indicator */}
-        <StepIndicator currentStep={step} totalSteps={TOTAL_STEPS} onStepClick={setStep} />
+        <StepIndicator currentStep={step} totalSteps={TOTAL_STEPS} onStepClick={handleStepClick} />
 
         {/* Step Content */}
         <AnimatePresence mode="wait">
@@ -242,8 +275,31 @@ export default function PackageBuilder() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Next Button */}
-        <div className="flex justify-end mt-8">
+        {/* Navigation Buttons */}
+        <div className="flex items-center justify-between mt-8">
+          <div className="flex items-center gap-2">
+            {step > 1 && (
+              <Button
+                onClick={handleBack}
+                variant="ghost"
+                className="text-gray-600 hover:text-gray-900 hover:bg-white rounded-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            )}
+            <Button
+              onClick={handleUndo}
+              variant="ghost"
+              disabled={!canUndo}
+              className="text-gray-600 hover:text-gray-900 hover:bg-white rounded-full disabled:opacity-50"
+              title="Undo last action"
+            >
+              <Undo2 className="w-4 h-4 mr-2" />
+              Undo
+            </Button>
+          </div>
+
           <Button
             onClick={handleNext}
             disabled={!canProceed()}

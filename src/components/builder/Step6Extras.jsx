@@ -59,6 +59,14 @@ export default function Step6Extras({ data, onChange, onNext }) {
   const [editValue, setEditValue] = React.useState('');
   const inputRef = React.useRef(null);
 
+  React.useEffect(() => {
+    const existing = data.extras_bonuses || [];
+    setBonuses(existing.map(b => ({
+      id: `${Date.now()}-${Math.random()}`,
+      type: typeof b === 'string' ? b : b.type
+    })));
+  }, [data.extras_bonuses]);
+
   const updateConfig = (updatedBonuses) => {
     const filteredBonuses = updatedBonuses.filter(b => b.type.trim()).map(b => b.type);
     
