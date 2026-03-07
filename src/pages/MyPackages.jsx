@@ -100,8 +100,22 @@ export default function MyPackages() {
     try {
       const baseUrl = window.location.origin;
       const previewPath = await getPublicPreviewPath(pkg, currentUser);
-      const previewUrl = baseUrl + previewPath;
-      const embedCode = `<iframe src="${previewUrl}" width="100%" height="800px" frameborder="0" style="border-radius: 12px;"></iframe>`;
+      const previewUrl = new URL(baseUrl + previewPath);
+      previewUrl.searchParams.set('embed', 'true');
+      const iframeId = `launchbox-embed-${pkg.id}`;
+      const embedCode = `<iframe id="${iframeId}" src="${previewUrl.toString()}" width="100%" style="border:0;border-radius:12px;min-height:800px;" scrolling="no"></iframe>
+<script>
+(function() {
+  var iframe = document.getElementById('${iframeId}');
+  if (!iframe) return;
+  function onMessage(event) {
+    if (!event.data || event.data.type !== 'launchbox:embedHeight') return;
+    if (typeof event.data.height !== 'number') return;
+    iframe.style.height = Math.max(800, event.data.height) + 'px';
+  }
+  window.addEventListener('message', onMessage);
+})();
+</script>`;
       await navigator.clipboard.writeText(embedCode);
       
       // Show success feedback

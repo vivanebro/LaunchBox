@@ -74,6 +74,7 @@ export default function Results() {
   const [popularPackageIndex, setPopularPackageIndex] = useState({ onetime: 2, retainer: 2 });
   const [popularBadgeText, setPopularBadgeText] = useState('Most Popular');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isEmbedMode, setIsEmbedMode] = useState(false);
   const [previewNotFound, setPreviewNotFound] = useState(false);
   const [packageId, setPackageId] = useState(null);
   const [isMobileView, setIsMobileView] = useState(false);
@@ -108,8 +109,10 @@ export default function Results() {
     const urlParams = new URLSearchParams(window.location.search);
     const isPrettyPreviewPath = Boolean(creator && slug);
     const isPreview = urlParams.get('preview') === 'true' || isPrettyPreviewPath;
+    const isEmbed = urlParams.get('embed') === 'true';
     let idFromUrl = urlParams.get('packageId');
     setIsPreviewMode(isPreview);
+    setIsEmbedMode(isEmbed);
 
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
@@ -596,6 +599,33 @@ export default function Results() {
 
     return () => window.removeEventListener('resize', checkMobile);
   }, [creator, slug]);
+
+  useEffect(() => {
+    if (!isPreviewMode || !isEmbedMode) return;
+
+    const sendEmbedHeight = () => {
+      const height = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      window.parent.postMessage(
+        { type: 'launchbox:embedHeight', height },
+        '*'
+      );
+    };
+
+    const resizeObserver = new ResizeObserver(() => sendEmbedHeight());
+    resizeObserver.observe(document.body);
+    sendEmbedHeight();
+    window.addEventListener('load', sendEmbedHeight);
+    window.addEventListener('resize', sendEmbedHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('load', sendEmbedHeight);
+      window.removeEventListener('resize', sendEmbedHeight);
+    };
+  }, [isPreviewMode, isEmbedMode, pricingMode, config]);
 
   // Use a ref to always have the latest config available (avoids stale closures)
   const configRef = useRef(config);
@@ -3090,36 +3120,48 @@ export default function Results() {
     return previewDesigns[0]();
   };
 
-  const goBackToWizard = () => {
-    bypassExitWarningRef.current = true;
+  const persistWizardDraft = () => {
     const latestConfig = configRef.current || config;
     localStorage.setItem('packageConfig', JSON.stringify(latestConfig));
     localStorage.setItem('editingFromResults', 'true');
     if (packageId) {
       localStorage.setItem('editingPackageId', packageId);
     }
-    window.location.href = createPageUrl('PackageBuilder');
   };
 
-  const confirmExitEditMode = () => {
-    const pendingUrl = pendingNavigationRef.current;
+  const exitEditMode = async ({ saveBeforeExit }) => {
+    const pendingUrl = pendingNavigationRef.current || createPageUrl('PackageBuilder');
+    const isWizardExit = (() => {
+      const destination = new URL(pendingUrl, window.location.href);
+      const wizard = new URL(createPageUrl('PackageBuilder'), window.location.href);
+      return destination.origin === wizard.origin && destination.pathname === wizard.pathname;
+    })();
+
     setShowExitEditModeModal(false);
     pendingNavigationRef.current = null;
-    bypassExitWarningRef.current = true;
 
-    if (pendingUrl) {
-      window.location.href = pendingUrl;
-      return;
+    if (saveBeforeExit) {
+      try {
+        if (isWizardExit) {
+          persistWizardDraft();
+        }
+        await silentSave();
+      } catch (error) {
+        console.error('Failed to save before exiting:', error);
+        alert('Failed to save changes before exiting.');
+        return;
+      }
     }
 
-    goBackToWizard();
+    bypassExitWarningRef.current = true;
+    window.location.href = pendingUrl;
   };
 
   if (isPreviewMode) {
     return (
       <div className="min-h-screen py-6 md:py-12" style={{ backgroundColor: '#F5F5F7' }}>
         <div className="max-w-7xl mx-auto px-4 md:px-6">
-          <div className="flex justify-center mb-6">
+          {!isEmbedMode && <div className="flex justify-center mb-6">
             <button
               onClick={() =>
                 exportPackageAsImages({
@@ -3139,7 +3181,7 @@ export default function Results() {
               <Download className="w-4 h-4" />
               {exporting ? 'Exporting...' : 'Download image'}
             </button>
-          </div>
+          </div>}
 
           <div ref={exportRef}>
           <div className="text-center">
@@ -3827,8 +3869,22 @@ export default function Results() {
                   { ...(configRef.current || config || {}), id: packageId },
                   currentUser
                 );
-                const previewUrl = baseUrl + previewPath;
-                const embedCode = `<iframe src="${previewUrl}" width="100%" height="800px" frameborder="0" style="border-radius: 12px;"></iframe>`;
+                const previewUrl = new URL(baseUrl + previewPath);
+                previewUrl.searchParams.set('embed', 'true');
+                const iframeId = `launchbox-embed-${packageId}`;
+                const embedCode = `<iframe id="${iframeId}" src="${previewUrl.toString()}" width="100%" style="border:0;border-radius:12px;min-height:800px;" scrolling="no"></iframe>
+<script>
+(function() {
+  var iframe = document.getElementById('${iframeId}');
+  if (!iframe) return;
+  function onMessage(event) {
+    if (!event.data || event.data.type !== 'launchbox:embedHeight') return;
+    if (typeof event.data.height !== 'number') return;
+    iframe.style.height = Math.max(800, event.data.height) + 'px';
+  }
+  window.addEventListener('message', onMessage);
+})();
+</script>`;
                 navigator.clipboard.writeText(embedCode);
                 alert('Embed code copied to clipboard!');
               }}
@@ -3935,16 +3991,16 @@ export default function Results() {
                 <Button
                   variant="outline"
                   className="flex-1 h-12 rounded-2xl border-2 border-gray-300 hover:bg-gray-50 font-semibold"
-                  onClick={() => setShowExitEditModeModal(false)}
+                  onClick={() => exitEditMode({ saveBeforeExit: false })}
                 >
-                  Stay Editing
+                  Exit Without Save
                 </Button>
                 <Button
                   className="flex-1 h-12 rounded-2xl text-white font-semibold"
                   style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
-                  onClick={confirmExitEditMode}
+                  onClick={() => exitEditMode({ saveBeforeExit: true })}
                 >
-                  Exit Edit Mode
+                  Save and Exit
                 </Button>
               </div>
             </motion.div>
