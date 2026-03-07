@@ -3206,28 +3206,6 @@ export default function Results() {
     return (
       <div className="min-h-screen py-6 md:py-12" style={{ backgroundColor: '#F5F5F7' }}>
         <div className="max-w-7xl mx-auto px-4 md:px-6">
-          {!isEmbedMode && <div className="flex justify-center mb-6">
-            <button
-              onClick={() =>
-                exportPackageAsImages({
-                  exportRef,
-                  packageName: config.package_set_name || config.business_name || 'package',
-                  config,
-                  pricingMode,
-                  setExporting,
-                  setIsPreviewMode,
-                  isPreviewMode,
-                  setPricingMode
-                })
-              }
-              disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
-            >
-              <Download className="w-4 h-4" />
-              {exporting ? 'Exporting...' : 'Download image'}
-            </button>
-          </div>}
-
           <div ref={exportRef}>
           <div className="text-center">
             {config.logo_url && (
