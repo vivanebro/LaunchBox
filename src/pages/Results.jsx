@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2 } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
@@ -90,10 +90,12 @@ export default function Results() {
   const pendingNavigationRef = useRef(null);
   const bypassExitWarningRef = useRef(false);
   const toggleEditRef = useRef(null);
+  const undoHistoryRef = useRef([]);
   const exportRef = React.useRef(null);
   const [exporting, setExporting] = React.useState(false);
   const [exportingPdf, setExportingPdf] = React.useState(false);
   const [showPdfOptions, setShowPdfOptions] = React.useState(false);
+  const [canUndo, setCanUndo] = useState(false);
 
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
@@ -633,9 +635,36 @@ export default function Results() {
     configRef.current = config;
   }, [config]);
 
+  const cloneForUndo = (obj) => (typeof structuredClone === 'function' ? structuredClone(obj) : JSON.parse(JSON.stringify(obj)));
+
+  const pushUndoSnapshot = () => {
+    if (!config) return;
+    const c = configRef.current || config;
+    undoHistoryRef.current.push({
+      config: cloneForUndo(c),
+      popularPackageIndex: cloneForUndo(popularPackageIndex),
+      popularBadgeText
+    });
+    setCanUndo(true);
+  };
+
+  const handleUndo = () => {
+    const prev = undoHistoryRef.current.pop();
+    if (!prev) return;
+    setConfig(prev.config);
+    configRef.current = prev.config;
+    setPopularPackageIndex(prev.popularPackageIndex);
+    setPopularBadgeText(prev.popularBadgeText);
+    localStorage.setItem('packageConfig', JSON.stringify(prev.config));
+    setCanUndo(undoHistoryRef.current.length > 0);
+  };
+
   const updateConfig = (field, value) => {
     const currentConfig = configRef.current || config;
     const updatedConfig = { ...currentConfig, [field]: value };
+    if (!isPreviewMode && currentConfig[field] !== value) {
+      pushUndoSnapshot();
+    }
     setConfig(updatedConfig);
     configRef.current = updatedConfig;
     localStorage.setItem('packageConfig', JSON.stringify(updatedConfig));
@@ -654,6 +683,10 @@ export default function Results() {
   // Helper to update multiple fields at once (avoids stale state issues)
   const updateConfigMultiple = (updates) => {
     const currentConfig = configRef.current || config;
+    const hasChanges = Object.keys(updates).some((k) => currentConfig[k] !== updates[k]);
+    if (!isPreviewMode && hasChanges) {
+      pushUndoSnapshot();
+    }
     const updatedConfig = { ...currentConfig, ...updates };
     setConfig(updatedConfig);
     configRef.current = updatedConfig;
@@ -1112,6 +1145,18 @@ export default function Results() {
       document.removeEventListener('click', handleDocumentClick, true);
     };
   }, [config, isPreviewMode]);
+
+  useEffect(() => {
+    if (isPreviewMode) return;
+    const onKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && undoHistoryRef.current.length > 0) {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isPreviewMode]);
 
   if (!config) {
     if (previewNotFound) {
@@ -3393,6 +3438,16 @@ export default function Results() {
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Wizard
+          </Button>
+          <Button
+            onClick={handleUndo}
+            disabled={!canUndo}
+            variant="outline"
+            className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-4 h-4 mr-2" />
+            Undo
           </Button>
         </div>
 
