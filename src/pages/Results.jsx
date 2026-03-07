@@ -10,6 +10,8 @@ import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 import { logPackageView, startTimeTracking, logButtonClick } from '@/lib/packageAnalytics';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { useParams } from 'react-router-dom';
+import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
 
@@ -64,6 +66,7 @@ const CURRENCIES = [
 ];
 
 export default function Results() {
+  const { creator, slug } = useParams();
   const [config, setConfig] = useState(null);
   const [pricingMode, setPricingMode] = useState('one-time');
   const [currentDesign, setCurrentDesign] = useState(1);
@@ -71,6 +74,7 @@ export default function Results() {
   const [popularPackageIndex, setPopularPackageIndex] = useState({ onetime: 2, retainer: 2 });
   const [popularBadgeText, setPopularBadgeText] = useState('Most Popular');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [previewNotFound, setPreviewNotFound] = useState(false);
   const [packageId, setPackageId] = useState(null);
   const [isMobileView, setIsMobileView] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -102,27 +106,10 @@ export default function Results() {
     document.head.appendChild(link);
 
     const urlParams = new URLSearchParams(window.location.search);
-    const isPreview = urlParams.get('preview') === 'true';
+    const isPrettyPreviewPath = Boolean(creator && slug);
+    const isPreview = urlParams.get('preview') === 'true' || isPrettyPreviewPath;
     let idFromUrl = urlParams.get('packageId');
     setIsPreviewMode(isPreview);
-    if (isPreview && idFromUrl) {
-      // Only track if viewer is NOT the owner (not logged in)
-      supabaseClient.auth.me().then(() => {
-        // logged in = owner, don't track
-      }).catch(() => {
-        // not logged in = real client, track it
-        window.__analyticsViewId = null;
-        window.__analyticsPending = logPackageView(idFromUrl).then(viewId => {
-          window.__analyticsViewId = viewId;
-          const cleanup = startTimeTracking(viewId);
-          window.__analyticsCleanup = cleanup;
-          return viewId;
-        });
-      });
-    }
-    if (idFromUrl) {
-      setPackageId(idFromUrl);
-    }
 
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
@@ -134,6 +121,41 @@ export default function Results() {
     const loadPackageConfig = async () => {
       // Set initial pricing mode based on pricing_availability
       let loadedConfig = null;
+      setPreviewNotFound(false);
+      if (!idFromUrl && isPrettyPreviewPath) {
+        try {
+          const matchingPackages = await supabaseClient.asServiceRole.entities.PackageConfig.filter({
+            creator_slug: creator,
+            public_slug: slug
+          });
+          if (matchingPackages.length > 0) {
+            loadedConfig = matchingPackages[0];
+            idFromUrl = loadedConfig.id;
+          }
+        } catch (publicPathError) {
+          console.error('Error loading package by public URL:', publicPathError);
+        }
+      }
+
+      if (isPreview && idFromUrl) {
+        // Only track if viewer is NOT the owner (not logged in)
+        supabaseClient.auth.me().then(() => {
+          // logged in = owner, don't track
+        }).catch(() => {
+          // not logged in = real client, track it
+          window.__analyticsViewId = null;
+          window.__analyticsPending = logPackageView(idFromUrl).then(viewId => {
+            window.__analyticsViewId = viewId;
+            const cleanup = startTimeTracking(viewId);
+            window.__analyticsCleanup = cleanup;
+            return viewId;
+          });
+        });
+      }
+
+      if (idFromUrl) {
+        setPackageId(idFromUrl);
+      }
 
       if (idFromUrl) {
         try {
@@ -163,7 +185,7 @@ export default function Results() {
         }
       }
       
-      if (!loadedConfig) {
+      if (!loadedConfig && !isPreview) {
         const savedConfig = localStorage.getItem('packageConfig');
         if (savedConfig) {
           loadedConfig = JSON.parse(savedConfig);
@@ -173,6 +195,11 @@ export default function Results() {
             delete loadedConfig.id;
           }
         }
+      }
+
+      if (!loadedConfig && isPreview) {
+        setPreviewNotFound(true);
+        return;
       }
 
       if (loadedConfig) {
@@ -568,7 +595,7 @@ export default function Results() {
     loadPackageConfig();
 
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  }, [creator, slug]);
 
   // Use a ref to always have the latest config available (avoids stale closures)
   const configRef = useRef(config);
@@ -959,7 +986,12 @@ export default function Results() {
       localStorage.setItem('packageConfig', JSON.stringify(configToSave));
 
       const baseUrl = window.location.origin;
-      const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${savedPackageId}`;
+      const currentUser = await supabaseClient.auth.me();
+      const previewPath = await getPublicPreviewPath(
+        { ...latestConfig, id: savedPackageId },
+        currentUser
+      );
+      const previewUrl = baseUrl + previewPath;
       window.open(previewUrl, '_blank');
 
       bypassExitWarningRef.current = true;
@@ -1052,6 +1084,16 @@ export default function Results() {
   }, [config, isPreviewMode]);
 
   if (!config) {
+    if (previewNotFound) {
+      return (
+        <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
+          <div className="text-center max-w-md px-6">
+            <p className="text-2xl font-bold text-gray-900 mb-2">Preview Not Found</p>
+            <p className="text-gray-600">This package preview link is invalid or no longer available.</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
         <div className="text-center">
@@ -3778,9 +3820,14 @@ export default function Results() {
           </Button>
           {packageId && (
             <Button
-              onClick={() => {
+              onClick={async () => {
                 const baseUrl = window.location.origin;
-                const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${packageId}`;
+                const currentUser = await supabaseClient.auth.me();
+                const previewPath = await getPublicPreviewPath(
+                  { ...(configRef.current || config || {}), id: packageId },
+                  currentUser
+                );
+                const previewUrl = baseUrl + previewPath;
                 const embedCode = `<iframe src="${previewUrl}" width="100%" height="800px" frameborder="0" style="border-radius: 12px;"></iframe>`;
                 navigator.clipboard.writeText(embedCode);
                 alert('Embed code copied to clipboard!');
@@ -4014,7 +4061,12 @@ export default function Results() {
                         localStorage.setItem('packageConfig', JSON.stringify(configToSave));
                         
                         const baseUrl = window.location.origin;
-                        const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${savedPackageId}`;
+                        const currentUser = await supabaseClient.auth.me();
+                        const previewPath = await getPublicPreviewPath(
+                          { ...latestConfig, id: savedPackageId },
+                          currentUser
+                        );
+                        const previewUrl = baseUrl + previewPath;
                         window.open(previewUrl, '_blank');
                         
                         bypassExitWarningRef.current = true;

@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, Mail, Calendar, Save, Loader2 } from 'lucide-react';
+import { User, Mail, Calendar, Save, Loader2, Link as LinkIcon } from 'lucide-react';
 import supabaseClient from '@/lib/supabaseClient';
+import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 
 export default function Settings() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [slugError, setSlugError] = useState(null);
+  const [slugChecking, setSlugChecking] = useState(false);
 
   useEffect(() => {
     loadUser();
@@ -25,10 +28,60 @@ export default function Settings() {
     setLoading(false);
   };
 
+  const handleSlugBlur = async () => {
+    if (!user?.creator_slug?.trim()) {
+      setSlugError(null);
+      return;
+    }
+    setSlugChecking(true);
+    setSlugError(null);
+    const normalized = slugify(user.creator_slug, '');
+    const validation = validateCreatorSlug(normalized);
+    if (!validation.valid) {
+      setSlugError(validation.error);
+      setSlugChecking(false);
+      return;
+    }
+    const available = await isCreatorSlugAvailable(normalized, user.id);
+    if (!available) {
+      setSlugError('This URL slug is already taken by another user');
+    }
+    setSlugChecking(false);
+  };
+
   const handleSave = async () => {
     setSaving(true);
+    setSlugError(null);
     try {
-      await supabaseClient.entities.User.update(user.id, { full_name: user.full_name });
+      const updates = { full_name: user.full_name };
+      if (user.creator_slug !== undefined) {
+        const normalized = slugify(user.creator_slug, '');
+        if (normalized) {
+          const validation = validateCreatorSlug(normalized);
+          if (!validation.valid) {
+            setSlugError(validation.error);
+            setSaving(false);
+            return;
+          }
+          const available = await isCreatorSlugAvailable(normalized, user.id);
+          if (!available) {
+            setSlugError('This URL slug is already taken by another user');
+            setSaving(false);
+            return;
+          }
+          updates.creator_slug = normalized;
+        } else {
+          updates.creator_slug = null;
+        }
+      }
+      await supabaseClient.entities.User.update(user.id, updates);
+      if (updates.creator_slug !== undefined) {
+        const packages = await supabaseClient.entities.PackageConfig.filter({ created_by: user.id });
+        for (const pkg of packages) {
+          await supabaseClient.entities.PackageConfig.update(pkg.id, { creator_slug: updates.creator_slug });
+        }
+      }
+      setUser({ ...user, ...updates });
       alert('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -90,6 +143,32 @@ export default function Settings() {
                 onChange={(e) => setUser({ ...user, full_name: e.target.value })}
                 className="h-12 bg-gray-50 border-gray-200"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <LinkIcon className="w-4 h-4 inline mr-2" />
+                URL Slug
+              </label>
+              <Input
+                value={user?.creator_slug || ''}
+                onChange={(e) => {
+                  setUser({ ...user, creator_slug: e.target.value });
+                  setSlugError(null);
+                }}
+                onBlur={handleSlugBlur}
+                placeholder="Your preferred URL slug"
+                className={`h-12 bg-gray-50 border-gray-200 ${slugError ? 'border-red-400' : ''}`}
+              />
+              {slugChecking && (
+                <p className="text-xs text-gray-500 mt-1">Checking availability...</p>
+              )}
+              {slugError && (
+                <p className="text-xs text-red-600 mt-1">{slugError}</p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Your package previews will use: yourdomain.com/<strong>{user?.creator_slug ? slugify(user.creator_slug, '') || 'your-slug' : 'your-slug'}</strong>/package-name
+              </p>
             </div>
 
             <div>

@@ -78,10 +78,20 @@ export default function Layout({ children, currentPageName }) {
   }, []);
   
   const isResultsPage = currentPageName === 'Results';
+  const isPublicPrettyPreviewPath = React.useMemo(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      const segments = window.location.pathname.split('/').filter(Boolean);
+      return isResultsPage && segments.length === 2;
+    } catch (e) {
+      console.warn('Path parsing failed:', e);
+      return false;
+    }
+  }, [isResultsPage]);
   
   React.useEffect(() => {
     const checkAuthAndRedirect = async () => {
-      const isPublicAccessAllowed = isWelcome || (isResultsPage && isPreview);
+      const isPublicAccessAllowed = isWelcome || (isResultsPage && (isPreview || isPublicPrettyPreviewPath));
 
       if (isPublicAccessAllowed) {
         setIsCheckingAuth(false);
@@ -133,7 +143,7 @@ export default function Layout({ children, currentPageName }) {
     }
 
     return () => window.removeEventListener('resize', checkMobile);
-  }, [currentPageName, isPreview, isWelcome, isResultsPage]);
+  }, [currentPageName, isPreview, isWelcome, isResultsPage, isPublicPrettyPreviewPath]);
   
   const getDarkerBrandColor = (color) => {
     if (!color || typeof color !== 'string' || !color.startsWith('#')) return '#cc0033';
@@ -157,7 +167,7 @@ export default function Layout({ children, currentPageName }) {
   const darkerBrandColor = getDarkerBrandColor(brandColor);
 
   // Don't show layout for welcome or preview
-  if (isWelcome || (isResultsPage && isPreview)) {
+  if (isWelcome || (isResultsPage && (isPreview || isPublicPrettyPreviewPath))) {
     return <ErrorBoundary>{children}</ErrorBoundary>;
   }
 

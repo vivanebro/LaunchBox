@@ -60,6 +60,14 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
+      <Route
+        path="/:creator/:slug"
+        element={
+          <LayoutWrapper currentPageName="Results">
+            <Pages.Results />
+          </LayoutWrapper>
+        }
+      />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

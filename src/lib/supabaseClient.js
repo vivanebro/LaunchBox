@@ -39,6 +39,7 @@ const TABLE_COLUMNS = {
     'pricing_availability', 'currency',
     'pricing_label_onetime', 'pricing_label_retainer',
     'pricing_button_label_onetime', 'pricing_button_label_retainer',
+    'creator_slug', 'public_slug',
     'brand_color', 'logo_url', 'logo_height', 'guarantee', 'urgency',
     'package_data', 'package_durations', 'package_names',
     'package_descriptions', 'button_links', 'active_packages',
@@ -48,7 +49,7 @@ const TABLE_COLUMNS = {
     'original_price_starter_retainer', 'original_price_growth_retainer', 'original_price_premium_retainer', 'original_price_elite_retainer',
   ]),
   users: new Set([
-    'id', 'email', 'full_name', 'role', 'created_date', 'updated_date',
+    'id', 'email', 'full_name', 'role', 'creator_slug', 'created_date', 'updated_date',
   ]),
   help_requests: new Set([
     'id', 'message', 'status', 'created_by', 'created_date', 'updated_date',
