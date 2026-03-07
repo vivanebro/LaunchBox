@@ -206,18 +206,6 @@ export default function PackageBuilder() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F5F5F7' }}>
       <div className="max-w-4xl mx-auto px-6 py-12">
-        {/* Back Button */}
-        {step > 1 && (
-          <Button
-            onClick={handleBack}
-            variant="ghost"
-            className="mb-8 text-gray-600 hover:text-gray-900 hover:bg-white rounded-full"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-        )}
-
         {/* Step Indicator */}
         <StepIndicator currentStep={step} totalSteps={TOTAL_STEPS} onStepClick={setStep} />
 
@@ -242,8 +230,21 @@ export default function PackageBuilder() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Next Button */}
-        <div className="flex justify-end mt-8">
+        {/* Navigation Buttons */}
+        <div className="flex items-center justify-between mt-8">
+          <div>
+            {step > 1 && (
+              <Button
+                onClick={handleBack}
+                variant="ghost"
+                className="text-gray-600 hover:text-gray-900 hover:bg-white rounded-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            )}
+          </div>
+
           <Button
             onClick={handleNext}
             disabled={!canProceed()}

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { createPageUrl } from '@/utils';
+import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 
 export default function Welcome() {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [creatorSlug, setCreatorSlug] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -34,7 +36,29 @@ export default function Welcome() {
         if (error) throw error;
         window.location.href = createPageUrl('Dashboard');
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const normalized = slugify(creatorSlug, '');
+        if (!normalized) {
+          setError('Please choose a URL slug (e.g. your name or brand)');
+          setSubmitting(false);
+          return;
+        }
+        const validation = validateCreatorSlug(normalized);
+        if (!validation.valid) {
+          setError(validation.error);
+          setSubmitting(false);
+          return;
+        }
+        const available = await isCreatorSlugAvailable(normalized);
+        if (!available) {
+          setError('This URL slug is already taken. Please choose another.');
+          setSubmitting(false);
+          return;
+        }
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { creator_slug: normalized } }
+        });
         if (error) throw error;
         setMessage('Account created! Check your email to confirm, then log in.');
         setMode('login');
@@ -88,7 +112,7 @@ export default function Welcome() {
         <p style={{ textAlign: 'center', color: '#666', marginBottom: '28px', fontSize: '14px' }}>
           {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
           <button
-            onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(null); setMessage(null); }}
+            onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(null); setMessage(null); setCreatorSlug(''); }}
             style={{ color: '#ff0044', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: 0 }}
           >
             {mode === 'login' ? 'Sign up' : 'Log in'}
@@ -130,6 +154,27 @@ export default function Welcome() {
               }}
             />
           </div>
+
+          {mode === 'signup' && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                URL Slug
+              </label>
+              <input
+                type="text"
+                value={creatorSlug}
+                onChange={(e) => setCreatorSlug(e.target.value)}
+                placeholder="Your preferred URL slug"
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1.5px solid #e5e7eb',
+                  borderRadius: '8px', fontSize: '15px', outline: 'none', boxSizing: 'border-box'
+                }}
+              />
+              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Your package links will be: yourdomain.com/<strong>{creatorSlug ? slugify(creatorSlug, '') || 'your-slug' : 'your-slug'}</strong>/package-name
+              </p>
+            </div>
+          )}
 
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>

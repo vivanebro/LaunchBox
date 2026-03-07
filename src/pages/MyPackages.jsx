@@ -8,6 +8,7 @@ import { Trash2, Edit, Loader2, Package as PackageIcon, AlertCircle, Eye, Share2
 import { createPageUrl } from '@/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { fetchAnalyticsForPackages } from '@/lib/packageAnalytics';
+import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
 
 export default function MyPackages() {
   const [packages, setPackages] = useState([]);
@@ -18,6 +19,7 @@ export default function MyPackages() {
   const [editingName, setEditingName] = useState(null);
   const [editedName, setEditedName] = useState('');
   const [analytics, setAnalytics] = useState({});
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     loadPackages();
@@ -27,6 +29,7 @@ export default function MyPackages() {
     setLoading(true);
     try {
       const currentUser = await supabaseClient.auth.me();
+      setCurrentUser(currentUser);
       const fetchedPackages = await supabaseClient.entities.PackageConfig.filter(
         { created_by: currentUser.id },
         '-created_date'
@@ -64,15 +67,21 @@ export default function MyPackages() {
 
   const handlePreview = (pkg) => {
     localStorage.setItem('packageConfig', JSON.stringify(pkg));
-    const previewUrl = createPageUrl('Results') + `?preview=true&packageId=${pkg.id}`;
-    window.open(previewUrl, '_blank');
+    getPublicPreviewPath(pkg, currentUser)
+      .then((previewPath) => window.open(previewPath, '_blank'))
+      .catch((error) => {
+        console.error('Error generating preview URL:', error);
+        const fallbackUrl = createPageUrl('Results') + `?preview=true&packageId=${pkg.id}`;
+        window.open(fallbackUrl, '_blank');
+      });
   };
 
   const handleCopyLink = async (pkg) => {
     setCopying(pkg.id);
     try {
       const baseUrl = window.location.origin;
-      const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${pkg.id}`;
+      const previewPath = await getPublicPreviewPath(pkg, currentUser);
+      const previewUrl = baseUrl + previewPath;
       await navigator.clipboard.writeText(previewUrl);
       
       // Show success feedback
@@ -90,8 +99,23 @@ export default function MyPackages() {
     setCopying(`embed-${pkg.id}`);
     try {
       const baseUrl = window.location.origin;
-      const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${pkg.id}`;
-      const embedCode = `<iframe src="${previewUrl}" width="100%" height="800px" frameborder="0" style="border-radius: 12px;"></iframe>`;
+      const previewPath = await getPublicPreviewPath(pkg, currentUser);
+      const previewUrl = new URL(baseUrl + previewPath);
+      previewUrl.searchParams.set('embed', 'true');
+      const iframeId = `launchbox-embed-${pkg.id}`;
+      const embedCode = `<iframe id="${iframeId}" src="${previewUrl.toString()}" width="100%" style="border:0;border-radius:12px;min-height:800px;" scrolling="no"></iframe>
+<script>
+(function() {
+  var iframe = document.getElementById('${iframeId}');
+  if (!iframe) return;
+  function onMessage(event) {
+    if (!event.data || event.data.type !== 'launchbox:embedHeight') return;
+    if (typeof event.data.height !== 'number') return;
+    iframe.style.height = Math.max(800, event.data.height) + 'px';
+  }
+  window.addEventListener('message', onMessage);
+})();
+</script>`;
       await navigator.clipboard.writeText(embedCode);
       
       // Show success feedback

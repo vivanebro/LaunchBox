@@ -3,12 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2 } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 import { logPackageView, startTimeTracking, logButtonClick } from '@/lib/packageAnalytics';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { useParams } from 'react-router-dom';
+import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
 
@@ -39,6 +42,8 @@ const roundToNearest50IfNeeded = (price) => {
   return Math.ceil(price / 50) * 50;
 };
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Currency symbol helper
 const getCurrencySymbol = (currency) => {
   const symbols = {
@@ -61,6 +66,7 @@ const CURRENCIES = [
 ];
 
 export default function Results() {
+  const { creator, slug } = useParams();
   const [config, setConfig] = useState(null);
   const [pricingMode, setPricingMode] = useState('one-time');
   const [currentDesign, setCurrentDesign] = useState(1);
@@ -68,6 +74,8 @@ export default function Results() {
   const [popularPackageIndex, setPopularPackageIndex] = useState({ onetime: 2, retainer: 2 });
   const [popularBadgeText, setPopularBadgeText] = useState('Most Popular');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isEmbedMode, setIsEmbedMode] = useState(false);
+  const [previewNotFound, setPreviewNotFound] = useState(false);
   const [packageId, setPackageId] = useState(null);
   const [isMobileView, setIsMobileView] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -76,11 +84,18 @@ export default function Results() {
   const [tempLabelOnetime, setTempLabelOnetime] = useState('');
   const [tempLabelRetainer, setTempLabelRetainer] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showExitEditModeModal, setShowExitEditModeModal] = useState(false);
   const [packageToDelete, setPackageToDelete] = useState(null);
   const [lastDeletedTier, setLastDeletedTier] = useState(null);
+  const pendingNavigationRef = useRef(null);
+  const bypassExitWarningRef = useRef(false);
   const toggleEditRef = useRef(null);
+  const undoHistoryRef = useRef([]);
   const exportRef = React.useRef(null);
   const [exporting, setExporting] = React.useState(false);
+  const [exportingPdf, setExportingPdf] = React.useState(false);
+  const [showPdfOptions, setShowPdfOptions] = React.useState(false);
+  const [canUndo, setCanUndo] = useState(false);
 
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
@@ -94,27 +109,12 @@ export default function Results() {
     document.head.appendChild(link);
 
     const urlParams = new URLSearchParams(window.location.search);
-    const isPreview = urlParams.get('preview') === 'true';
+    const isPrettyPreviewPath = Boolean(creator && slug);
+    const isPreview = urlParams.get('preview') === 'true' || isPrettyPreviewPath;
+    const isEmbed = urlParams.get('embed') === 'true';
     let idFromUrl = urlParams.get('packageId');
     setIsPreviewMode(isPreview);
-    if (isPreview && idFromUrl) {
-      // Only track if viewer is NOT the owner (not logged in)
-      supabaseClient.auth.me().then(() => {
-        // logged in = owner, don't track
-      }).catch(() => {
-        // not logged in = real client, track it
-        window.__analyticsViewId = null;
-        window.__analyticsPending = logPackageView(idFromUrl).then(viewId => {
-          window.__analyticsViewId = viewId;
-          const cleanup = startTimeTracking(viewId);
-          window.__analyticsCleanup = cleanup;
-          return viewId;
-        });
-      });
-    }
-    if (idFromUrl) {
-      setPackageId(idFromUrl);
-    }
+    setIsEmbedMode(isEmbed);
 
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
@@ -126,6 +126,41 @@ export default function Results() {
     const loadPackageConfig = async () => {
       // Set initial pricing mode based on pricing_availability
       let loadedConfig = null;
+      setPreviewNotFound(false);
+      if (!idFromUrl && isPrettyPreviewPath) {
+        try {
+          const matchingPackages = await supabaseClient.asServiceRole.entities.PackageConfig.filter({
+            creator_slug: creator,
+            public_slug: slug
+          });
+          if (matchingPackages.length > 0) {
+            loadedConfig = matchingPackages[0];
+            idFromUrl = loadedConfig.id;
+          }
+        } catch (publicPathError) {
+          console.error('Error loading package by public URL:', publicPathError);
+        }
+      }
+
+      if (isPreview && idFromUrl) {
+        // Only track if viewer is NOT the owner (not logged in)
+        supabaseClient.auth.me().then(() => {
+          // logged in = owner, don't track
+        }).catch(() => {
+          // not logged in = real client, track it
+          window.__analyticsViewId = null;
+          window.__analyticsPending = logPackageView(idFromUrl).then(viewId => {
+            window.__analyticsViewId = viewId;
+            const cleanup = startTimeTracking(viewId);
+            window.__analyticsCleanup = cleanup;
+            return viewId;
+          });
+        });
+      }
+
+      if (idFromUrl) {
+        setPackageId(idFromUrl);
+      }
 
       if (idFromUrl) {
         try {
@@ -155,7 +190,7 @@ export default function Results() {
         }
       }
       
-      if (!loadedConfig) {
+      if (!loadedConfig && !isPreview) {
         const savedConfig = localStorage.getItem('packageConfig');
         if (savedConfig) {
           loadedConfig = JSON.parse(savedConfig);
@@ -165,6 +200,11 @@ export default function Results() {
             delete loadedConfig.id;
           }
         }
+      }
+
+      if (!loadedConfig && isPreview) {
+        setPreviewNotFound(true);
+        return;
       }
 
       if (loadedConfig) {
@@ -252,6 +292,7 @@ export default function Results() {
         if (loadedConfig.pricing_label_retainer === undefined) loadedConfig.pricing_label_retainer = 'monthly';
         if (loadedConfig.pricing_button_label_onetime === undefined) loadedConfig.pricing_button_label_onetime = 'One-time Project';
         if (loadedConfig.pricing_button_label_retainer === undefined) loadedConfig.pricing_button_label_retainer = 'Monthly Retainer';
+        if (loadedConfig.retainer_discount_text === undefined) loadedConfig.retainer_discount_text = '15% off one-time price';
         if (loadedConfig.starter_duration === undefined) loadedConfig.starter_duration = null;
         if (loadedConfig.growth_duration === undefined) loadedConfig.growth_duration = null;
         if (loadedConfig.premium_duration === undefined) loadedConfig.premium_duration = null;
@@ -520,6 +561,7 @@ export default function Results() {
             pricing_label_retainer: 'monthly',
             pricing_button_label_onetime: 'One-time Project',
             pricing_button_label_retainer: 'Monthly Retainer',
+            retainer_discount_text: '15% off one-time price',
             starter_duration: null,
             growth_duration: null,
             premium_duration: null,
@@ -558,7 +600,34 @@ export default function Results() {
     loadPackageConfig();
 
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  }, [creator, slug]);
+
+  useEffect(() => {
+    if (!isPreviewMode || !isEmbedMode) return;
+
+    const sendEmbedHeight = () => {
+      const height = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      window.parent.postMessage(
+        { type: 'launchbox:embedHeight', height },
+        '*'
+      );
+    };
+
+    const resizeObserver = new ResizeObserver(() => sendEmbedHeight());
+    resizeObserver.observe(document.body);
+    sendEmbedHeight();
+    window.addEventListener('load', sendEmbedHeight);
+    window.addEventListener('resize', sendEmbedHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('load', sendEmbedHeight);
+      window.removeEventListener('resize', sendEmbedHeight);
+    };
+  }, [isPreviewMode, isEmbedMode, pricingMode, config]);
 
   // Use a ref to always have the latest config available (avoids stale closures)
   const configRef = useRef(config);
@@ -566,9 +635,36 @@ export default function Results() {
     configRef.current = config;
   }, [config]);
 
+  const cloneForUndo = (obj) => (typeof structuredClone === 'function' ? structuredClone(obj) : JSON.parse(JSON.stringify(obj)));
+
+  const pushUndoSnapshot = () => {
+    if (!config) return;
+    const c = configRef.current || config;
+    undoHistoryRef.current.push({
+      config: cloneForUndo(c),
+      popularPackageIndex: cloneForUndo(popularPackageIndex),
+      popularBadgeText
+    });
+    setCanUndo(true);
+  };
+
+  const handleUndo = () => {
+    const prev = undoHistoryRef.current.pop();
+    if (!prev) return;
+    setConfig(prev.config);
+    configRef.current = prev.config;
+    setPopularPackageIndex(prev.popularPackageIndex);
+    setPopularBadgeText(prev.popularBadgeText);
+    localStorage.setItem('packageConfig', JSON.stringify(prev.config));
+    setCanUndo(undoHistoryRef.current.length > 0);
+  };
+
   const updateConfig = (field, value) => {
     const currentConfig = configRef.current || config;
     const updatedConfig = { ...currentConfig, [field]: value };
+    if (!isPreviewMode && currentConfig[field] !== value) {
+      pushUndoSnapshot();
+    }
     setConfig(updatedConfig);
     configRef.current = updatedConfig;
     localStorage.setItem('packageConfig', JSON.stringify(updatedConfig));
@@ -587,6 +683,10 @@ export default function Results() {
   // Helper to update multiple fields at once (avoids stale state issues)
   const updateConfigMultiple = (updates) => {
     const currentConfig = configRef.current || config;
+    const hasChanges = Object.keys(updates).some((k) => currentConfig[k] !== updates[k]);
+    if (!isPreviewMode && hasChanges) {
+      pushUndoSnapshot();
+    }
     const updatedConfig = { ...currentConfig, ...updates };
     setConfig(updatedConfig);
     configRef.current = updatedConfig;
@@ -949,9 +1049,15 @@ export default function Results() {
       localStorage.setItem('packageConfig', JSON.stringify(configToSave));
 
       const baseUrl = window.location.origin;
-      const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${savedPackageId}`;
+      const currentUser = await supabaseClient.auth.me();
+      const previewPath = await getPublicPreviewPath(
+        { ...latestConfig, id: savedPackageId },
+        currentUser
+      );
+      const previewUrl = baseUrl + previewPath;
       window.open(previewUrl, '_blank');
 
+      bypassExitWarningRef.current = true;
       window.location.href = createPageUrl('MyPackages');
 
     } catch (error) {
@@ -998,7 +1104,71 @@ export default function Results() {
     setCurrentDesign((prev) => (prev - 1 + 2) % 2);
   };
 
+  useEffect(() => {
+    if (!config || isPreviewMode) return;
+
+    const shouldWarnOnExit = () => !bypassExitWarningRef.current;
+
+    const handleBeforeUnload = (event) => {
+      if (!shouldWarnOnExit()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    const handleDocumentClick = (event) => {
+      if (!shouldWarnOnExit()) return;
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (!(event.target instanceof Element)) return;
+
+      const link = event.target.closest('a[href]');
+      if (!link) return;
+      if (link.target === '_blank' || link.hasAttribute('download')) return;
+
+      const nextUrl = new URL(link.href, window.location.href);
+      const currentUrl = new URL(window.location.href);
+      const isSamePage = nextUrl.pathname === currentUrl.pathname && nextUrl.search === currentUrl.search && nextUrl.hash === currentUrl.hash;
+
+      if (isSamePage) return;
+      if (nextUrl.origin !== currentUrl.origin) return;
+
+      event.preventDefault();
+      pendingNavigationRef.current = nextUrl.toString();
+      setShowExitEditModeModal(true);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('click', handleDocumentClick, true);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleDocumentClick, true);
+    };
+  }, [config, isPreviewMode]);
+
+  useEffect(() => {
+    if (isPreviewMode) return;
+    const onKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && undoHistoryRef.current.length > 0) {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isPreviewMode]);
+
   if (!config) {
+    if (previewNotFound) {
+      return (
+        <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
+          <div className="text-center max-w-md px-6">
+            <p className="text-2xl font-bold text-gray-900 mb-2">Preview Not Found</p>
+            <p className="text-gray-600">This package preview link is invalid or no longer available.</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
         <div className="text-center">
@@ -1036,31 +1206,41 @@ export default function Results() {
   // Available package tiers
   const availableTiers = ['starter', 'growth', 'premium', 'elite'];
   const activePackages = config.active_packages?.[modeKey] || ['starter', 'growth', 'premium'];
+  const getPackageDescription = (tier, fallback) => {
+    const descriptions = config.package_descriptions?.[modeKey];
+    if (!descriptions || typeof descriptions !== 'object') return fallback;
+
+    if (Object.prototype.hasOwnProperty.call(descriptions, tier)) {
+      return descriptions[tier] === null ? null : (descriptions[tier] ?? fallback);
+    }
+
+    return fallback;
+  };
 
   const packages = activePackages.map((tier, index) => {
     const tierData = {
       starter: {
         name: config.package_names?.[modeKey]?.starter || 'Starter',
         price: pricingMode === 'one-time' ? config.price_starter : config.price_starter_retainer,
-        description: config.package_descriptions?.[modeKey]?.starter || 'For individuals just starting out who need essential features',
+        description: getPackageDescription('starter', 'For individuals just starting out who need essential features'),
         duration: config.package_durations?.[modeKey]?.starter || getDurationForTier('starter')
       },
       growth: {
         name: config.package_names?.[modeKey]?.growth || 'Growth',
         price: pricingMode === 'one-time' ? config.price_growth : config.price_growth_retainer,
-        description: config.package_descriptions?.[modeKey]?.growth || 'For growing businesses that want to scale their content',
+        description: getPackageDescription('growth', 'For growing businesses that want to scale their content'),
         duration: config.package_durations?.[modeKey]?.growth || getDurationForTier('growth')
       },
       premium: {
         name: config.package_names?.[modeKey]?.premium || 'Premium',
         price: pricingMode === 'one-time' ? config.price_premium : config.price_premium_retainer,
-        description: config.package_descriptions?.[modeKey]?.premium || 'For established brands that need complete solutions',
+        description: getPackageDescription('premium', 'For established brands that need complete solutions'),
         duration: config.package_durations?.[modeKey]?.premium || getDurationForTier('premium')
       },
       elite: {
         name: config.package_names?.[modeKey]?.elite || 'Elite',
         price: pricingMode === 'one-time' ? (config.price_elite || 0) : (config.price_elite_retainer || 0),
-        description: config.package_descriptions?.[modeKey]?.elite || 'For enterprise clients that need the ultimate solution',
+        description: getPackageDescription('elite', 'For enterprise clients that need the ultimate solution'),
         duration: config.package_durations?.[modeKey]?.elite || getDurationForTier('elite')
       }
     }[tier];
@@ -1162,6 +1342,13 @@ export default function Results() {
   };
 
   const previewPackages = packages;
+  const retainerDiscountText = config.retainer_discount_text ?? '15% off one-time price';
+  const disablePreviewAnimations = isPreviewMode || exporting || exportingPdf;
+  const getPreviewMotionProps = (index) => (
+    disablePreviewAnimations
+      ? { initial: false, animate: { opacity: 1, y: 0 }, transition: { duration: 0 } }
+      : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { delay: index * 0.1 } }
+  );
 
   const EditableText = ({ value, onSave, className, multiline, placeholder, darkMode, brandColor }) => {
     const safeValue = value || '';
@@ -1253,7 +1440,7 @@ export default function Results() {
         }}
       >
         {value || <span className="text-gray-400 italic">{placeholder}</span>}
-        <Edit2 className={`w-3 h-3 absolute -right-1 -top-1 opacity-0 group-hover:opacity-100 ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
+        <Edit2 className={`w-4 h-4 absolute right-3 -top-1 opacity-0 group-hover:opacity-100 ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
       </div>
     );
   };
@@ -1944,36 +2131,75 @@ export default function Results() {
                       </button>
                     ) : <div />}
                   </div>
-                  <div className="flex items-baseline gap-1 justify-center">
-                    <EditablePrice
-                      value={pkg.price}
-                      onSave={(newPrice) => {
-                        if (pricingMode === 'one-time') {
-                          const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
-                          updateConfigMultiple({
-                            [`price_${tierName}`]: newPrice,
-                            [`price_${tierName}_retainer`]: retainerPrice
-                          });
-                        } else {
-                          updateConfig(`price_${tierName}_retainer`, newPrice);
-                        }
-                      }}
-                      className={`font-bold inline-block ${packages.length === 4 ? 'text-3xl' : 'text-4xl'}`}
-                      style={{ color: brandColor }}
-                      brandColor={brandColor}
-                    />
-                    <span className="text-base text-gray-500">
-                      / <EditableText
-                        value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
-                        onSave={(newValue) => {
-                          const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
-                          updateConfig(field, newValue);
+                  <div>
+                    <div className="flex items-baseline gap-1 justify-center">
+                      <EditablePrice
+                        value={pkg.price}
+                        onSave={(newPrice) => {
+                          if (pricingMode === 'one-time') {
+                            const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
+                            updateConfigMultiple({
+                              [`price_${tierName}`]: newPrice,
+                              [`price_${tierName}_retainer`]: retainerPrice
+                            });
+                          } else {
+                            updateConfig(`price_${tierName}_retainer`, newPrice);
+                          }
                         }}
-                        className="inline text-base"
-                        placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                        className={`font-bold inline-block ${packages.length === 4 ? 'text-3xl' : 'text-4xl'}`}
+                        style={{ color: brandColor }}
                         brandColor={brandColor}
                       />
-                    </span>
+                      <span className="text-base text-gray-500">
+                        / <EditableText
+                          value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                          onSave={(newValue) => {
+                            const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
+                            updateConfig(field, newValue);
+                          }}
+                          className="inline text-base"
+                          placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                          brandColor={brandColor}
+                        />
+                      </span>
+                    </div>
+                    {pricingMode === 'retainer' && (
+                      <div className="mt-1 flex justify-center">
+                        {retainerDiscountText?.trim() ? (
+                          <div className="relative group/discount inline-block">
+                            <EditableText
+                              value={retainerDiscountText}
+                              onSave={(newValue) => updateConfig('retainer_discount_text', newValue)}
+                              className="text-xs text-gray-500 text-center"
+                              placeholder="15% off one-time price"
+                              multiline={false}
+                              darkMode={false}
+                              brandColor={brandColor}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateConfig('retainer_discount_text', '');
+                              }}
+                              className="absolute -right-1 -top-1 opacity-0 group-hover/discount:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                              title="Delete discount text"
+                              aria-label="Delete discount text"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => updateConfig('retainer_discount_text', '15% off one-time price')}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline"
+                          >
+                            + Add discount text
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {pricingMode === 'one-time' && (
@@ -1988,19 +2214,42 @@ export default function Results() {
                   </p>
                 )}
 
-                <div 
-                  className="mb-6 p-4 rounded-xl"
-                  style={{ backgroundColor: `${brandColor}15` }}
-                >
-                  <EditableText
-                    value={pkg.description}
-                    onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                    className="text-sm text-gray-700"
-                    multiline={true}
-                    placeholder="Describe who this package is best for"
-                    brandColor={brandColor}
-                  />
-                </div>
+                {pkg.description !== null ? (
+                  <div
+                    className="mb-6 p-4 rounded-xl relative group/desc"
+                    style={{ backgroundColor: `${brandColor}15` }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updatePackageDescription(tierName, null);
+                      }}
+                      className="absolute top-2 right-2 opacity-0 group-hover/desc:opacity-100 transition-opacity text-red-400 hover:text-red-600"
+                      title="Delete description"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <EditableText
+                      value={pkg.description}
+                      onSave={(newValue) => updatePackageDescription(tierName, newValue)}
+                      className="text-sm text-gray-700"
+                      multiline={true}
+                      placeholder="Describe who this package is best for"
+                      brandColor={brandColor}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updatePackageDescription(tierName, '');
+                    }}
+                    className="mb-6 text-sm font-medium underline"
+                    style={{ color: brandColor }}
+                  >
+                    + Add description
+                  </button>
+                )}
 
                 <div className={`space-y-3 mb-6`}>
                   <p className="text-sm font-semibold text-gray-500 uppercase">Deliverables</p>
@@ -2277,37 +2526,76 @@ export default function Results() {
                       </button>
                     ) : <div />}
                   </div>
-                  <div className="flex items-baseline gap-1 justify-center">
-                    <EditablePrice
-                      value={pkg.price}
-                      onSave={(newPrice) => {
-                        if (pricingMode === 'one-time') {
-                          const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
-                          updateConfigMultiple({
-                            [`price_${tierName}`]: newPrice,
-                            [`price_${tierName}_retainer`]: retainerPrice
-                          });
-                        } else {
-                          updateConfig(`price_${tierName}_retainer`, newPrice);
-                        }
-                      }}
-                      className={`font-bold text-white inline-block ${packages.length === 4 ? 'text-4xl' : 'text-5xl'}`}
-                      darkMode={true}
-                      brandColor={brandColor}
-                    />
-                    <span className="text-base text-white/70">
-                      / <EditableText
-                        value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
-                        onSave={(newValue) => {
-                          const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
-                          updateConfig(field, newValue);
+                  <div>
+                    <div className="flex items-baseline gap-1 justify-center">
+                      <EditablePrice
+                        value={pkg.price}
+                        onSave={(newPrice) => {
+                          if (pricingMode === 'one-time') {
+                            const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
+                            updateConfigMultiple({
+                              [`price_${tierName}`]: newPrice,
+                              [`price_${tierName}_retainer`]: retainerPrice
+                            });
+                          } else {
+                            updateConfig(`price_${tierName}_retainer`, newPrice);
+                          }
                         }}
-                        className="inline text-base"
-                        placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                        className={`font-bold text-white inline-block ${packages.length === 4 ? 'text-4xl' : 'text-5xl'}`}
                         darkMode={true}
                         brandColor={brandColor}
                       />
-                    </span>
+                      <span className="text-base text-white/70">
+                        / <EditableText
+                          value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                          onSave={(newValue) => {
+                            const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
+                            updateConfig(field, newValue);
+                          }}
+                          className="inline text-base"
+                          placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                          darkMode={true}
+                          brandColor={brandColor}
+                        />
+                      </span>
+                    </div>
+                    {pricingMode === 'retainer' && (
+                      <div className="mt-1 flex justify-center">
+                        {retainerDiscountText?.trim() ? (
+                          <div className="relative group/discount inline-block">
+                            <EditableText
+                              value={retainerDiscountText}
+                              onSave={(newValue) => updateConfig('retainer_discount_text', newValue)}
+                              className="text-xs text-white/70 text-center"
+                              placeholder="15% off one-time price"
+                              multiline={false}
+                              darkMode={true}
+                              brandColor={brandColor}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateConfig('retainer_discount_text', '');
+                              }}
+                              className="absolute -right-1 -top-1 opacity-0 group-hover/discount:opacity-100 text-white/50 hover:text-red-300 transition-opacity"
+                              title="Delete discount text"
+                              aria-label="Delete discount text"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => updateConfig('retainer_discount_text', '15% off one-time price')}
+                            className="text-xs text-white/50 hover:text-white/70 underline"
+                          >
+                            + Add discount text
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {pricingMode === 'one-time' && (
@@ -2323,20 +2611,42 @@ export default function Results() {
                   </p>
                 )}
 
-                <div 
-                  className="mb-6 p-4 rounded-xl"
-                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-                >
-                  <EditableText
-                    value={pkg.description}
-                    onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                    className="text-sm text-white"
-                    multiline={true}
-                    placeholder="Describe who this package is best for"
-                    darkMode={true}
-                    brandColor={brandColor}
-                  />
-                </div>
+                {pkg.description !== null ? (
+                  <div
+                    className="mb-6 p-4 rounded-xl relative group/desc"
+                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updatePackageDescription(tierName, null);
+                      }}
+                      className="absolute top-2 right-2 opacity-0 group-hover/desc:opacity-100 transition-opacity text-red-200 hover:text-red-100"
+                      title="Delete description"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <EditableText
+                      value={pkg.description}
+                      onSave={(newValue) => updatePackageDescription(tierName, newValue)}
+                      className="text-sm text-white"
+                      multiline={true}
+                      placeholder="Describe who this package is best for"
+                      darkMode={true}
+                      brandColor={brandColor}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updatePackageDescription(tierName, '');
+                    }}
+                    className="mb-6 text-sm font-medium underline text-white/80 hover:text-white"
+                  >
+                    + Add description
+                  </button>
+                )}
 
                 <div className={`space-y-3 mb-6`}>
                   <p className="text-sm font-semibold text-white/70 uppercase">Deliverables</p>
@@ -2476,9 +2786,7 @@ export default function Results() {
           return (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              {...getPreviewMotionProps(index)}
               className={`relative bg-white rounded-3xl border-2 border-gray-200 shadow-lg flex flex-col ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
             >
               <div className={`flex-grow flex flex-col items-center justify-center ${previewPackages.length === 4 ? 'py-6' : 'py-12'}`}>
@@ -2530,9 +2838,7 @@ export default function Results() {
         return (
         <motion.div
           key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
+          {...getPreviewMotionProps(index)}
           className={`relative bg-white rounded-3xl border-2 flex flex-col ${
             pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
           } ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
@@ -2567,13 +2873,18 @@ export default function Results() {
                     )}
                   </div>
                 )}
-                <div className="flex items-baseline gap-1 justify-center">
-                  <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-2xl' : 'text-4xl'}`}>
-                    {currencySymbol}{(pkg.price || 0).toLocaleString()}
+                <div>
+                  <div className="flex items-baseline gap-1 justify-center">
+                    <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-2xl' : 'text-4xl'}`}>
+                      {currencySymbol}{(pkg.price || 0).toLocaleString()}
+                    </div>
+                    <span className={`text-gray-500 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
+                      / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                    </span>
                   </div>
-                  <span className={`text-gray-500 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
-                    / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
-                  </span>
+                  {pricingMode === 'retainer' && retainerDiscountText?.trim() && (
+                    <p className="text-xs text-gray-500 text-center mt-1">{retainerDiscountText}</p>
+                  )}
                 </div>
               </div>
               {pricingMode === 'one-time' && (
@@ -2582,12 +2893,14 @@ export default function Results() {
                 </p>
               )}
 
-              <div 
-                className={`p-3 rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
-                style={{ backgroundColor: `${brandColor}15` }}
-              >
-                <p className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
-              </div>
+              {pkg.description !== null && (
+                <div
+                  className={`p-3 rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
+                  style={{ backgroundColor: `${brandColor}15` }}
+                >
+                  <p className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
+                </div>
+              )}
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
@@ -2673,9 +2986,7 @@ export default function Results() {
           return (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              {...getPreviewMotionProps(index)}
               className={`relative rounded-3xl text-white shadow-2xl flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
             >
               <div className={`flex-grow flex flex-col items-center justify-center ${previewPackages.length === 4 ? 'py-6' : 'py-12'}`}>
@@ -2723,9 +3034,7 @@ export default function Results() {
         return (
         <motion.div
           key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
+          {...getPreviewMotionProps(index)}
           className={`relative rounded-3xl text-white shadow-2xl flex flex-col ${
             pkg.popular
               ? ''
@@ -2756,11 +3065,16 @@ export default function Results() {
                     )}
                   </div>
                 )}
-                <div className="flex items-baseline gap-1 justify-center">
-                  <div className={`font-bold ${previewPackages.length === 4 ? 'text-3xl' : 'text-5xl'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</div>
-                  <span className={`text-white/70 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
-                    / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
-                  </span>
+                <div>
+                  <div className="flex items-baseline gap-1 justify-center">
+                    <div className={`font-bold ${previewPackages.length === 4 ? 'text-3xl' : 'text-5xl'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</div>
+                    <span className={`text-white/70 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
+                      / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                    </span>
+                  </div>
+                  {pricingMode === 'retainer' && retainerDiscountText?.trim() && (
+                    <p className="text-xs text-white/70 text-center mt-1">{retainerDiscountText}</p>
+                  )}
                 </div>
               </div>
               {pricingMode === 'one-time' && (
@@ -2769,12 +3083,14 @@ export default function Results() {
                 </p>
               )}
 
-              <div 
-                className={`rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-              >
-                <p className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
-              </div>
+              {pkg.description !== null && (
+                <div
+                  className={`rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
+                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
+                >
+                  <p className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
+                </div>
+              )}
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
@@ -2849,12 +3165,70 @@ export default function Results() {
     return previewDesigns[0]();
   };
 
+  const persistWizardDraft = () => {
+    const latestConfig = configRef.current || config;
+    localStorage.setItem('packageConfig', JSON.stringify(latestConfig));
+    localStorage.setItem('editingFromResults', 'true');
+    if (packageId) {
+      localStorage.setItem('editingPackageId', packageId);
+    }
+  };
 
+  const exitEditMode = async ({ saveBeforeExit }) => {
+    const pendingUrl = pendingNavigationRef.current || createPageUrl('PackageBuilder');
+    const isWizardExit = (() => {
+      const destination = new URL(pendingUrl, window.location.href);
+      const wizard = new URL(createPageUrl('PackageBuilder'), window.location.href);
+      return destination.origin === wizard.origin && destination.pathname === wizard.pathname;
+    })();
+
+    setShowExitEditModeModal(false);
+    pendingNavigationRef.current = null;
+
+    if (saveBeforeExit) {
+      try {
+        if (isWizardExit) {
+          persistWizardDraft();
+        }
+        await silentSave();
+      } catch (error) {
+        console.error('Failed to save before exiting:', error);
+        alert('Failed to save changes before exiting.');
+        return;
+      }
+    }
+
+    bypassExitWarningRef.current = true;
+    window.location.href = pendingUrl;
+  };
 
   if (isPreviewMode) {
     return (
       <div className="min-h-screen py-6 md:py-12" style={{ backgroundColor: '#F5F5F7' }}>
         <div className="max-w-7xl mx-auto px-4 md:px-6">
+          {!isEmbedMode && <div className="flex justify-center mb-6">
+            <button
+              onClick={() =>
+                exportPackageAsImages({
+                  exportRef,
+                  packageName: config.package_set_name || config.business_name || 'package',
+                  config,
+                  pricingMode,
+                  setExporting,
+                  setIsPreviewMode,
+                  isPreviewMode,
+                  setPricingMode
+                })
+              }
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              {exporting ? 'Exporting...' : 'Download image'}
+            </button>
+          </div>}
+
+          <div ref={exportRef}>
           <div className="text-center">
             {config.logo_url && (
               <img 
@@ -2913,6 +3287,7 @@ export default function Results() {
               <p className="text-sm text-gray-700 italic">{config.urgency}</p>
             )}
           </div>
+          </div>
         </div>
       </div>
     );
@@ -2929,14 +3304,111 @@ export default function Results() {
     { name: 'Indigo', color: '#6366F1' }
   ];
 
-  const goBackToWizard = () => {
-    const latestConfig = configRef.current || config;
-    localStorage.setItem('packageConfig', JSON.stringify(latestConfig));
-    localStorage.setItem('editingFromResults', 'true');
-    if (packageId) {
-      localStorage.setItem('editingPackageId', packageId);
+  const downloadAsPdf = async (orientation = 'portrait') => {
+    if (!exportRef?.current) return;
+
+    const safeName = (config?.package_set_name || config?.business_name || 'package')
+      .replace(/[^a-z0-9]/gi, '_')
+      .toLowerCase();
+    const originalPreviewMode = isPreviewMode;
+
+    setExportingPdf(true);
+    try {
+      // Match PNG export behavior exactly by capturing preview-mode UI.
+      if (!originalPreviewMode) {
+        setIsPreviewMode(true);
+        await wait(300);
+      }
+
+      const imgData = await toPng(exportRef.current, { pixelRatio: 2 });
+      const [{ jsPDF }] = await Promise.all([import('jspdf')]);
+
+      const image = new Image();
+      const imageLoaded = new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+      });
+      image.src = imgData;
+      await imageLoaded;
+
+      const pdfOrientation = orientation === 'landscape' ? 'l' : 'p';
+      const pdf = new jsPDF(pdfOrientation, 'mm', 'a4');
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const contentWidthMm = pageWidth - margin * 2;
+      const contentHeightMm = pageHeight - margin * 2;
+
+      if (orientation === 'landscape') {
+        // Always keep landscape export on a single page without cropping.
+        const scale = Math.min(contentWidthMm / image.width, contentHeightMm / image.height);
+        const renderWidth = image.width * scale;
+        const renderHeight = image.height * scale;
+        const x = margin + (contentWidthMm - renderWidth) / 2;
+        const y = margin + (contentHeightMm - renderHeight) / 2;
+        pdf.addImage(imgData, 'PNG', x, y, renderWidth, renderHeight);
+        pdf.save(`${safeName}_${orientation}.pdf`);
+        return;
+      }
+
+      const fullRenderHeightMm = (image.height * contentWidthMm) / image.width;
+
+      // If it fits on one page, render once with original proportions.
+      if (fullRenderHeightMm <= contentHeightMm) {
+        const y = margin + (contentHeightMm - fullRenderHeightMm) / 2;
+        pdf.addImage(imgData, 'PNG', margin, y, contentWidthMm, fullRenderHeightMm);
+      } else {
+        // Slice into multiple pages instead of squeezing vertically.
+        const pxPerMm = image.width / contentWidthMm;
+        const pageSliceHeightPx = Math.floor(contentHeightMm * pxPerMm);
+        let renderedHeightPx = 0;
+        let pageIndex = 0;
+
+        while (renderedHeightPx < image.height) {
+          const remainingPx = image.height - renderedHeightPx;
+          const sliceHeightPx = Math.min(pageSliceHeightPx, remainingPx);
+
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = image.width;
+          sliceCanvas.height = sliceHeightPx;
+          const sliceCtx = sliceCanvas.getContext('2d');
+
+          if (!sliceCtx) break;
+
+          sliceCtx.drawImage(
+            image,
+            0,
+            renderedHeightPx,
+            image.width,
+            sliceHeightPx,
+            0,
+            0,
+            image.width,
+            sliceHeightPx
+          );
+
+          const sliceData = sliceCanvas.toDataURL('image/png');
+          const sliceHeightMm = sliceHeightPx / pxPerMm;
+
+          if (pageIndex > 0) {
+            pdf.addPage();
+          }
+
+          pdf.addImage(sliceData, 'PNG', margin, margin, contentWidthMm, sliceHeightMm);
+          renderedHeightPx += sliceHeightPx;
+          pageIndex += 1;
+        }
+      }
+
+      pdf.save(`${safeName}_${orientation}.pdf`);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      alert('Failed to export PDF.');
+    } finally {
+      setIsPreviewMode(originalPreviewMode);
+      setExportingPdf(false);
     }
-    window.location.href = createPageUrl('PackageBuilder');
   };
 
   return (
@@ -2945,7 +3417,10 @@ export default function Results() {
         <div className="flex items-center gap-4 mb-8">
           {config?.from_template && (
             <Button
-              onClick={() => { window.location.href = createPageUrl('Templates'); }}
+              onClick={() => {
+                pendingNavigationRef.current = createPageUrl('Templates');
+                setShowExitEditModeModal(true);
+              }}
               variant="ghost"
               className="text-gray-600 hover:text-gray-900 hover:bg-white rounded-full"
             >
@@ -2954,12 +3429,25 @@ export default function Results() {
             </Button>
           )}
           <Button
-            onClick={goBackToWizard}
+            onClick={() => {
+              pendingNavigationRef.current = null;
+              setShowExitEditModeModal(true);
+            }}
             variant="outline"
             className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-full font-medium"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Wizard
+          </Button>
+          <Button
+            onClick={handleUndo}
+            disabled={!canUndo}
+            variant="outline"
+            className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-4 h-4 mr-2" />
+            Undo
           </Button>
         </div>
 
@@ -3370,13 +3858,45 @@ export default function Results() {
 
         <div className="flex justify-center gap-4 flex-wrap">
           <button
-            onClick={() => exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, setPricingMode })}
+            onClick={() => exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, isPreviewMode, setPricingMode })}
             disabled={exporting}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
             {exporting ? 'Exporting...' : 'Export image'}
           </button>
+          <div className="relative">
+            <button
+              onClick={() => !exportingPdf && setShowPdfOptions((prev) => !prev)}
+              disabled={exportingPdf}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              {exportingPdf ? 'Exporting PDF...' : 'Export PDF'}
+            </button>
+            {showPdfOptions && !exportingPdf && (
+              <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden z-20 min-w-[180px]">
+                <button
+                  onClick={async () => {
+                    setShowPdfOptions(false);
+                    await downloadAsPdf('portrait');
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Portrait
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowPdfOptions(false);
+                    await downloadAsPdf('landscape');
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100"
+                >
+                  Landscape
+                </button>
+              </div>
+            )}
+          </div>
           <Button
             onClick={handleSave}
             disabled={saving}
@@ -3397,10 +3917,29 @@ export default function Results() {
           </Button>
           {packageId && (
             <Button
-              onClick={() => {
+              onClick={async () => {
                 const baseUrl = window.location.origin;
-                const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${packageId}`;
-                const embedCode = `<iframe src="${previewUrl}" width="100%" height="800px" frameborder="0" style="border-radius: 12px;"></iframe>`;
+                const currentUser = await supabaseClient.auth.me();
+                const previewPath = await getPublicPreviewPath(
+                  { ...(configRef.current || config || {}), id: packageId },
+                  currentUser
+                );
+                const previewUrl = new URL(baseUrl + previewPath);
+                previewUrl.searchParams.set('embed', 'true');
+                const iframeId = `launchbox-embed-${packageId}`;
+                const embedCode = `<iframe id="${iframeId}" src="${previewUrl.toString()}" width="100%" style="border:0;border-radius:12px;min-height:800px;" scrolling="no"></iframe>
+<script>
+(function() {
+  var iframe = document.getElementById('${iframeId}');
+  if (!iframe) return;
+  function onMessage(event) {
+    if (!event.data || event.data.type !== 'launchbox:embedHeight') return;
+    if (typeof event.data.height !== 'number') return;
+    iframe.style.height = Math.max(800, event.data.height) + 'px';
+  }
+  window.addEventListener('message', onMessage);
+})();
+</script>`;
                 navigator.clipboard.writeText(embedCode);
                 alert('Embed code copied to clipboard!');
               }}
@@ -3465,6 +4004,58 @@ export default function Results() {
                   className="flex-1 h-12 rounded-full text-white font-semibold shadow-lg hover:shadow-xl bg-red-500 hover:bg-red-600"
                 >
                   Delete
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Exit Edit Mode Warning Modal */}
+      <AnimatePresence>
+        {showExitEditModeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowExitEditModeModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.3 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border-2 border-gray-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div
+                  className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+                  style={{ backgroundColor: '#FEF3C7' }}
+                >
+                  <X className="w-8 h-8 text-amber-500" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Exit Edit Mode?</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  You are about to leave this page. Any unsaved edits may be lost.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 rounded-2xl border-2 border-gray-300 hover:bg-gray-50 font-semibold"
+                  onClick={() => exitEditMode({ saveBeforeExit: false })}
+                >
+                  Exit Without Save
+                </Button>
+                <Button
+                  className="flex-1 h-12 rounded-2xl text-white font-semibold"
+                  style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                  onClick={() => exitEditMode({ saveBeforeExit: true })}
+                >
+                  Save and Exit
                 </Button>
               </div>
             </motion.div>
@@ -3581,9 +4172,15 @@ export default function Results() {
                         localStorage.setItem('packageConfig', JSON.stringify(configToSave));
                         
                         const baseUrl = window.location.origin;
-                        const previewUrl = baseUrl + createPageUrl('Results') + `?preview=true&packageId=${savedPackageId}`;
+                        const currentUser = await supabaseClient.auth.me();
+                        const previewPath = await getPublicPreviewPath(
+                          { ...latestConfig, id: savedPackageId },
+                          currentUser
+                        );
+                        const previewUrl = baseUrl + previewPath;
                         window.open(previewUrl, '_blank');
                         
+                        bypassExitWarningRef.current = true;
                         window.location.href = createPageUrl('MyPackages');
                       } catch (error) {
                         console.error('Error saving package:', error);
