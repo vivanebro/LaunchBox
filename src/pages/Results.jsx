@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2 } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
@@ -842,6 +842,28 @@ export default function Results() {
     updateConfig('package_data', updatedPackageData);
   };
 
+  const duplicateDeliverable = (tier, index) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const currentDeliverables = c.package_data[modeKey][tier].deliverables || [];
+    if (index < 0 || index >= currentDeliverables.length) return;
+
+    const updatedDeliverables = [...currentDeliverables];
+    updatedDeliverables.splice(index + 1, 0, currentDeliverables[index]);
+
+    const updatedPackageData = {
+      ...c.package_data,
+      [modeKey]: {
+        ...c.package_data[modeKey],
+        [tier]: {
+          ...c.package_data[modeKey][tier],
+          deliverables: updatedDeliverables
+        }
+      }
+    };
+    updateConfig('package_data', updatedPackageData);
+  };
+
   const addBonus = (tier) => {
     const newBonus = 'New bonus';
     const modeKey = getCurrentModeKey();
@@ -1531,7 +1553,7 @@ export default function Results() {
     );
   };
 
-  const EditableDeliverableItem = ({ deliverable, onSave, onDelete, darkMode, brandColor, dragHandleProps }) => {
+  const EditableDeliverableItem = ({ deliverable, onSave, onDuplicate, onDelete, darkMode, brandColor, dragHandleProps }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(typeof deliverable === 'string' ? deliverable : deliverable.type || '');
     const [isHovered, setIsHovered] = useState(false);
@@ -1632,7 +1654,18 @@ export default function Results() {
         <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${getIconClasses()}`} style={getIconInlineStyle()} />
         <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-700'}`}>{displayText}</span>
         <div className="flex items-center gap-1">
-          <Edit2 className={`w-3 h-3 opacity-0 group-hover:opacity-100 mt-0.5 transition-opacity ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity ${darkMode ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+            title="Duplicate deliverable"
+          >
+            <Copy className="w-3 h-3" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -2264,6 +2297,7 @@ export default function Results() {
                                <EditableDeliverableItem
                                  deliverable={d}
                                  onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
+                                 onDuplicate={() => duplicateDeliverable(tierName, idx)}
                                  onDelete={() => deleteDeliverable(tierName, idx)}
                                  darkMode={false}
                                  brandColor={brandColor}
@@ -2661,6 +2695,7 @@ export default function Results() {
                                <EditableDeliverableItem
                                  deliverable={d}
                                  onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
+                                 onDuplicate={() => duplicateDeliverable(tierName, idx)}
                                  onDelete={() => deleteDeliverable(tierName, idx)}
                                  darkMode={true}
                                  brandColor={brandColor}

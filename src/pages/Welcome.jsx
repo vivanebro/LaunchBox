@@ -38,7 +38,7 @@ export default function Welcome() {
       } else {
         const normalized = slugify(creatorSlug, '');
         if (!normalized) {
-          setError('Please choose a URL slug (e.g. your name or brand)');
+          setError('Please choose a company name (e.g. your Company Name or brand)');
           setSubmitting(false);
           return;
         }
@@ -50,7 +50,7 @@ export default function Welcome() {
         }
         const available = await isCreatorSlugAvailable(normalized);
         if (!available) {
-          setError('This URL slug is already taken. Please choose another.');
+          setError('This company name is already taken. Please choose another.');
           setSubmitting(false);
           return;
         }
@@ -158,20 +158,20 @@ export default function Welcome() {
           {mode === 'signup' && (
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
-                URL Slug
+                Company name
               </label>
               <input
                 type="text"
                 value={creatorSlug}
                 onChange={(e) => setCreatorSlug(e.target.value)}
-                placeholder="Your preferred URL slug"
+                placeholder="Your company name"
                 style={{
                   width: '100%', padding: '10px 14px', border: '1.5px solid #e5e7eb',
                   borderRadius: '8px', fontSize: '15px', outline: 'none', boxSizing: 'border-box'
                 }}
               />
               <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                Your package links will be: yourdomain.com/<strong>{creatorSlug ? slugify(creatorSlug, '') || 'your-slug' : 'your-slug'}</strong>/package-name
+                Your package links will be: https://launch-box.io/<strong>{creatorSlug ? slugify(creatorSlug, '') || 'your-company-name' : 'your-company-name'}</strong>/package-name
               </p>
             </div>
           )}
