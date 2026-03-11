@@ -100,6 +100,7 @@ export default function Results() {
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
   const currencySymbol = getCurrencySymbol(config?.currency || 'USD');
+  const showExcludedDeliverables = config?.show_excluded_deliverables !== false;
 
   useEffect(() => {
     // Load Sour Gummy font
@@ -298,6 +299,7 @@ export default function Results() {
         if (loadedConfig.premium_duration === undefined) loadedConfig.premium_duration = null;
         if (loadedConfig.currency === undefined) loadedConfig.currency = 'USD';
         if (loadedConfig.pricing_availability === undefined) loadedConfig.pricing_availability = 'both';
+        if (loadedConfig.show_excluded_deliverables === undefined) loadedConfig.show_excluded_deliverables = true;
         // Migrate old button_links to new structure
         if (!loadedConfig.button_links || loadedConfig.button_links === null || !loadedConfig.button_links.onetime) {
           const oldLinks = (loadedConfig.button_links && loadedConfig.button_links !== null && typeof loadedConfig.button_links === 'object') ? loadedConfig.button_links : {};
@@ -567,6 +569,7 @@ export default function Results() {
             premium_duration: null,
             currency: 'USD',
             pricing_availability: 'both',
+            show_excluded_deliverables: true,
             package_names: {
               onetime: {
                 starter: 'Starter',
@@ -2005,6 +2008,9 @@ export default function Results() {
   const renderDesign1 = () => {
     // Calculate max deliverables to align bonus sections
     const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
+      packages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
     const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
     
     return (
@@ -2290,23 +2296,48 @@ export default function Results() {
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
                       <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                       {pkg.deliverables.map((d, idx) => (
-                         <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
-                           {(provided) => (
-                             <div ref={provided.innerRef} {...provided.draggableProps}>
-                               <EditableDeliverableItem
-                                 deliverable={d}
-                                 onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
-                                 onDuplicate={() => duplicateDeliverable(tierName, idx)}
-                                 onDelete={() => deleteDeliverable(tierName, idx)}
-                                 darkMode={false}
-                                 brandColor={brandColor}
-                                 dragHandleProps={provided.dragHandleProps}
-                               />
+                       {(showExcludedDeliverables ? deliverableTemplate : pkg.deliverables).map((templateDeliverable, idx) => {
+                         const deliverable = pkg.deliverables[idx];
+                         const isIncluded = idx < pkg.deliverables.length;
+                         const placeholderText = typeof templateDeliverable === 'string'
+                           ? templateDeliverable
+                           : templateDeliverable?.type || '';
+
+                         if (!isIncluded) {
+                           return (
+                             <div
+                               key={`deliv-missing-${tierName}-${idx}`}
+                               className="flex items-start gap-2 rounded px-2 py-1"
+                             >
+                               <div className="p-1 mt-0.5">
+                                 <GripVertical className="w-4 h-4 text-transparent" />
+                               </div>
+                               <X className="w-5 h-5 mt-0.5 text-gray-300 flex-shrink-0" />
+                               <span className="text-sm text-gray-400 flex-1">
+                                 {placeholderText}
+                               </span>
                              </div>
-                           )}
-                         </Draggable>
-                       ))}
+                           );
+                         }
+
+                         return (
+                           <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
+                             {(provided) => (
+                               <div ref={provided.innerRef} {...provided.draggableProps}>
+                                 <EditableDeliverableItem
+                                   deliverable={deliverable}
+                                   onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
+                                   onDuplicate={() => duplicateDeliverable(tierName, idx)}
+                                   onDelete={() => deleteDeliverable(tierName, idx)}
+                                   darkMode={false}
+                                   brandColor={brandColor}
+                                   dragHandleProps={provided.dragHandleProps}
+                                 />
+                               </div>
+                             )}
+                           </Draggable>
+                         );
+                       })}
                        {provided.placeholder}
                       </div>
                     )}
@@ -2404,6 +2435,9 @@ export default function Results() {
   const renderDesign2 = () => {
     // Calculate max deliverables to align bonus sections
     const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
+      packages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
     const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
     
     return (
@@ -2688,23 +2722,48 @@ export default function Results() {
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
                       <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                       {pkg.deliverables.map((d, idx) => (
-                         <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
-                           {(provided) => (
-                             <div ref={provided.innerRef} {...provided.draggableProps}>
-                               <EditableDeliverableItem
-                                 deliverable={d}
-                                 onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
-                                 onDuplicate={() => duplicateDeliverable(tierName, idx)}
-                                 onDelete={() => deleteDeliverable(tierName, idx)}
-                                 darkMode={true}
-                                 brandColor={brandColor}
-                                 dragHandleProps={provided.dragHandleProps}
-                               />
+                       {(showExcludedDeliverables ? deliverableTemplate : pkg.deliverables).map((templateDeliverable, idx) => {
+                         const deliverable = pkg.deliverables[idx];
+                         const isIncluded = idx < pkg.deliverables.length;
+                         const placeholderText = typeof templateDeliverable === 'string'
+                           ? templateDeliverable
+                           : templateDeliverable?.type || '';
+
+                         if (!isIncluded) {
+                           return (
+                             <div
+                               key={`deliv-missing-${tierName}-${idx}`}
+                               className="flex items-start gap-2 rounded px-2 py-1"
+                             >
+                               <div className="p-1 mt-0.5">
+                                 <GripVertical className="w-4 h-4 text-transparent" />
+                               </div>
+                               <X className="w-5 h-5 mt-0.5 text-white/30 flex-shrink-0" />
+                               <span className="text-sm text-white/40 flex-1">
+                                 {placeholderText}
+                               </span>
                              </div>
-                           )}
-                         </Draggable>
-                       ))}
+                           );
+                         }
+
+                         return (
+                           <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
+                             {(provided) => (
+                               <div ref={provided.innerRef} {...provided.draggableProps}>
+                                 <EditableDeliverableItem
+                                   deliverable={deliverable}
+                                   onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
+                                   onDuplicate={() => duplicateDeliverable(tierName, idx)}
+                                   onDelete={() => deleteDeliverable(tierName, idx)}
+                                   darkMode={true}
+                                   brandColor={brandColor}
+                                   dragHandleProps={provided.dragHandleProps}
+                                 />
+                               </div>
+                             )}
+                           </Draggable>
+                         );
+                       })}
                        {provided.placeholder}
                       </div>
                     )}
@@ -2799,6 +2858,9 @@ export default function Results() {
 
             const renderPreviewDesign1 = () => {
     const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
+      previewPackages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
@@ -2940,14 +3002,29 @@ export default function Results() {
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
                 <div style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                  {pkg.deliverables.map((d, i) => (
-                    <div key={i} className="flex items-start gap-1.5 mb-1">
-                      <Check className={`flex-shrink-0 mt-0.5 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} style={{ color: brandColor }} />
-                      <span className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
-                        {typeof d === 'string' ? d : d.type || ''}
-                      </span>
-                    </div>
-                  ))}
+                  {(showExcludedDeliverables ? deliverableTemplate : pkg.deliverables).map((templateDeliverable, i) => {
+                    const deliverable = pkg.deliverables[i];
+                    const isIncluded = i < pkg.deliverables.length;
+                    const label = typeof (deliverable || templateDeliverable) === 'string'
+                      ? (deliverable || templateDeliverable)
+                      : (deliverable || templateDeliverable)?.type || '';
+
+                    return (
+                      <div key={i} className="flex items-start gap-1.5 mb-1">
+                        {isIncluded ? (
+                          <Check
+                            className={`flex-shrink-0 mt-0.5 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`}
+                            style={{ color: brandColor }}
+                          />
+                        ) : (
+                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        )}
+                        <span className={`${isIncluded ? 'text-gray-700' : 'text-gray-400'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -2999,6 +3076,9 @@ export default function Results() {
 
   const renderPreviewDesign2 = () => {
     const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
+      previewPackages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
@@ -3130,14 +3210,26 @@ export default function Results() {
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
                 <div style={{ minHeight: `${deliverablesMinHeight}px` }} className="space-y-2">
-                  {pkg.deliverables.map((d, i) => (
-                    <div key={i} className="flex items-start gap-1.5">
-                      <Check className={`flex-shrink-0 mt-0.5 text-white ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
-                      <span className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
-                        {typeof d === 'string' ? d : d.type || ''}
-                      </span>
-                    </div>
-                  ))}
+                  {(showExcludedDeliverables ? deliverableTemplate : pkg.deliverables).map((templateDeliverable, i) => {
+                    const deliverable = pkg.deliverables[i];
+                    const isIncluded = i < pkg.deliverables.length;
+                    const label = typeof (deliverable || templateDeliverable) === 'string'
+                      ? (deliverable || templateDeliverable)
+                      : (deliverable || templateDeliverable)?.type || '';
+
+                    return (
+                      <div key={i} className="flex items-start gap-1.5">
+                        {isIncluded ? (
+                          <Check className={`flex-shrink-0 mt-0.5 text-white ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        ) : (
+                          <X className={`flex-shrink-0 mt-0.5 text-white/30 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        )}
+                        <span className={`${isIncluded ? 'text-white' : 'text-white/40'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -3666,6 +3758,27 @@ export default function Results() {
                   Retainer Only
                 </button>
               </div>
+            </div>
+          </div>
+          <div className="pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm font-semibold text-gray-700">Show Excluded Items</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showExcludedDeliverables}
+                onClick={() => updateConfig('show_excluded_deliverables', !showExcludedDeliverables)}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  showExcludedDeliverables ? 'bg-blue-500' : 'bg-gray-300'
+                }`}
+                title={showExcludedDeliverables ? 'On' : 'Off'}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                    showExcludedDeliverables ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
           </div>
           </div>
