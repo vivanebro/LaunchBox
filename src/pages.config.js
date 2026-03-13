@@ -58,6 +58,7 @@ import Results from './pages/Results';
 import Settings from './pages/Settings';
 import Templates from './pages/Templates';
 import Welcome from './pages/Welcome';
+import QuizManager from './pages/QuizManager';
 import __Layout from './Layout.jsx';
 
 
@@ -69,6 +70,7 @@ export const PAGES = {
     "Home": Home,
     "MyPackages": MyPackages,
     "PackageBuilder": PackageBuilder,
+    "QuizManager": QuizManager,
     "Results": Results,
     "Settings": Settings,
     "Templates": Templates,
