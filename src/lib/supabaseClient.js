@@ -62,6 +62,17 @@ const TABLE_COLUMNS = {
     'id', 'report_date', 'total_packages', 'auto_fixed', 'needs_attention',
     'fixes', 'issues', 'report_text', 'status', 'created_date', 'updated_date',
   ]),
+  quiz_configs: new Set([
+    'id', 'created_by', 'created_date', 'updated_date',
+    'quiz_name', 'welcome_title', 'welcome_subtitle', 'welcome_button_text',
+    'brand_color', 'logo_url', 'business_name',
+    'questions', 'pricing_config', 'tier_config',
+    'cta_type', 'cta_link', 'currency', 'is_active',
+  ]),
+  quiz_submissions: new Set([
+    'id', 'quiz_id', 'answers', 'generated_packages',
+    'calculated_base_price', 'started_at', 'completed_at', 'created_date',
+  ]),
 };
 
 const stripUnknownFields = (tableName, data) => {
@@ -173,6 +184,8 @@ export const entities = {
   AccessCode: createEntityHelper('access_codes'),
   HealthReport: createEntityHelper('health_reports'),
   HelpRequest: createEntityHelper('help_requests'),
+  QuizConfig: createEntityHelper('quiz_configs'),
+  QuizSubmission: createEntityHelper('quiz_submissions'),
 };
 
 export const entitiesAsServiceRole = {
@@ -181,6 +194,8 @@ export const entitiesAsServiceRole = {
   AccessCode: createEntityHelper('access_codes', true),
   HealthReport: createEntityHelper('health_reports', true),
   HelpRequest: createEntityHelper('help_requests', true),
+  QuizConfig: createEntityHelper('quiz_configs', true),
+  QuizSubmission: createEntityHelper('quiz_submissions', true),
 };
 
 export const auth = {
