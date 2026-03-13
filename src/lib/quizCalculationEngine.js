@@ -28,7 +28,15 @@ export function calculatePackages(answers, questions, pricingConfig, tierConfig)
             const idx = (question.options || []).indexOf(answer);
             quantity = idx >= 0 ? (Number(question.option_values[idx]) || 0) : 0;
         } else if (question.type === 'multi_select') {
-            quantity = Array.isArray(answer) ? answer.length : 0;
+            if (question.option_values && Array.isArray(answer)) {
+                // Sum per-option amounts (each selected label → its option_value)
+                quantity = answer.reduce((sum, selectedLabel) => {
+                    const idx = (question.options || []).indexOf(selectedLabel);
+                    return sum + (idx >= 0 ? (Number(question.option_values[idx]) || 0) : 0);
+                }, 0);
+            } else {
+                quantity = Array.isArray(answer) ? answer.length : 0;
+            }
         }
 
         if (quantity > 0) {
