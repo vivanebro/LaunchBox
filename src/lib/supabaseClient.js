@@ -45,6 +45,7 @@ const TABLE_COLUMNS = {
     'package_descriptions', 'button_links', 'active_packages',
     'core_deliverables', 'extras_bonuses', 'niches',
     'currentDesign', 'pricingMode', 'popularPackageIndex', 'popularBadgeText',
+    'show_excluded_deliverables', 'show_package_buttons_in_edit_mode', 'retainer_discount_text',
     'original_price_starter', 'original_price_growth', 'original_price_premium', 'original_price_elite',
     'original_price_starter_retainer', 'original_price_growth_retainer', 'original_price_premium_retainer', 'original_price_elite_retainer',
   ]),

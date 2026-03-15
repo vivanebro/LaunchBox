@@ -1462,7 +1462,16 @@ export default function Results() {
       : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { delay: index * 0.1 } }
   );
 
-  const EditableText = ({ value, onSave, className, multiline, placeholder, darkMode, brandColor }) => {
+  const EditableText = ({
+    value,
+    onSave,
+    className,
+    multiline = false,
+    placeholder,
+    darkMode = false,
+    brandColor,
+    maxLength = undefined
+  }) => {
     const safeValue = value || '';
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(safeValue);
@@ -1518,6 +1527,7 @@ export default function Results() {
           onClick={(e) => e.stopPropagation()}
           className={`${className || ''} min-h-[60px] ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
           autoFocus
+          maxLength={maxLength}
           placeholder={placeholder}
           style={{ borderColor: brandColor }}
         />
@@ -1530,6 +1540,7 @@ export default function Results() {
           onClick={(e) => e.stopPropagation()}
           className={`${className || ''} ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
           autoFocus
+          maxLength={maxLength}
           placeholder={placeholder}
           style={{ borderColor: brandColor }}
         />
@@ -2096,12 +2107,14 @@ export default function Results() {
 
 
   const renderDesign1 = () => {
-    // Calculate max deliverables to align bonus sections
-    const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    // Calculate max deliverables and bonuses to align sections across tiers
+    const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length), 1);
+    const maxBonuses = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
     const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
       packages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
     );
     const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
+    const bonusesMinHeight = packages.length === 4 ? maxBonuses * 28 : maxBonuses * 32;
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -2347,7 +2360,9 @@ export default function Results() {
 
                 {pkg.description !== null ? (
                   <div
-                    className="mb-6 p-4 rounded-xl relative group/desc"
+                    className={`mb-6 rounded-xl relative group/desc overflow-y-auto ${
+                      packages.length === 4 ? 'p-3 min-h-[88px] max-h-[88px]' : 'p-4 min-h-[96px] max-h-[96px]'
+                    }`}
                     style={{ backgroundColor: `${brandColor}15` }}
                   >
                     <button
@@ -2365,6 +2380,7 @@ export default function Results() {
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
                       className="text-sm text-gray-700"
                       multiline={true}
+                      maxLength={120}
                       placeholder="Describe who this package is best for"
                       brandColor={brandColor}
                     />
@@ -2388,7 +2404,7 @@ export default function Results() {
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
                       <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                       {(showExcludedDeliverables ? deliverableTemplate : pkg.deliverables).map((templateDeliverable, idx) => {
+                       {deliverableTemplate.map((templateDeliverable, idx) => {
                          const deliverable = pkg.deliverables[idx];
                          const isIncluded = idx < pkg.deliverables.length;
                          const placeholderText = typeof templateDeliverable === 'string'
@@ -2396,6 +2412,9 @@ export default function Results() {
                            : templateDeliverable?.type || '';
 
                          if (!isIncluded) {
+                           if (!showExcludedDeliverables) {
+                             return <div key={`deliv-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                           }
                            return (
                              <div
                                key={`deliv-missing-${tierName}-${idx}`}
@@ -2456,7 +2475,7 @@ export default function Results() {
 
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${bonusesMinHeight}px` }}>
                       {pkg.bonuses.map((bonus, idx) => (
                         <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
                           {(provided) => (
@@ -2518,12 +2537,14 @@ export default function Results() {
   };
 
   const renderDesign2 = () => {
-    // Calculate max deliverables to align bonus sections
-    const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    // Calculate max deliverables and bonuses to align sections across tiers
+    const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length), 1);
+    const maxBonuses = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
     const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
       packages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
     );
     const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
+    const bonusesMinHeight = packages.length === 4 ? maxBonuses * 28 : maxBonuses * 32;
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -2768,7 +2789,9 @@ export default function Results() {
 
                 {pkg.description !== null ? (
                   <div
-                    className="mb-6 p-4 rounded-xl relative group/desc"
+                    className={`mb-6 rounded-xl relative group/desc overflow-y-auto ${
+                      packages.length === 4 ? 'p-3 min-h-[88px] max-h-[88px]' : 'p-4 min-h-[96px] max-h-[96px]'
+                    }`}
                     style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
                   >
                     <button
@@ -2786,6 +2809,7 @@ export default function Results() {
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
                       className="text-sm text-white"
                       multiline={true}
+                      maxLength={120}
                       placeholder="Describe who this package is best for"
                       darkMode={true}
                       brandColor={brandColor}
@@ -2809,7 +2833,7 @@ export default function Results() {
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
                       <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                       {(showExcludedDeliverables ? deliverableTemplate : pkg.deliverables).map((templateDeliverable, idx) => {
+                       {deliverableTemplate.map((templateDeliverable, idx) => {
                          const deliverable = pkg.deliverables[idx];
                          const isIncluded = idx < pkg.deliverables.length;
                          const placeholderText = typeof templateDeliverable === 'string'
@@ -2817,6 +2841,9 @@ export default function Results() {
                            : templateDeliverable?.type || '';
 
                          if (!isIncluded) {
+                           if (!showExcludedDeliverables) {
+                             return <div key={`deliv-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                           }
                            return (
                              <div
                                key={`deliv-missing-${tierName}-${idx}`}
@@ -2874,7 +2901,7 @@ export default function Results() {
 
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${bonusesMinHeight}px` }}>
                       {pkg.bonuses.map((bonus, idx) => (
                         <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
                           {(provided) => (
@@ -2937,11 +2964,16 @@ export default function Results() {
   };
 
             const renderPreviewDesign1 = () => {
-    const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length), 1);
+    const maxBonuses = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
     const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
       previewPackages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
     );
+    const rowGap = previewPackages.length === 4 ? 4 : 12;
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
+    const deliverablesHeight = deliverablesMinHeight + Math.max(0, maxDeliverables - 1) * rowGap;
+    const bonusesHeight = maxBonuses > 0 ? (previewPackages.length === 4 ? maxBonuses * 24 : maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
+    const descHeight = previewPackages.length === 4 ? 72 : 88;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
     );
@@ -3074,27 +3106,35 @@ export default function Results() {
                 </p>
               )}
 
-              {pkg.description !== null && (
-                <div
-                  className={`p-3 rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
-                  style={{ backgroundColor: `${brandColor}15` }}
-                >
+              <div
+                className={`rounded-xl mb-4 overflow-y-auto ${
+                  previewPackages.length === 4 ? 'p-2' : 'p-4'
+                }`}
+                style={{ height: `${descHeight}px`, minHeight: `${descHeight}px`, backgroundColor: pkg.description != null ? `${brandColor}15` : 'transparent' }}
+              >
+                {pkg.description != null && (
                   <p className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
-                </div>
-              )}
+                )}
+              </div>
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
-                <div style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                  {(showExcludedDeliverables ? deliverableTemplate : pkg.deliverables).map((templateDeliverable, i) => {
+                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                  {deliverableTemplate.map((templateDeliverable, i) => {
                     const deliverable = pkg.deliverables[i];
                     const isIncluded = i < pkg.deliverables.length;
-                    const label = typeof (deliverable || templateDeliverable) === 'string'
-                      ? (deliverable || templateDeliverable)
-                      : (deliverable || templateDeliverable)?.type || '';
+                    const label = showExcludedDeliverables
+                      ? (typeof (deliverable || templateDeliverable) === 'string'
+                          ? (deliverable || templateDeliverable)
+                          : (deliverable || templateDeliverable)?.type || '')
+                      : (isIncluded ? (typeof deliverable === 'string' ? deliverable : deliverable?.type || '') : '');
+
+                    if (!isIncluded && !showExcludedDeliverables) {
+                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                    }
 
                     return (
-                      <div key={i} className="flex items-start gap-1.5 mb-1">
+                      <div key={i} className="flex items-start gap-1.5">
                         {isIncluded ? (
                           <Check
                             className={`flex-shrink-0 mt-0.5 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`}
@@ -3112,15 +3152,24 @@ export default function Results() {
                 </div>
               </div>
 
-            {pkg.bonuses.length > 0 && (
+            {(maxBonuses > 0 || pkg.bonuses.length > 0) && (
               <div className={`pt-4 border-t border-gray-200 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Bonuses</p>
-                {pkg.bonuses.map((bonus, i) => (
-                  <div key={i} className="flex items-start gap-1.5 mb-1">
-                    <Plus className={`flex-shrink-0 mt-0.5 text-green-500 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
-                    <span className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonus}</span>
-                  </div>
-                ))}
+                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                  {Array.from({ length: maxBonuses }, (_, i) => {
+                    const bonus = pkg.bonuses[i];
+                    const hasBonus = i < pkg.bonuses.length;
+                    if (!hasBonus) {
+                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                    }
+                    return (
+                      <div key={i} className="flex items-start gap-1.5">
+                        <Plus className={`flex-shrink-0 mt-0.5 text-green-500 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        <span className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonus}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -3161,11 +3210,16 @@ export default function Results() {
   };
 
   const renderPreviewDesign2 = () => {
-    const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length), 1);
+    const maxBonuses = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
     const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
       previewPackages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
     );
+    const rowGap = previewPackages.length === 4 ? 4 : 12;
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
+    const deliverablesHeight = deliverablesMinHeight + Math.max(0, maxDeliverables - 1) * rowGap;
+    const bonusesHeight = maxBonuses > 0 ? (previewPackages.length === 4 ? maxBonuses * 24 : maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
+    const descHeight = previewPackages.length === 4 ? 72 : 88;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
     );
@@ -3288,24 +3342,32 @@ export default function Results() {
                 </p>
               )}
 
-              {pkg.description !== null && (
-                <div
-                  className={`rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
-                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-                >
+              <div
+                className={`rounded-xl mb-4 overflow-y-auto ${
+                  previewPackages.length === 4 ? 'p-2' : 'p-4'
+                }`}
+                style={{ height: `${descHeight}px`, minHeight: `${descHeight}px`, backgroundColor: pkg.description != null ? 'rgba(255, 255, 255, 0.15)' : 'transparent' }}
+              >
+                {pkg.description != null && (
                   <p className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
-                </div>
-              )}
+                )}
+              </div>
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
-                <div style={{ minHeight: `${deliverablesMinHeight}px` }} className="space-y-2">
-                  {(showExcludedDeliverables ? deliverableTemplate : pkg.deliverables).map((templateDeliverable, i) => {
+                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                  {deliverableTemplate.map((templateDeliverable, i) => {
                     const deliverable = pkg.deliverables[i];
                     const isIncluded = i < pkg.deliverables.length;
-                    const label = typeof (deliverable || templateDeliverable) === 'string'
-                      ? (deliverable || templateDeliverable)
-                      : (deliverable || templateDeliverable)?.type || '';
+                    const label = showExcludedDeliverables
+                      ? (typeof (deliverable || templateDeliverable) === 'string'
+                          ? (deliverable || templateDeliverable)
+                          : (deliverable || templateDeliverable)?.type || '')
+                      : (isIncluded ? (typeof deliverable === 'string' ? deliverable : deliverable?.type || '') : '');
+
+                    if (!isIncluded && !showExcludedDeliverables) {
+                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                    }
 
                     return (
                       <div key={i} className="flex items-start gap-1.5">
@@ -3323,15 +3385,24 @@ export default function Results() {
                 </div>
               </div>
 
-            {pkg.bonuses.length > 0 && (
+            {(maxBonuses > 0 || pkg.bonuses.length > 0) && (
               <div className={`pt-4 border-t border-white/20 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-bold uppercase tracking-wider ${previewPackages.length === 4 ? 'text-[10px]' : 'text-xs'}`}>Bonuses</p>
-                {pkg.bonuses.map((bonus, i) => (
-                  <div key={i} className="flex items-start gap-1.5 mb-1">
-                    <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
-                    <span className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonus}</span>
-                  </div>
-                ))}
+                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                  {Array.from({ length: maxBonuses }, (_, i) => {
+                    const bonus = pkg.bonuses[i];
+                    const hasBonus = i < pkg.bonuses.length;
+                    if (!hasBonus) {
+                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                    }
+                    return (
+                      <div key={i} className="flex items-start gap-1.5">
+                        <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        <span className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonus}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
