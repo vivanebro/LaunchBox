@@ -56,6 +56,17 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function Layout({ children, currentPageName }) {
+  const [hideHelpButton, setHideHelpButton] = React.useState(false);
+
+  React.useEffect(() => {
+    const onToggle = (event) => {
+      setHideHelpButton(Boolean(event?.detail?.hidden));
+    };
+
+    window.addEventListener('launchbox:toggleHelpButton', onToggle);
+    return () => window.removeEventListener('launchbox:toggleHelpButton', onToggle);
+  }, []);
+
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [packageBuilderExpanded, setPackageBuilderExpanded] = React.useState(false);
   const [isMobileView, setIsMobileView] = React.useState(false);
@@ -379,7 +390,7 @@ export default function Layout({ children, currentPageName }) {
           {children}
         </main>
 
-        <HelpButton />
+        {!hideHelpButton && <HelpButton />}
         </div>
         </ErrorBoundary>
         );

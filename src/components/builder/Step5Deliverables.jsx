@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, GripVertical, Plus, ArrowRight, Check } from 'lucide-react';
+import { X, GripVertical, Plus, ArrowRight, Check, Copy } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -103,6 +103,22 @@ export default function Step5Deliverables({ data, onChange, onNext }) {
     const newDeliverables = deliverables.filter(d => d.id !== id);
     setDeliverables(newDeliverables);
     updateParentConfig(newDeliverables);
+  };
+
+  const duplicateDeliverable = (id) => {
+    const sourceIndex = deliverables.findIndex(d => d.id === id);
+    if (sourceIndex === -1) return;
+
+    const source = deliverables[sourceIndex];
+    const duplicate = {
+      ...source,
+      id: `${Date.now()}-${Math.random()}`
+    };
+
+    const updated = [...deliverables];
+    updated.splice(sourceIndex + 1, 0, duplicate);
+    setDeliverables(updated);
+    updateParentConfig(updated);
   };
 
   const startEdit = (deliverable) => {
@@ -230,6 +246,15 @@ export default function Step5Deliverables({ data, onChange, onNext }) {
                             >
                               {deliverable.type}
                             </div>
+                            <Button
+                              onClick={() => duplicateDeliverable(deliverable.id)}
+                              variant="ghost"
+                              size="icon"
+                              className="h-10 w-10 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-full flex-shrink-0"
+                              title="Duplicate"
+                            >
+                              <Copy className="w-5 h-5" />
+                            </Button>
                             
                             <Button
                               onClick={() => removeDeliverable(deliverable.id)}

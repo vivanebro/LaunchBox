@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2 } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
 import { toPng } from 'html-to-image';
 import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
@@ -12,6 +14,15 @@ import { logPackageView, startTimeTracking, logButtonClick } from '@/lib/package
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useParams } from 'react-router-dom';
 import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
+import { CostCalculatorPanel } from '@/components/CostCalculator/CostCalculatorPanel';
+import {
+  CostCalculatorTrigger,
+  getCostCalculatorDisplay,
+  hasOpenedCalculatorOnce,
+  setOpenedCalculatorOnce,
+  hasNudgeBeenDismissed,
+  setNudgeDismissed,
+} from '@/components/CostCalculator/CostCalculatorTrigger';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
 
@@ -65,6 +76,20 @@ const CURRENCIES = [
   { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' }
 ];
 
+// Button configuration options for Get Started
+const BUTTON_OPTIONS = [
+  { id: 'book_a_call', label: 'Book a Call', placeholder: 'Paste your calendar link', hint: 'best if you haven\'t presented the offer live yet' },
+  { id: 'lock_your_spot', label: 'Lock Your Spot', placeholder: 'Paste your payment link', hint: 'best after presenting, or if you want them to buy straight away' },
+  { id: 'sign_contract', label: 'Sign Contract', placeholder: 'Paste your e-signature link', hint: 'best if you want them to sign before paying' },
+  { id: 'apply', label: 'Apply', placeholder: 'Paste your form link', hint: 'best if you want to qualify them first' },
+  { id: 'custom', label: 'Custom', placeholder: 'Paste the link here', hint: '' }
+];
+
+const getCTAOptionEmoji = (optionId) => {
+  const emojis = { book_a_call: '📅', lock_your_spot: '🔒', sign_contract: '✍️', apply: '📋', custom: '✏️' };
+  return emojis[optionId] || '✏️';
+};
+
 export default function Results() {
   const { creator, slug } = useParams();
   const [config, setConfig] = useState(null);
@@ -80,6 +105,12 @@ export default function Results() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showLinksModal, setShowLinksModal] = useState(false);
+  const [configureModalTier, setConfigureModalTier] = useState(null);
+  const [configureModalStep, setConfigureModalStep] = useState(1);
+  const [configureModalOption, setConfigureModalOption] = useState('lock_your_spot');
+  const [configureModalLink, setConfigureModalLink] = useState('');
+  const [configureModalCustomLabel, setConfigureModalCustomLabel] = useState('');
+  const [configureModalCopyToAll, setConfigureModalCopyToAll] = useState(false);
   const [editingToggleLabels, setEditingToggleLabels] = useState(false);
   const [tempLabelOnetime, setTempLabelOnetime] = useState('');
   const [tempLabelRetainer, setTempLabelRetainer] = useState('');
@@ -94,12 +125,30 @@ export default function Results() {
   const exportRef = React.useRef(null);
   const [exporting, setExporting] = React.useState(false);
   const [exportingPdf, setExportingPdf] = React.useState(false);
-  const [showPdfOptions, setShowPdfOptions] = React.useState(false);
+  const [showExportDropdown, setShowExportDropdown] = React.useState(false);
+  const [showPdfSubmenu, setShowPdfSubmenu] = React.useState(false);
+  const exportDropdownRef = React.useRef(null);
   const [canUndo, setCanUndo] = useState(false);
+  const [costCalculatorTier, setCostCalculatorTier] = useState(null);
 
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
   const currencySymbol = getCurrencySymbol(config?.currency || 'USD');
+  const showExcludedDeliverables = config?.show_excluded_deliverables !== false;
+  const showPackageButtonsInEditMode = true;
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('launchbox:toggleHelpButton', {
+      detail: { hidden: Boolean(costCalculatorTier) }
+    }));
+
+    return () => {
+      window.dispatchEvent(new CustomEvent('launchbox:toggleHelpButton', {
+        detail: { hidden: false }
+      }));
+    };
+  }, [costCalculatorTier]);
+
 
   useEffect(() => {
     // Load Sour Gummy font
@@ -298,6 +347,8 @@ export default function Results() {
         if (loadedConfig.premium_duration === undefined) loadedConfig.premium_duration = null;
         if (loadedConfig.currency === undefined) loadedConfig.currency = 'USD';
         if (loadedConfig.pricing_availability === undefined) loadedConfig.pricing_availability = 'both';
+        if (loadedConfig.show_excluded_deliverables === undefined) loadedConfig.show_excluded_deliverables = true;
+        if (loadedConfig.show_package_buttons_in_edit_mode === undefined) loadedConfig.show_package_buttons_in_edit_mode = true;
         // Migrate old button_links to new structure
         if (!loadedConfig.button_links || loadedConfig.button_links === null || !loadedConfig.button_links.onetime) {
           const oldLinks = (loadedConfig.button_links && loadedConfig.button_links !== null && typeof loadedConfig.button_links === 'object') ? loadedConfig.button_links : {};
@@ -567,6 +618,8 @@ export default function Results() {
             premium_duration: null,
             currency: 'USD',
             pricing_availability: 'both',
+            show_excluded_deliverables: true,
+            show_package_buttons_in_edit_mode: true,
             package_names: {
               onetime: {
                 starter: 'Starter',
@@ -731,6 +784,84 @@ export default function Results() {
   };
 
   const updateButtonLink = (tier, link) => safeUpdateNestedConfig('button_links', tier, link);
+
+  const updateCostData = (tier, data) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const costData = (c.cost_data && typeof c.cost_data === 'object') ? c.cost_data : {};
+    const modeData = (costData[modeKey] && typeof costData[modeKey] === 'object') ? costData[modeKey] : {};
+    updateConfig('cost_data', {
+      ...costData,
+      [modeKey]: { ...modeData, [tier]: data }
+    });
+  };
+
+  const openCostCalculator = (tier) => {
+    setCostCalculatorTier(tier);
+    setOpenedCalculatorOnce();
+  };
+
+  const openConfigureModal = (tier) => {
+    const modeKey = getCurrentModeKey();
+    const existingType = config.button_links?.[modeKey]?.[tier + '_type'];
+    const existingLink = config.button_links?.[modeKey]?.[tier] || '';
+    const existingLabel = config.button_links?.[modeKey]?.[tier + '_label'] || '';
+    setConfigureModalTier(tier);
+    setConfigureModalStep(1);
+    setConfigureModalOption(existingType || 'lock_your_spot');
+    setConfigureModalLink(existingLink);
+    setConfigureModalCustomLabel(existingType === 'custom' ? existingLabel : '');
+  };
+
+  const closeConfigureModal = () => {
+    setConfigureModalTier(null);
+    setConfigureModalStep(1);
+    setConfigureModalOption('lock_your_spot');
+    setConfigureModalLink('');
+    setConfigureModalCustomLabel('');
+    setConfigureModalCopyToAll(false);
+  };
+
+  const saveConfigureModal = () => {
+    if (!configureModalTier) return;
+    const modeKey = getCurrentModeKey();
+    const selectedOption = BUTTON_OPTIONS.find(o => o.id === configureModalOption);
+    const label = configureModalOption === 'custom'
+      ? (configureModalCustomLabel.trim() || 'Custom')
+      : (selectedOption?.label || 'Lock Your Spot');
+    const linkValue = configureModalLink.trim();
+
+    const currentLinks = config?.button_links || {};
+    const currentModeLinks = (currentLinks[modeKey] && typeof currentLinks[modeKey] === 'object') ? { ...currentLinks[modeKey] } : {};
+
+    if (configureModalCopyToAll) {
+      packages.forEach((pkg) => {
+        currentModeLinks[pkg.tier] = linkValue;
+        currentModeLinks[pkg.tier + '_label'] = label;
+        currentModeLinks[pkg.tier + '_type'] = configureModalOption;
+        currentModeLinks[pkg.tier + '_removed'] = false;
+      });
+    } else {
+      currentModeLinks[configureModalTier] = linkValue;
+      currentModeLinks[configureModalTier + '_label'] = label;
+      currentModeLinks[configureModalTier + '_type'] = configureModalOption;
+      currentModeLinks[configureModalTier + '_removed'] = false;
+    }
+
+    updateConfig('button_links', {
+      ...currentLinks,
+      [modeKey]: currentModeLinks
+    });
+    closeConfigureModal();
+  };
+
+  const removeButtonCTA = (tier) => {
+    const modeKey = getCurrentModeKey();
+    updateButtonLink(tier, '');
+    updateButtonLink(tier + '_label', '');
+    updateButtonLink(tier + '_type', '');
+    updateButtonLink(tier + '_removed', true);
+  };
   const updatePackageDescription = (tier, value) => safeUpdateNestedConfig('package_descriptions', tier, value);
   const updatePackageDuration = (tier, value) => safeUpdateNestedConfig('package_durations', tier, value);
   const updatePackageName = (tier, value) => safeUpdateNestedConfig('package_names', tier, value);
@@ -829,6 +960,28 @@ export default function Results() {
     const modeKey = getCurrentModeKey();
     const c = configRef.current || config;
     const updatedDeliverables = c.package_data[modeKey][tier].deliverables.filter((_, idx) => idx !== index);
+    const updatedPackageData = {
+      ...c.package_data,
+      [modeKey]: {
+        ...c.package_data[modeKey],
+        [tier]: {
+          ...c.package_data[modeKey][tier],
+          deliverables: updatedDeliverables
+        }
+      }
+    };
+    updateConfig('package_data', updatedPackageData);
+  };
+
+  const duplicateDeliverable = (tier, index) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const currentDeliverables = c.package_data[modeKey][tier].deliverables || [];
+    if (index < 0 || index >= currentDeliverables.length) return;
+
+    const updatedDeliverables = [...currentDeliverables];
+    updatedDeliverables.splice(index + 1, 0, currentDeliverables[index]);
+
     const updatedPackageData = {
       ...c.package_data,
       [modeKey]: {
@@ -1158,6 +1311,18 @@ export default function Results() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isPreviewMode]);
 
+  useEffect(() => {
+    if (!showExportDropdown) return;
+    const handleClickOutside = (e) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) {
+        setShowExportDropdown(false);
+        setShowPdfSubmenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showExportDropdown]);
+
   if (!config) {
     if (previewNotFound) {
       return (
@@ -1295,12 +1460,31 @@ export default function Results() {
       retainer: modeKey === 'retainer' ? newPopularIndex : (popularPackageIndex?.retainer ?? 2)
     };
 
-    setPopularPackageIndex(updatedPopularIndex);
-    updateConfigMultiple({
+    const updates = {
       active_packages: updatedActivePackages,
       popularPackageIndex: updatedPopularIndex
-    });
-    
+    };
+
+    // Remove cost data for deleted package
+    const costData = currentConfig.cost_data;
+    if (costData && typeof costData === 'object') {
+      const newCostData = { ...costData };
+      for (const key of ['onetime', 'retainer']) {
+        if (newCostData[key] && newCostData[key][tierToDelete]) {
+          const modeCopy = { ...newCostData[key] };
+          delete modeCopy[tierToDelete];
+          newCostData[key] = modeCopy;
+        }
+      }
+      updates.cost_data = newCostData;
+    }
+
+    updateConfigMultiple(updates);
+
+    if (costCalculatorTier === tierToDelete) {
+      setCostCalculatorTier(null);
+    }
+
     setShowDeleteModal(false);
     setPackageToDelete(null);
   };
@@ -1350,7 +1534,16 @@ export default function Results() {
       : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { delay: index * 0.1 } }
   );
 
-  const EditableText = ({ value, onSave, className, multiline, placeholder, darkMode, brandColor }) => {
+  const EditableText = ({
+    value,
+    onSave,
+    className,
+    multiline = false,
+    placeholder,
+    darkMode = false,
+    brandColor,
+    maxLength = undefined
+  }) => {
     const safeValue = value || '';
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(safeValue);
@@ -1396,31 +1589,49 @@ export default function Results() {
       }
     };
 
+    const hasReachedMaxLength = typeof maxLength === 'number' && editValue.length >= maxLength;
+
     if (isEditing) {
       return multiline ? (
-        <Textarea
-          ref={editRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onClick={(e) => e.stopPropagation()}
-          className={`${className || ''} min-h-[60px] ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
-          autoFocus
-          placeholder={placeholder}
-          style={{ borderColor: brandColor }}
-        />
+        <>
+          <Textarea
+            ref={editRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className={`${className || ''} min-h-[60px] resize-none overflow-hidden ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
+            autoFocus
+            maxLength={maxLength}
+            placeholder={placeholder}
+            style={{ borderColor: brandColor }}
+          />
+          {hasReachedMaxLength && (
+            <p className={`mt-1 text-xs ${darkMode ? 'text-red-100' : 'text-red-600'}`}>
+              Character limit reached ({maxLength})
+            </p>
+          )}
+        </>
       ) : (
-        <Input
-          ref={editRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onClick={(e) => e.stopPropagation()}
-          className={`${className || ''} ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
-          autoFocus
-          placeholder={placeholder}
-          style={{ borderColor: brandColor }}
-        />
+        <>
+          <Input
+            ref={editRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className={`${className || ''} ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
+            autoFocus
+            maxLength={maxLength}
+            placeholder={placeholder}
+            style={{ borderColor: brandColor }}
+          />
+          {hasReachedMaxLength && (
+            <p className={`mt-1 text-xs ${darkMode ? 'text-red-100' : 'text-red-600'}`}>
+              Character limit reached ({maxLength})
+            </p>
+          )}
+        </>
       );
     }
 
@@ -1531,7 +1742,7 @@ export default function Results() {
     );
   };
 
-  const EditableDeliverableItem = ({ deliverable, onSave, onDelete, darkMode, brandColor, dragHandleProps }) => {
+  const EditableDeliverableItem = ({ deliverable, onSave, onDuplicate, onDelete, darkMode, brandColor, dragHandleProps }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(typeof deliverable === 'string' ? deliverable : deliverable.type || '');
     const [isHovered, setIsHovered] = useState(false);
@@ -1632,7 +1843,18 @@ export default function Results() {
         <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${getIconClasses()}`} style={getIconInlineStyle()} />
         <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-700'}`}>{displayText}</span>
         <div className="flex items-center gap-1">
-          <Edit2 className={`w-3 h-3 opacity-0 group-hover:opacity-100 mt-0.5 transition-opacity ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity ${darkMode ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+            title="Duplicate deliverable"
+          >
+            <Copy className="w-3 h-3" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -1768,32 +1990,18 @@ export default function Results() {
     );
   };
 
-  const EditableButton = ({ tier, brandColor, darkerBrandColor, darkMode, customLabel, isCustomOffer }) => {
+  const EditableButton = ({ tier, brandColor, darkerBrandColor, darkMode, customLabel, isCustomOffer = false, onConfigureClick, isRemoved = false, onRemoveClick }) => {
     const [isHovered, setIsHovered] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
     const [isEditingLabel, setIsEditingLabel] = useState(false);
-    const modeKey = getCurrentModeKey();
-    const [linkValue, setLinkValue] = useState(config.button_links?.[modeKey]?.[tier] || '');
     const [labelValue, setLabelValue] = useState(customLabel);
-    const inputRef = useRef(null);
+    const modeKey = getCurrentModeKey();
     const labelInputRef = useRef(null);
+    const showConfigOnHover = !isMobileView && isHovered;
+    const showConfigAlways = isMobileView;
 
     useEffect(() => {
-      setLinkValue(config.button_links?.[modeKey]?.[tier] || '');
       setLabelValue(customLabel);
-    }, [config.button_links, tier, modeKey, customLabel]);
-
-    useEffect(() => {
-      if (isEditing) {
-        const handleClickOutside = (event) => {
-          if (inputRef.current && !inputRef.current.contains(event.target)) {
-            handleSave();
-          }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-      }
-    }, [isEditing, linkValue]);
+    }, [customLabel]);
 
     useEffect(() => {
       if (isEditingLabel) {
@@ -1807,26 +2015,11 @@ export default function Results() {
       }
     }, [isEditingLabel, labelValue]);
 
-    const handleSave = () => {
-      updateButtonLink(tier, linkValue);
-      setIsEditing(false);
-    };
-
     const handleSaveLabel = () => {
       if (isCustomOffer && labelValue.trim()) {
         updateButtonLink(tier + '_label', labelValue.trim());
       }
       setIsEditingLabel(false);
-    };
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        handleSave();
-      }
-      if (e.key === 'Escape') {
-        setLinkValue(config.button_links?.[tier] || '');
-        setIsEditing(false);
-      }
     };
 
     const handleLabelKeyDown = (e) => {
@@ -1838,6 +2031,22 @@ export default function Results() {
         setIsEditingLabel(false);
       }
     };
+
+    if (isRemoved && !isCustomOffer && onConfigureClick) {
+      return (
+        <div className="space-y-2">
+          <button
+            onClick={() => onConfigureClick(tier)}
+            className={`w-full h-12 font-semibold rounded-full border-2 border-dashed flex items-center justify-center gap-2 transition-all ${
+              darkMode ? 'border-white/40 text-white/80 hover:border-white/60 hover:bg-white/10' : 'border-gray-300 text-gray-500 hover:border-gray-400 hover:bg-gray-50'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            Add CTA
+          </button>
+        </div>
+      );
+    }
 
     if (isEditingLabel && isCustomOffer) {
       return (
@@ -1876,44 +2085,8 @@ export default function Results() {
       );
     }
 
-    if (isEditing && !isCustomOffer) {
-      return (
-        <div ref={inputRef} className="space-y-2">
-          <Input
-            value={linkValue}
-            onChange={(e) => setLinkValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="https://example.com"
-            className={`w-full text-sm ${darkMode ? 'bg-white text-gray-900' : ''}`}
-            autoFocus
-            style={{ borderColor: brandColor }}
-          />
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={handleSave}
-              className="flex-1 text-white"
-              style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
-            >
-              <Save className="w-3 h-3 mr-1" />
-              Save Link
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setLinkValue(config.button_links?.[modeKey]?.[tier] || '');
-                setIsEditing(false);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
     const buttonLink = config.button_links?.[modeKey]?.[tier];
+    const displayLabel = customLabel || (isCustomOffer ? 'Get Custom Offer' : 'Lock Your Spot');
 
     const ensureHttps = (url) => {
       if (!url) return '';
@@ -1924,21 +2097,36 @@ export default function Results() {
       return `https://${trimmed}`;
     };
 
+    const buttonClasses = `w-full h-12 font-semibold rounded-full shadow-lg transition-all flex items-center justify-center ${
+      darkMode ? 'bg-white text-gray-900 hover:bg-gray-100' : 'text-white'
+    }`;
+    const buttonStyle = !darkMode ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` } : {};
+
     return (
       <div
         className="relative group/button"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Button
-          onClick={(e) => e.preventDefault()}
-          className={`w-full h-12 font-semibold rounded-full shadow-lg transition-all ${
-            darkMode ? 'bg-white text-gray-900 hover:bg-gray-100' : 'text-white'
-          }`}
-          style={!darkMode ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` } : {}}
-        >
-          {customLabel || 'Get Started'}
-        </Button>
+        {buttonLink ? (
+          <a
+            href={ensureHttps(buttonLink)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClasses}
+            style={{ ...buttonStyle, textDecoration: 'none' }}
+          >
+            {displayLabel}
+          </a>
+        ) : (
+          <Button
+            onClick={(e) => e.preventDefault()}
+            className={buttonClasses}
+            style={buttonStyle}
+          >
+            {displayLabel}
+          </Button>
+        )}
         {buttonLink && (
           <div className="absolute -bottom-6 left-0 right-0 text-center">
             <span className="text-xs text-gray-400 truncate block px-2" title={ensureHttps(buttonLink)}>
@@ -1946,14 +2134,51 @@ export default function Results() {
             </span>
           </div>
         )}
-        {isHovered && !isCustomOffer && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="absolute top-1/2 right-3 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all z-10"
-            title="Edit button link"
-          >
-            <LinkIcon className="w-4 h-4" style={{ color: brandColor }} />
-          </button>
+        {!buttonLink && !isCustomOffer && onConfigureClick && (
+          <div className="absolute -bottom-6 left-0 right-0 text-center px-2">
+            <span className="text-xs text-gray-500">
+              Using a different strategy for this offer? (
+              <button
+                type="button"
+                onClick={() => onConfigureClick(tier)}
+                className="text-xs font-medium underline hover:no-underline inline"
+                style={{ color: brandColor }}
+              >
+                Change
+              </button>
+              )
+            </span>
+          </div>
+        )}
+        {!isCustomOffer && onConfigureClick && (showConfigOnHover || showConfigAlways) && (
+          <div className="absolute top-1/2 right-3 -translate-y-1/2 flex items-center gap-1 z-10">
+            {isMobileView ? (
+              <button
+                onClick={() => onConfigureClick(tier)}
+                className="text-xs font-medium px-3 py-1.5 rounded-full bg-white/90 hover:bg-white shadow-md transition-all"
+                style={{ color: brandColor }}
+              >
+                Change
+              </button>
+            ) : (
+              <button
+                onClick={() => onConfigureClick(tier)}
+                className="w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all"
+                title="Configure button"
+              >
+                <Settings className="w-4 h-4" style={{ color: brandColor }} />
+              </button>
+            )}
+            {onRemoveClick && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemoveClick(tier); }}
+                className="w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all text-red-500 hover:text-red-600"
+                title="Remove CTA"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         )}
         {isHovered && isCustomOffer && (
           <button
@@ -1970,9 +2195,17 @@ export default function Results() {
 
 
   const renderDesign1 = () => {
-    // Calculate max deliverables to align bonus sections
-    const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    // Calculate max deliverables and bonuses to align sections across tiers
+    const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length), 1);
+    const maxBonuses = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
+    const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
+      packages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
+    const bonusTemplate = Array.from({ length: maxBonuses }, (_, idx) =>
+      packages.find(p => !p.isCustomOffer && p.bonuses[idx])?.bonuses[idx] || ''
+    );
     const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
+    const bonusesMinHeight = packages.length === 4 ? maxBonuses * 28 : maxBonuses * 32;
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -2041,16 +2274,18 @@ export default function Results() {
                     />
                   </p>
                 </div>
-                <div className="w-full">
-                  <EditableButton
-                    tier={tierName}
-                    brandColor={brandColor}
-                    darkerBrandColor={darkerBrandColor}
-                    darkMode={false}
-                    customLabel={config.button_links?.[modeKey]?.[tierName + '_label'] || "Get Custom Offer"}
-                    isCustomOffer={true}
-                  />
-                </div>
+                {showPackageButtonsInEditMode && (
+                  <div className="w-full">
+                    <EditableButton
+                      tier={tierName}
+                      brandColor={brandColor}
+                      darkerBrandColor={darkerBrandColor}
+                      darkMode={false}
+                      customLabel={config.button_links?.[modeKey]?.[tierName + '_label'] || "Get Custom Offer"}
+                      isCustomOffer={true}
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -2216,7 +2451,9 @@ export default function Results() {
 
                 {pkg.description !== null ? (
                   <div
-                    className="mb-6 p-4 rounded-xl relative group/desc"
+                    className={`mb-6 rounded-xl relative group/desc overflow-hidden ${
+                      packages.length === 4 ? 'p-3 min-h-[88px] max-h-[88px]' : 'p-4 min-h-[96px] max-h-[96px]'
+                    }`}
                     style={{ backgroundColor: `${brandColor}15` }}
                   >
                     <button
@@ -2234,6 +2471,7 @@ export default function Results() {
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
                       className="text-sm text-gray-700"
                       multiline={true}
+                      maxLength={120}
                       placeholder="Describe who this package is best for"
                       brandColor={brandColor}
                     />
@@ -2251,28 +2489,69 @@ export default function Results() {
                   </button>
                 )}
 
+                {!isPreviewMode && (
+                  <CostCalculatorTrigger
+                    {...getCostCalculatorDisplay(config.cost_data?.[modeKey]?.[tierName], pkg.price, currencySymbol)}
+                    onClick={() => openCostCalculator(tierName)}
+                    isMobile={isMobileView}
+                    showNewBadge={!hasOpenedCalculatorOnce()}
+                    showNudgeTooltip={!hasNudgeBeenDismissed()}
+                    onNudgeDismiss={setNudgeDismissed}
+                    darkMode={false}
+                  />
+                )}
+
                 <div className={`space-y-3 mb-6`}>
                   <p className="text-sm font-semibold text-gray-500 uppercase">Deliverables</p>
 
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
                       <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                       {pkg.deliverables.map((d, idx) => (
-                         <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
-                           {(provided) => (
-                             <div ref={provided.innerRef} {...provided.draggableProps}>
-                               <EditableDeliverableItem
-                                 deliverable={d}
-                                 onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
-                                 onDelete={() => deleteDeliverable(tierName, idx)}
-                                 darkMode={false}
-                                 brandColor={brandColor}
-                                 dragHandleProps={provided.dragHandleProps}
-                               />
+                       {deliverableTemplate.map((templateDeliverable, idx) => {
+                         const deliverable = pkg.deliverables[idx];
+                         const isIncluded = idx < pkg.deliverables.length;
+                         const placeholderText = typeof templateDeliverable === 'string'
+                           ? templateDeliverable
+                           : templateDeliverable?.type || '';
+
+                         if (!isIncluded) {
+                           if (!showExcludedDeliverables) {
+                             return <div key={`deliv-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                           }
+                           return (
+                             <div
+                               key={`deliv-missing-${tierName}-${idx}`}
+                               className="flex items-start gap-2 rounded px-2 py-1"
+                             >
+                               <div className="p-1 mt-0.5">
+                                 <GripVertical className="w-4 h-4 text-transparent" />
+                               </div>
+                               <X className="w-5 h-5 mt-0.5 text-gray-300 flex-shrink-0" />
+                               <span className="text-sm text-gray-400 flex-1">
+                                 {placeholderText}
+                               </span>
                              </div>
-                           )}
-                         </Draggable>
-                       ))}
+                           );
+                         }
+
+                         return (
+                           <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
+                             {(provided) => (
+                               <div ref={provided.innerRef} {...provided.draggableProps}>
+                                 <EditableDeliverableItem
+                                   deliverable={deliverable}
+                                   onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
+                                   onDuplicate={() => duplicateDeliverable(tierName, idx)}
+                                   onDelete={() => deleteDeliverable(tierName, idx)}
+                                   darkMode={false}
+                                   brandColor={brandColor}
+                                   dragHandleProps={provided.dragHandleProps}
+                                 />
+                               </div>
+                             )}
+                           </Draggable>
+                         );
+                       })}
                        {provided.placeholder}
                       </div>
                     )}
@@ -2299,24 +2578,49 @@ export default function Results() {
 
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
-                      {pkg.bonuses.map((bonus, idx) => (
-                        <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
-                          {(provided) => (
-                            <div ref={provided.innerRef} {...provided.draggableProps}>
-                              <EditableListItem
-                                value={bonus}
-                                onSave={(newValue) => updateBonus(tierName, idx, newValue)}
-                                onDelete={() => deleteBonus(tierName, idx)}
-                                icon={Plus}
-                                iconClassName="text-green-500"
-                                brandColor={brandColor}
-                                dragHandleProps={provided.dragHandleProps}
-                              />
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${bonusesMinHeight}px` }}>
+                      {bonusTemplate.map((templateBonus, idx) => {
+                        const bonus = pkg.bonuses[idx];
+                        const hasBonus = idx < pkg.bonuses.length;
+
+                        if (!hasBonus) {
+                          if (!showExcludedDeliverables) {
+                            return <div key={`bonus-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                          }
+                          return (
+                            <div
+                              key={`bonus-missing-${tierName}-${idx}`}
+                              className="flex items-start gap-2 rounded px-2 py-1"
+                            >
+                              <div className="p-1 mt-0.5">
+                                <GripVertical className="w-4 h-4 text-transparent" />
+                              </div>
+                              <X className="w-5 h-5 mt-0.5 text-gray-300 flex-shrink-0" />
+                              <span className="text-sm text-gray-400 flex-1">
+                                {templateBonus}
+                              </span>
                             </div>
-                          )}
-                        </Draggable>
-                      ))}
+                          );
+                        }
+
+                        return (
+                          <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
+                            {(provided) => (
+                              <div ref={provided.innerRef} {...provided.draggableProps}>
+                                <EditableListItem
+                                  value={bonus}
+                                  onSave={(newValue) => updateBonus(tierName, idx, newValue)}
+                                  onDelete={() => deleteBonus(tierName, idx)}
+                                  icon={Plus}
+                                  iconClassName="text-green-500"
+                                  brandColor={brandColor}
+                                  dragHandleProps={provided.dragHandleProps}
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
                       {provided.placeholder}
                     </div>
                   )}
@@ -2335,28 +2639,21 @@ export default function Results() {
               </div>
             </div>
 
-            <div className="relative">
-              <EditableButton
-                tier={tierName}
-                brandColor={brandColor}
-                darkerBrandColor={darkerBrandColor}
-                darkMode={false}
-              />
-
-              {!isPreviewMode && index === 0 && (
-                <div className="absolute -top-12 left-6 pointer-events-none" style={{ transform: 'rotate(-8deg)' }}>
-                  <div 
-                    className="text-gray-500 text-sm leading-tight"
-                    style={{ fontFamily: '"Sour Gummy", cursive', fontWeight: 400 }}
-                  >
-                    Add link :)
-                  </div>
-                  <svg width="40" height="40" viewBox="0 0 375 375" className="absolute top-4 left-10 text-gray-500" style={{ transform: 'rotate(20deg)' }}>
-                    <path fill="currentColor" d="M 224.339844 260.644531 C 224.886719 244.621094 223.992188 228.351562 227.515625 212.601562 C 228.203125 209.511719 235.894531 188.441406 233.585938 187.402344 C 230.769531 188.617188 226.753906 188.640625 225.441406 191.765625 C 222.289062 203.566406 217.433594 215.648438 216.53125 227.898438 C 216.464844 228.777344 217.882812 237.042969 215.039062 234.339844 C 213.527344 232.914062 210.949219 225.867188 209.335938 223.242188 C 197.03125 203.203125 181.867188 179.925781 167.101562 161.738281 C 134.816406 121.980469 64.929688 64.773438 13.214844 57.34375 C 9.722656 56.847656 0.820312 55.742188 2.257812 61.90625 C 3.1875 65.882812 6.824219 64.128906 9.59375 64.765625 C 89.363281 83.25 156.222656 153.132812 197.8125 220.796875 C 200.417969 225.042969 203.191406 229.925781 204.96875 234.578125 C 204.492188 235.90625 181.160156 223.957031 179.148438 223.242188 C 174.644531 221.625 162.3125 218.652344 158.609375 221.140625 C 155.941406 222.929688 156.597656 232.648438 158.28125 235.003906 C 159.628906 236.890625 171.019531 238.742188 174.222656 239.855469 C 180.863281 242.15625 197.734375 249.234375 203.433594 253.207031 C 206.195312 255.132812 215.4375 264.65625 217.84375 265.125 C 220.246094 265.59375 223.082031 262.609375 224.308594 260.652344 Z M 224.339844 260.644531 " fillOpacity="0.5" />
-                  </svg>
-                </div>
-              )}
-            </div>
+            {showPackageButtonsInEditMode && (
+              <div className="relative">
+                <EditableButton
+                  tier={tierName}
+                  brandColor={brandColor}
+                  darkerBrandColor={darkerBrandColor}
+                  darkMode={false}
+                  customLabel={config.button_links?.[modeKey]?.[tierName + '_label'] || 'Lock Your Spot'}
+                  isCustomOffer={false}
+                  onConfigureClick={openConfigureModal}
+                  isRemoved={config.button_links?.[modeKey]?.[tierName + '_removed'] === true}
+                  onRemoveClick={removeButtonCTA}
+                />
+              </div>
+            )}
             </>
             )}
             </motion.div>
@@ -2368,9 +2665,17 @@ export default function Results() {
   };
 
   const renderDesign2 = () => {
-    // Calculate max deliverables to align bonus sections
-    const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    // Calculate max deliverables and bonuses to align sections across tiers
+    const maxDeliverables = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length), 1);
+    const maxBonuses = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
+    const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
+      packages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
+    const bonusTemplate = Array.from({ length: maxBonuses }, (_, idx) =>
+      packages.find(p => !p.isCustomOffer && p.bonuses[idx])?.bonuses[idx] || ''
+    );
     const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
+    const bonusesMinHeight = packages.length === 4 ? maxBonuses * 28 : maxBonuses * 32;
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -2442,16 +2747,18 @@ export default function Results() {
                     />
                   </p>
                 </div>
-                <div className="w-full">
-                  <EditableButton
-                    tier={tierName}
-                    brandColor={brandColor}
-                    darkerBrandColor={darkerBrandColor}
-                    darkMode={true}
-                    customLabel={config.button_links?.[modeKey]?.[tierName + '_label'] || "Get Custom Offer"}
-                    isCustomOffer={true}
-                  />
-                </div>
+                {showPackageButtonsInEditMode && (
+                  <div className="w-full">
+                    <EditableButton
+                      tier={tierName}
+                      brandColor={brandColor}
+                      darkerBrandColor={darkerBrandColor}
+                      darkMode={true}
+                      customLabel={config.button_links?.[modeKey]?.[tierName + '_label'] || "Get Custom Offer"}
+                      isCustomOffer={true}
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -2613,7 +2920,9 @@ export default function Results() {
 
                 {pkg.description !== null ? (
                   <div
-                    className="mb-6 p-4 rounded-xl relative group/desc"
+                    className={`mb-6 rounded-xl relative group/desc overflow-hidden ${
+                      packages.length === 4 ? 'p-3 min-h-[88px] max-h-[88px]' : 'p-4 min-h-[96px] max-h-[96px]'
+                    }`}
                     style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
                   >
                     <button
@@ -2631,6 +2940,7 @@ export default function Results() {
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
                       className="text-sm text-white"
                       multiline={true}
+                      maxLength={120}
                       placeholder="Describe who this package is best for"
                       darkMode={true}
                       brandColor={brandColor}
@@ -2648,28 +2958,69 @@ export default function Results() {
                   </button>
                 )}
 
+                {!isPreviewMode && (
+                  <CostCalculatorTrigger
+                    {...getCostCalculatorDisplay(config.cost_data?.[modeKey]?.[tierName], pkg.price, currencySymbol)}
+                    onClick={() => openCostCalculator(tierName)}
+                    isMobile={isMobileView}
+                    showNewBadge={!hasOpenedCalculatorOnce()}
+                    showNudgeTooltip={!hasNudgeBeenDismissed()}
+                    onNudgeDismiss={setNudgeDismissed}
+                    darkMode={true}
+                  />
+                )}
+
                 <div className={`space-y-3 mb-6`}>
                   <p className="text-sm font-semibold text-white/70 uppercase">Deliverables</p>
 
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
                       <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                       {pkg.deliverables.map((d, idx) => (
-                         <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
-                           {(provided) => (
-                             <div ref={provided.innerRef} {...provided.draggableProps}>
-                               <EditableDeliverableItem
-                                 deliverable={d}
-                                 onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
-                                 onDelete={() => deleteDeliverable(tierName, idx)}
-                                 darkMode={true}
-                                 brandColor={brandColor}
-                                 dragHandleProps={provided.dragHandleProps}
-                               />
+                       {deliverableTemplate.map((templateDeliverable, idx) => {
+                         const deliverable = pkg.deliverables[idx];
+                         const isIncluded = idx < pkg.deliverables.length;
+                         const placeholderText = typeof templateDeliverable === 'string'
+                           ? templateDeliverable
+                           : templateDeliverable?.type || '';
+
+                         if (!isIncluded) {
+                           if (!showExcludedDeliverables) {
+                             return <div key={`deliv-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                           }
+                           return (
+                             <div
+                               key={`deliv-missing-${tierName}-${idx}`}
+                               className="flex items-start gap-2 rounded px-2 py-1"
+                             >
+                               <div className="p-1 mt-0.5">
+                                 <GripVertical className="w-4 h-4 text-transparent" />
+                               </div>
+                               <X className="w-5 h-5 mt-0.5 text-white/30 flex-shrink-0" />
+                               <span className="text-sm text-white/40 flex-1">
+                                 {placeholderText}
+                               </span>
                              </div>
-                           )}
-                         </Draggable>
-                       ))}
+                           );
+                         }
+
+                         return (
+                           <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
+                             {(provided) => (
+                               <div ref={provided.innerRef} {...provided.draggableProps}>
+                                 <EditableDeliverableItem
+                                   deliverable={deliverable}
+                                   onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
+                                   onDuplicate={() => duplicateDeliverable(tierName, idx)}
+                                   onDelete={() => deleteDeliverable(tierName, idx)}
+                                   darkMode={true}
+                                   brandColor={brandColor}
+                                   dragHandleProps={provided.dragHandleProps}
+                                 />
+                               </div>
+                             )}
+                           </Draggable>
+                         );
+                       })}
                        {provided.placeholder}
                       </div>
                     )}
@@ -2693,25 +3044,50 @@ export default function Results() {
 
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
-                      {pkg.bonuses.map((bonus, idx) => (
-                        <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
-                          {(provided) => (
-                            <div ref={provided.innerRef} {...provided.draggableProps}>
-                              <EditableListItem
-                                value={bonus}
-                                onSave={(newValue) => updateBonus(tierName, idx, newValue)}
-                                onDelete={() => deleteBonus(tierName, idx)}
-                                icon={Plus}
-                                iconClassName="text-yellow-400"
-                                darkMode={true}
-                                brandColor={brandColor}
-                                dragHandleProps={provided.dragHandleProps}
-                              />
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${bonusesMinHeight}px` }}>
+                      {bonusTemplate.map((templateBonus, idx) => {
+                        const bonus = pkg.bonuses[idx];
+                        const hasBonus = idx < pkg.bonuses.length;
+
+                        if (!hasBonus) {
+                          if (!showExcludedDeliverables) {
+                            return <div key={`bonus-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                          }
+                          return (
+                            <div
+                              key={`bonus-missing-${tierName}-${idx}`}
+                              className="flex items-start gap-2 rounded px-2 py-1"
+                            >
+                              <div className="p-1 mt-0.5">
+                                <GripVertical className="w-4 h-4 text-transparent" />
+                              </div>
+                              <X className="w-5 h-5 mt-0.5 text-white/30 flex-shrink-0" />
+                              <span className="text-sm text-white/40 flex-1">
+                                {templateBonus}
+                              </span>
                             </div>
-                          )}
-                        </Draggable>
-                      ))}
+                          );
+                        }
+
+                        return (
+                          <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
+                            {(provided) => (
+                              <div ref={provided.innerRef} {...provided.draggableProps}>
+                                <EditableListItem
+                                  value={bonus}
+                                  onSave={(newValue) => updateBonus(tierName, idx, newValue)}
+                                  onDelete={() => deleteBonus(tierName, idx)}
+                                  icon={Plus}
+                                  iconClassName="text-yellow-400"
+                                  darkMode={true}
+                                  brandColor={brandColor}
+                                  dragHandleProps={provided.dragHandleProps}
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
                       {provided.placeholder}
                     </div>
                   )}
@@ -2730,28 +3106,21 @@ export default function Results() {
               </div>
             </div>
 
-            <div className="relative">
-              <EditableButton
-                tier={tierName}
-                brandColor={brandColor}
-                darkerBrandColor={darkerBrandColor}
-                darkMode={true}
-              />
-
-              {!isPreviewMode && index === 0 && (
-                <div className="absolute -top-12 left-6 pointer-events-none" style={{ transform: 'rotate(-8deg)' }}>
-                  <div 
-                    className="text-gray-400 text-sm leading-tight"
-                    style={{ fontFamily: '"Sour Gummy", cursive', fontWeight: 400 }}
-                  >
-                    Add link :)
-                  </div>
-                  <svg width="40" height="40" viewBox="0 0 375 375" className="absolute top-4 left-10 text-gray-400" style={{ transform: 'rotate(20deg)' }}>
-                    <path fill="currentColor" d="M 224.339844 260.644531 C 224.886719 244.621094 223.992188 228.351562 227.515625 212.601562 C 228.203125 209.511719 235.894531 188.441406 233.585938 187.402344 C 230.769531 188.617188 226.753906 188.640625 225.441406 191.765625 C 222.289062 203.566406 217.433594 215.648438 216.53125 227.898438 C 216.464844 228.777344 217.882812 237.042969 215.039062 234.339844 C 213.527344 232.914062 210.949219 225.867188 209.335938 223.242188 C 197.03125 203.203125 181.867188 179.925781 167.101562 161.738281 C 134.816406 121.980469 64.929688 64.773438 13.214844 57.34375 C 9.722656 56.847656 0.820312 55.742188 2.257812 61.90625 C 3.1875 65.882812 6.824219 64.128906 9.59375 64.765625 C 89.363281 83.25 156.222656 153.132812 197.8125 220.796875 C 200.417969 225.042969 203.191406 229.925781 204.96875 234.578125 C 204.492188 235.90625 181.160156 223.957031 179.148438 223.242188 C 174.644531 221.625 162.3125 218.652344 158.609375 221.140625 C 155.941406 222.929688 156.597656 232.648438 158.28125 235.003906 C 159.628906 236.890625 171.019531 238.742188 174.222656 239.855469 C 180.863281 242.15625 197.734375 249.234375 203.433594 253.207031 C 206.195312 255.132812 215.4375 264.65625 217.84375 265.125 C 220.246094 265.59375 223.082031 262.609375 224.308594 260.652344 Z M 224.339844 260.644531 " fillOpacity="0.5" />
-                  </svg>
-                </div>
-              )}
-            </div>
+            {showPackageButtonsInEditMode && (
+              <div className="relative">
+                <EditableButton
+                  tier={tierName}
+                  brandColor={brandColor}
+                  darkerBrandColor={darkerBrandColor}
+                  darkMode={true}
+                  customLabel={config.button_links?.[modeKey]?.[tierName + '_label'] || 'Lock Your Spot'}
+                  isCustomOffer={false}
+                  onConfigureClick={openConfigureModal}
+                  isRemoved={config.button_links?.[modeKey]?.[tierName + '_removed'] === true}
+                  onRemoveClick={removeButtonCTA}
+                />
+              </div>
+            )}
             </>
             )}
             </motion.div>
@@ -2763,8 +3132,16 @@ export default function Results() {
   };
 
             const renderPreviewDesign1 = () => {
-    const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length), 1);
+    const maxBonuses = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
+    const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
+      previewPackages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
+    const rowGap = previewPackages.length === 4 ? 4 : 12;
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
+    const deliverablesHeight = deliverablesMinHeight + Math.max(0, maxDeliverables - 1) * rowGap;
+    const bonusesHeight = maxBonuses > 0 ? (previewPackages.length === 4 ? maxBonuses * 24 : maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
+    const descHeight = previewPackages.length === 4 ? 72 : 88;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
     );
@@ -2774,8 +3151,10 @@ export default function Results() {
                 {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
+        const isRemoved = config.button_links?.[modeKey]?.[pkg.tier + '_removed'] === true;
         const trimmedLink = buttonLink?.trim() || '';
         const hasValidLink = trimmedLink !== '';
+        const showCTA = hasValidLink && !isRemoved;
         const finalLink = hasValidLink ? (
           trimmedLink.startsWith('http://') || trimmedLink.startsWith('https://')
             ? trimmedLink
@@ -2804,6 +3183,7 @@ export default function Results() {
                     {config.package_descriptions?.[modeKey]?.[pkg.tier + '_subtitle'] || "Let's create a custom package tailored specifically to your needs"}
                   </p>
                 </div>
+                {showCTA && (
                 <a
                   href={finalLink || '#'}
                   target="_blank"
@@ -2830,6 +3210,7 @@ export default function Results() {
                 >
                   {config.button_links?.[modeKey]?.[pkg.tier + '_label'] || "Get Custom Offer"}
                 </a>
+                )}
               </div>
             </motion.div>
           );
@@ -2893,42 +3274,80 @@ export default function Results() {
                 </p>
               )}
 
-              {pkg.description !== null && (
-                <div
-                  className={`p-3 rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
-                  style={{ backgroundColor: `${brandColor}15` }}
-                >
+              <div
+                className={`rounded-xl mb-4 overflow-y-auto ${
+                  previewPackages.length === 4 ? 'p-2' : 'p-4'
+                }`}
+                style={{ height: `${descHeight}px`, minHeight: `${descHeight}px`, backgroundColor: pkg.description != null ? `${brandColor}15` : 'transparent' }}
+              >
+                {pkg.description != null && (
                   <p className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
-                </div>
-              )}
+                )}
+              </div>
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
-                <div style={{ minHeight: `${deliverablesMinHeight}px` }}>
-                  {pkg.deliverables.map((d, i) => (
-                    <div key={i} className="flex items-start gap-1.5 mb-1">
-                      <Check className={`flex-shrink-0 mt-0.5 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} style={{ color: brandColor }} />
-                      <span className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
-                        {typeof d === 'string' ? d : d.type || ''}
-                      </span>
-                    </div>
-                  ))}
+                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                  {deliverableTemplate.map((templateDeliverable, i) => {
+                    const deliverable = pkg.deliverables[i];
+                    const isIncluded = i < pkg.deliverables.length;
+                    const label = showExcludedDeliverables
+                      ? (typeof (deliverable || templateDeliverable) === 'string'
+                          ? (deliverable || templateDeliverable)
+                          : (deliverable || templateDeliverable)?.type || '')
+                      : (isIncluded ? (typeof deliverable === 'string' ? deliverable : deliverable?.type || '') : '');
+
+                    if (!isIncluded && !showExcludedDeliverables) {
+                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                    }
+
+                    return (
+                      <div key={i} className="flex items-start gap-1.5">
+                        {isIncluded ? (
+                          <Check
+                            className={`flex-shrink-0 mt-0.5 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`}
+                            style={{ color: brandColor }}
+                          />
+                        ) : (
+                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        )}
+                        <span className={`${isIncluded ? 'text-gray-700' : 'text-gray-400'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-            {pkg.bonuses.length > 0 && (
+            {(maxBonuses > 0 || pkg.bonuses.length > 0) && (
               <div className={`pt-4 border-t border-gray-200 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Bonuses</p>
-                {pkg.bonuses.map((bonus, i) => (
-                  <div key={i} className="flex items-start gap-1.5 mb-1">
-                    <Plus className={`flex-shrink-0 mt-0.5 text-green-500 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
-                    <span className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonus}</span>
-                  </div>
-                ))}
+                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                  {Array.from({ length: maxBonuses }, (_, i) => {
+                    const bonus = pkg.bonuses[i];
+                    const hasBonus = i < pkg.bonuses.length;
+                    const bonusLabel = hasBonus ? bonus : (previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i] || '');
+                    if (!hasBonus && !showExcludedDeliverables) {
+                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                    }
+                    return (
+                      <div key={i} className="flex items-start gap-1.5">
+                        {hasBonus ? (
+                          <Plus className={`flex-shrink-0 mt-0.5 text-green-500 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        ) : (
+                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        )}
+                        <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-400'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonusLabel}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
+          {showCTA && (
           <a
             href={finalLink || '#'}
             target="_blank"
@@ -2953,8 +3372,9 @@ export default function Results() {
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
             }}
           >
-            Get Started
+            {config.button_links?.[modeKey]?.[pkg.tier + '_label'] || 'Lock Your Spot'}
           </a>
+          )}
         </motion.div>
         );
       })}
@@ -2963,8 +3383,16 @@ export default function Results() {
   };
 
   const renderPreviewDesign2 = () => {
-    const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length));
+    const maxDeliverables = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.deliverables.length), 1);
+    const maxBonuses = Math.max(...previewPackages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
+    const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
+      previewPackages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
+    const rowGap = previewPackages.length === 4 ? 4 : 12;
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
+    const deliverablesHeight = deliverablesMinHeight + Math.max(0, maxDeliverables - 1) * rowGap;
+    const bonusesHeight = maxBonuses > 0 ? (previewPackages.length === 4 ? maxBonuses * 24 : maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
+    const descHeight = previewPackages.length === 4 ? 72 : 88;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
     );
@@ -2974,8 +3402,10 @@ export default function Results() {
       {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
+        const isRemoved = config.button_links?.[modeKey]?.[pkg.tier + '_removed'] === true;
         const trimmedLink = buttonLink?.trim() || '';
         const hasValidLink = trimmedLink !== '';
+        const showCTA = hasValidLink && !isRemoved;
         const finalLink = hasValidLink ? (
           trimmedLink.startsWith('http://') || trimmedLink.startsWith('https://') 
             ? trimmedLink 
@@ -3003,6 +3433,7 @@ export default function Results() {
                     {config.package_descriptions?.[modeKey]?.[pkg.tier + '_subtitle'] || "Let's create a custom package tailored specifically to your needs"}
                   </p>
                 </div>
+                {showCTA && (
                 <a
                   href={finalLink || '#'}
                   target="_blank"
@@ -3026,6 +3457,7 @@ export default function Results() {
                 >
                   {config.button_links?.[modeKey]?.[pkg.tier + '_label'] || "Get Custom Offer"}
                 </a>
+                )}
               </div>
             </motion.div>
           );
@@ -3083,42 +3515,77 @@ export default function Results() {
                 </p>
               )}
 
-              {pkg.description !== null && (
-                <div
-                  className={`rounded-xl mb-4 ${previewPackages.length === 4 ? 'p-2' : 'p-4'}`}
-                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
-                >
+              <div
+                className={`rounded-xl mb-4 overflow-y-auto ${
+                  previewPackages.length === 4 ? 'p-2' : 'p-4'
+                }`}
+                style={{ height: `${descHeight}px`, minHeight: `${descHeight}px`, backgroundColor: pkg.description != null ? 'rgba(255, 255, 255, 0.15)' : 'transparent' }}
+              >
+                {pkg.description != null && (
                   <p className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
-                </div>
-              )}
+                )}
+              </div>
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
-                <div style={{ minHeight: `${deliverablesMinHeight}px` }} className="space-y-2">
-                  {pkg.deliverables.map((d, i) => (
-                    <div key={i} className="flex items-start gap-1.5">
-                      <Check className={`flex-shrink-0 mt-0.5 text-white ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
-                      <span className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
-                        {typeof d === 'string' ? d : d.type || ''}
-                      </span>
-                    </div>
-                  ))}
+                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                  {deliverableTemplate.map((templateDeliverable, i) => {
+                    const deliverable = pkg.deliverables[i];
+                    const isIncluded = i < pkg.deliverables.length;
+                    const label = showExcludedDeliverables
+                      ? (typeof (deliverable || templateDeliverable) === 'string'
+                          ? (deliverable || templateDeliverable)
+                          : (deliverable || templateDeliverable)?.type || '')
+                      : (isIncluded ? (typeof deliverable === 'string' ? deliverable : deliverable?.type || '') : '');
+
+                    if (!isIncluded && !showExcludedDeliverables) {
+                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                    }
+
+                    return (
+                      <div key={i} className="flex items-start gap-1.5">
+                        {isIncluded ? (
+                          <Check className={`flex-shrink-0 mt-0.5 text-white ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        ) : (
+                          <X className={`flex-shrink-0 mt-0.5 text-white/30 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        )}
+                        <span className={`${isIncluded ? 'text-white' : 'text-white/40'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-            {pkg.bonuses.length > 0 && (
+            {(maxBonuses > 0 || pkg.bonuses.length > 0) && (
               <div className={`pt-4 border-t border-white/20 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
                 <p className={`font-bold uppercase tracking-wider ${previewPackages.length === 4 ? 'text-[10px]' : 'text-xs'}`}>Bonuses</p>
-                {pkg.bonuses.map((bonus, i) => (
-                  <div key={i} className="flex items-start gap-1.5 mb-1">
-                    <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
-                    <span className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonus}</span>
-                  </div>
-                ))}
+                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                  {Array.from({ length: maxBonuses }, (_, i) => {
+                    const bonus = pkg.bonuses[i];
+                    const hasBonus = i < pkg.bonuses.length;
+                    const bonusLabel = hasBonus ? bonus : (previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i] || '');
+                    if (!hasBonus && !showExcludedDeliverables) {
+                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                    }
+                    return (
+                      <div key={i} className="flex items-start gap-1.5">
+                        {hasBonus ? (
+                          <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        ) : (
+                          <X className={`flex-shrink-0 mt-0.5 text-white/30 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        )}
+                        <span className={`${hasBonus ? 'text-white' : 'text-white/40'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonusLabel}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
+          {showCTA && (
           <a
             href={finalLink || '#'}
             target="_blank"
@@ -3140,8 +3607,9 @@ export default function Results() {
                     else if (window.__analyticsPending) { window.__analyticsPending.then(doClick); }
             }}
           >
-            Get Started
+            {config.button_links?.[modeKey]?.[pkg.tier + '_label'] || 'Lock Your Spot'}
           </a>
+          )}
         </motion.div>
         );
       })}
@@ -3202,9 +3670,28 @@ export default function Results() {
     window.location.href = pendingUrl;
   };
 
+  const LAUNCHBOX_LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68e6df240580e3bf55058574/655c15688_LaunchBoxlogo_E3copy.png';
+
   if (isPreviewMode) {
     return (
-      <div className="min-h-screen py-6 md:py-12" style={{ backgroundColor: '#F5F5F7' }}>
+      <div className="min-h-screen py-6 md:py-12 relative" style={{ backgroundColor: '#F5F5F7' }}>
+        {/* Export loading overlay */}
+        {(exporting || exportingPdf) && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/60 backdrop-blur-md">
+            <div className="flex flex-col items-center gap-6">
+              <img
+                src={LAUNCHBOX_LOGO_URL}
+                alt="LaunchBox"
+                className="h-16 w-auto object-contain"
+              />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink" />
+                <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink-2" />
+                <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink-3" />
+              </div>
+            </div>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div ref={exportRef}>
           <div className="text-center">
@@ -3390,7 +3877,24 @@ export default function Results() {
   };
 
   return (
-    <div className="min-h-screen py-12" style={{ backgroundColor: '#F5F5F7' }}>
+    <div className="min-h-screen py-12 relative" style={{ backgroundColor: '#F5F5F7' }}>
+      {/* Export loading overlay */}
+      {(exporting || exportingPdf) && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/60 backdrop-blur-md">
+          <div className="flex flex-col items-center gap-6">
+            <img
+              src={LAUNCHBOX_LOGO_URL}
+              alt="LaunchBox"
+              className="h-16 w-auto object-contain"
+            />
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink" />
+              <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink-2" />
+              <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink-3" />
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center gap-4 mb-8">
           {config?.from_template && (
@@ -3633,6 +4137,27 @@ export default function Results() {
               </div>
             </div>
           </div>
+          <div className="pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm font-semibold text-gray-700">Show Excluded Items</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showExcludedDeliverables}
+                onClick={() => updateConfig('show_excluded_deliverables', !showExcludedDeliverables)}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  showExcludedDeliverables ? 'bg-blue-500' : 'bg-gray-300'
+                }`}
+                title={showExcludedDeliverables ? 'On' : 'Off'}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                    showExcludedDeliverables ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
           </div>
 
         <div className="flex items-center justify-center gap-4 mb-8">
@@ -3752,6 +4277,7 @@ export default function Results() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
             className="mb-12"
+            style={costCalculatorTier ? { pointerEvents: 'none' } : undefined}
           >
             <div ref={exportRef}>{renderCurrentDesign()}</div>
 
@@ -3770,7 +4296,10 @@ export default function Results() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="text-center space-y-4 mb-12">
+        <div
+          className="text-center space-y-4 mb-12"
+          style={costCalculatorTier ? { pointerEvents: 'none' } : undefined}
+        >
           {config.guarantee && (
             <div className="bg-white rounded-xl p-6 shadow-md max-w-3xl mx-auto border-2 border-gray-200 relative group">
               <button
@@ -3835,43 +4364,66 @@ export default function Results() {
         </div>
 
         <div className="flex justify-center gap-4 flex-wrap">
-          <button
-            onClick={() => exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, isPreviewMode, setPricingMode })}
-            disabled={exporting}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            {exporting ? 'Exporting...' : 'Export image'}
-          </button>
-          <div className="relative">
+          <div className="relative" ref={exportDropdownRef}>
             <button
-              onClick={() => !exportingPdf && setShowPdfOptions((prev) => !prev)}
-              disabled={exportingPdf}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!exporting && !exportingPdf) setShowExportDropdown((prev) => !prev);
+              }}
+              disabled={exporting || exportingPdf}
               className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
-              {exportingPdf ? 'Exporting PDF...' : 'Export PDF'}
+              {exporting ? 'Exporting...' : exportingPdf ? 'Exporting PDF...' : 'Export'}
+              {showExportDropdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-            {showPdfOptions && !exportingPdf && (
-              <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden z-20 min-w-[180px]">
-                <button
-                  onClick={async () => {
-                    setShowPdfOptions(false);
-                    await downloadAsPdf('portrait');
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Portrait
-                </button>
-                <button
-                  onClick={async () => {
-                    setShowPdfOptions(false);
-                    await downloadAsPdf('landscape');
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100"
-                >
-                  Landscape
-                </button>
+            {showExportDropdown && !exporting && !exportingPdf && (
+              <div className="absolute bottom-full mb-2 left-0 z-20 min-w-[180px]">
+                <div className="relative">
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden">
+                    <button
+                      onClick={async () => {
+                        setShowExportDropdown(false);
+                        setShowPdfSubmenu(false);
+                        await exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, isPreviewMode, setPricingMode });
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl"
+                    >
+                      Image
+                    </button>
+                    <button
+                      onClick={() => setShowPdfSubmenu((prev) => !prev)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between border-t border-gray-100 rounded-b-xl"
+                    >
+                      PDF
+                      <ChevronRight className={`w-4 h-4 transition-transform ${showPdfSubmenu ? 'rotate-90' : ''}`} />
+                    </button>
+                  </div>
+                  {showPdfSubmenu && (
+                    <div className="absolute left-full top-10 ml-1 bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden z-30 min-w-[120px]">
+                      <button
+                        onClick={async () => {
+                          setShowExportDropdown(false);
+                          setShowPdfSubmenu(false);
+                          await downloadAsPdf('portrait');
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl"
+                      >
+                        Portrait
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setShowExportDropdown(false);
+                          setShowPdfSubmenu(false);
+                          await downloadAsPdf('landscape');
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 rounded-b-xl"
+                      >
+                        Landscape
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -3931,6 +4483,39 @@ export default function Results() {
           )}
         </div>
       </div>
+
+      {/* Cost Calculator Panel */}
+      {!isPreviewMode && costCalculatorTier && packages.find((p) => p.tier === costCalculatorTier) && (
+        <CostCalculatorPanel
+          isOpen={!!costCalculatorTier}
+          onClose={() => setCostCalculatorTier(null)}
+          packageName={packages.find((p) => p.tier === costCalculatorTier)?.name || costCalculatorTier}
+          packagePrice={packages.find((p) => p.tier === costCalculatorTier)?.price ?? 0}
+          currencySymbol={currencySymbol}
+          costData={config.cost_data?.[getCurrentModeKey()]?.[costCalculatorTier]}
+          onSave={(data) => {
+            updateCostData(costCalculatorTier, data);
+            setTimeout(() => silentSave(), 500);
+          }}
+          onApplySuggestedPrice={(newPrice) => {
+            const tierName = costCalculatorTier;
+            if (pricingMode === 'one-time') {
+              const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
+              updateConfigMultiple({
+                [`price_${tierName}`]: newPrice,
+                [`price_${tierName}_retainer`]: retainerPrice
+              });
+            } else {
+              updateConfig(`price_${tierName}_retainer`, newPrice);
+            }
+            setTimeout(() => silentSave(), 500);
+          }}
+          isMobile={isMobileView}
+          tiers={packages.filter((p) => !p.isCustomOffer).map((p) => ({ tier: p.tier, name: p.name, price: p.price }))}
+          currentTier={costCalculatorTier}
+          onTierChange={setCostCalculatorTier}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
@@ -4041,6 +4626,253 @@ export default function Results() {
         )}
       </AnimatePresence>
 
+      {/* Configure Button Modal - bottom sheet on mobile, centered modal on desktop */}
+      {configureModalTier && isMobileView ? (
+        <Sheet open={!!configureModalTier} onOpenChange={(open) => !open && closeConfigureModal()}>
+          <SheetContent side="bottom" className="rounded-t-3xl max-h-[90vh] overflow-y-auto">
+            <SheetHeader className="text-left pb-4">
+              <SheetTitle>
+                {configureModalStep === 1 ? 'Configure Button' : 'Add Your Link'}
+              </SheetTitle>
+            </SheetHeader>
+            <div className="pb-8">
+              {configureModalStep === 1 ? (
+                <>
+                  <p className="text-gray-600 text-sm mb-4">What should this button do?</p>
+                  <div className="space-y-2 mb-6">
+                    {BUTTON_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setConfigureModalOption(opt.id)}
+                        className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
+                          configureModalOption === opt.id
+                            ? 'border-gray-900 bg-gray-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        style={configureModalOption === opt.id ? { borderColor: brandColor, backgroundColor: `${brandColor}08` } : {}}
+                      >
+                        <span className="text-lg flex-shrink-0">{getCTAOptionEmoji(opt.id)}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-gray-900 block">{opt.label}</span>
+                          {opt.hint && (
+                            <span className="text-xs text-gray-500 block mt-0.5">({opt.hint})</span>
+                          )}
+                        </div>
+                        {configureModalOption === opt.id && (
+                          <Check className="w-5 h-5 flex-shrink-0" style={{ color: brandColor }} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <Button
+                    onClick={() => setConfigureModalStep(2)}
+                    className="w-full h-12 rounded-full text-white font-semibold"
+                    style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                  >
+                    Next
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <span className="text-sm font-medium text-gray-700">
+                      {configureModalOption === 'custom' ? 'Custom' : (BUTTON_OPTIONS.find(o => o.id === configureModalOption)?.label || 'Lock Your Spot')}
+                    </span>
+                  </div>
+                  {configureModalOption === 'custom' && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Button name</label>
+                      <Input
+                        value={configureModalCustomLabel}
+                        onChange={(e) => setConfigureModalCustomLabel(e.target.value)}
+                        placeholder="Whatever you want :)"
+                        className="w-full h-12 text-base rounded-xl"
+                        style={{ borderColor: brandColor }}
+                        autoFocus
+                      />
+                    </div>
+                  )}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {configureModalOption === 'custom' ? 'Link' : 'Paste your link'}
+                    </label>
+                    <Input
+                      value={configureModalLink}
+                      onChange={(e) => setConfigureModalLink(e.target.value)}
+                      placeholder={BUTTON_OPTIONS.find(o => o.id === configureModalOption)?.placeholder || 'Paste your payment link'}
+                      className="w-full h-12 text-base rounded-xl"
+                      style={{ borderColor: brandColor }}
+                      autoFocus={configureModalOption !== 'custom'}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mb-4">
+                    If no link is attached, this button won't be visible to clients.
+                  </p>
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-gray-50/50 mb-6">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Apply to all packages</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Use this link for every CTA button</p>
+                    </div>
+                    <Switch
+                      checked={configureModalCopyToAll}
+                      onCheckedChange={setConfigureModalCopyToAll}
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfigureModalStep(1)}
+                      className="flex-1 h-12 rounded-full border-2 border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold"
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      onClick={saveConfigureModal}
+                      className="flex-1 h-12 rounded-full text-white font-semibold"
+                      style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : configureModalTier ? (
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={closeConfigureModal}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.3 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 border-2 border-gray-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  {configureModalStep === 1 ? 'Configure Button' : 'Add Your Link'}
+                </h3>
+                <button
+                  onClick={closeConfigureModal}
+                  className="p-2 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {configureModalStep === 1 ? (
+                <>
+                  <p className="text-gray-600 text-sm mb-4">What should this button do?</p>
+                  <div className="space-y-2 mb-6">
+                    {BUTTON_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setConfigureModalOption(opt.id)}
+                        className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
+                          configureModalOption === opt.id
+                            ? 'border-gray-900 bg-gray-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        style={configureModalOption === opt.id ? { borderColor: brandColor, backgroundColor: `${brandColor}08` } : {}}
+                      >
+                        <span className="text-lg flex-shrink-0">{getCTAOptionEmoji(opt.id)}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-gray-900 block">{opt.label}</span>
+                          {opt.hint && (
+                            <span className="text-xs text-gray-500 block mt-0.5">({opt.hint})</span>
+                          )}
+                        </div>
+                        {configureModalOption === opt.id && (
+                          <Check className="w-5 h-5 flex-shrink-0" style={{ color: brandColor }} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <Button
+                    onClick={() => setConfigureModalStep(2)}
+                    className="w-full h-12 rounded-full text-white font-semibold"
+                    style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                  >
+                    Next
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <span className="text-sm font-medium text-gray-700">
+                      {configureModalOption === 'custom' ? 'Custom' : (BUTTON_OPTIONS.find(o => o.id === configureModalOption)?.label || 'Lock Your Spot')}
+                    </span>
+                  </div>
+                  {configureModalOption === 'custom' && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Button name</label>
+                      <Input
+                        value={configureModalCustomLabel}
+                        onChange={(e) => setConfigureModalCustomLabel(e.target.value)}
+                        placeholder="Whatever you want :)"
+                        className="w-full h-12 text-base rounded-xl"
+                        style={{ borderColor: brandColor }}
+                        autoFocus
+                      />
+                    </div>
+                  )}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {configureModalOption === 'custom' ? 'Link' : 'Paste your link'}
+                    </label>
+                    <Input
+                      value={configureModalLink}
+                      onChange={(e) => setConfigureModalLink(e.target.value)}
+                      placeholder={BUTTON_OPTIONS.find(o => o.id === configureModalOption)?.placeholder || 'Paste your payment link'}
+                      className="w-full h-12 text-base rounded-xl"
+                      style={{ borderColor: brandColor }}
+                      autoFocus={configureModalOption !== 'custom'}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mb-4">
+                    If no link is attached, this button won't be visible to clients.
+                  </p>
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-gray-50/50 mb-6">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Apply to all packages</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Use this link for every CTA button</p>
+                    </div>
+                    <Switch
+                      checked={configureModalCopyToAll}
+                      onCheckedChange={setConfigureModalCopyToAll}
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfigureModalStep(1)}
+                      className="flex-1 h-12 rounded-full border-2 border-gray-200 text-gray-700 hover:bg-gray-50 font-semibold"
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      onClick={saveConfigureModal}
+                      className="flex-1 h-12 rounded-full text-white font-semibold"
+                      style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
+      ) : null}
+
       {/* Custom Links Modal */}
       <AnimatePresence>
         {showLinksModal && (
@@ -4068,7 +4900,7 @@ export default function Results() {
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">🤔 Add Button Links?</h3>
                 <p className="text-gray-600 leading-relaxed">
-                  Your packages look great! Want to add links to your "Get Started" buttons?
+                  Your packages look great! Want to add links to your "CTA" buttons?
                 </p>
               </div>
 
