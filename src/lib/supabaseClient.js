@@ -48,6 +48,7 @@ const TABLE_COLUMNS = {
     'show_excluded_deliverables', 'show_package_buttons_in_edit_mode', 'retainer_discount_text',
     'original_price_starter', 'original_price_growth', 'original_price_premium', 'original_price_elite',
     'original_price_starter_retainer', 'original_price_growth_retainer', 'original_price_premium_retainer', 'original_price_elite_retainer',
+    'cost_data',
   ]),
   users: new Set([
     'id', 'email', 'full_name', 'role', 'creator_slug', 'created_date', 'updated_date',

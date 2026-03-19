@@ -2,6 +2,8 @@ import { toPng } from 'html-to-image';
 
 const wait = (ms) => new Promise(res => setTimeout(res, ms));
 
+const getScrollContainer = () => document.querySelector('main') || document.documentElement;
+
 export const exportPackageAsImages = async ({
   exportRef,
   packageName,
@@ -18,6 +20,11 @@ export const exportPackageAsImages = async ({
   const hasBoth = config?.pricing_availability === 'both';
   const originalMode = pricingMode;
   const originalPreviewMode = Boolean(isPreviewMode);
+
+  // Save scroll position before mode switch (image export switches to preview mode)
+  const scrollEl = getScrollContainer();
+  const savedScrollTop = scrollEl.scrollTop;
+  const savedScrollLeft = scrollEl.scrollLeft;
 
   setExporting(true);
 
@@ -42,6 +49,14 @@ export const exportPackageAsImages = async ({
   } finally {
     setIsPreviewMode(originalPreviewMode);
     setExporting(false);
+    // Restore scroll position after React re-renders back to edit mode
+    setTimeout(() => {
+      const el = getScrollContainer();
+      if (el) {
+        el.scrollTop = savedScrollTop;
+        el.scrollLeft = savedScrollLeft;
+      }
+    }, 50);
   }
 };
 

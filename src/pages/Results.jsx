@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { toPng } from 'html-to-image';
@@ -14,6 +14,15 @@ import { logPackageView, startTimeTracking, logButtonClick } from '@/lib/package
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useParams } from 'react-router-dom';
 import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
+import { CostCalculatorPanel } from '@/components/CostCalculator/CostCalculatorPanel';
+import {
+  CostCalculatorTrigger,
+  getCostCalculatorDisplay,
+  hasOpenedCalculatorOnce,
+  setOpenedCalculatorOnce,
+  hasNudgeBeenDismissed,
+  setNudgeDismissed,
+} from '@/components/CostCalculator/CostCalculatorTrigger';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
 
@@ -116,14 +125,30 @@ export default function Results() {
   const exportRef = React.useRef(null);
   const [exporting, setExporting] = React.useState(false);
   const [exportingPdf, setExportingPdf] = React.useState(false);
-  const [showPdfOptions, setShowPdfOptions] = React.useState(false);
+  const [showExportDropdown, setShowExportDropdown] = React.useState(false);
+  const [showPdfSubmenu, setShowPdfSubmenu] = React.useState(false);
+  const exportDropdownRef = React.useRef(null);
   const [canUndo, setCanUndo] = useState(false);
+  const [costCalculatorTier, setCostCalculatorTier] = useState(null);
 
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
   const currencySymbol = getCurrencySymbol(config?.currency || 'USD');
   const showExcludedDeliverables = config?.show_excluded_deliverables !== false;
-  const showPackageButtonsInEditMode = config?.show_package_buttons_in_edit_mode !== false;
+  const showPackageButtonsInEditMode = true;
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('launchbox:toggleHelpButton', {
+      detail: { hidden: Boolean(costCalculatorTier) }
+    }));
+
+    return () => {
+      window.dispatchEvent(new CustomEvent('launchbox:toggleHelpButton', {
+        detail: { hidden: false }
+      }));
+    };
+  }, [costCalculatorTier]);
+
 
   useEffect(() => {
     // Load Sour Gummy font
@@ -760,6 +785,22 @@ export default function Results() {
 
   const updateButtonLink = (tier, link) => safeUpdateNestedConfig('button_links', tier, link);
 
+  const updateCostData = (tier, data) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const costData = (c.cost_data && typeof c.cost_data === 'object') ? c.cost_data : {};
+    const modeData = (costData[modeKey] && typeof costData[modeKey] === 'object') ? costData[modeKey] : {};
+    updateConfig('cost_data', {
+      ...costData,
+      [modeKey]: { ...modeData, [tier]: data }
+    });
+  };
+
+  const openCostCalculator = (tier) => {
+    setCostCalculatorTier(tier);
+    setOpenedCalculatorOnce();
+  };
+
   const openConfigureModal = (tier) => {
     const modeKey = getCurrentModeKey();
     const existingType = config.button_links?.[modeKey]?.[tier + '_type'];
@@ -1270,6 +1311,18 @@ export default function Results() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isPreviewMode]);
 
+  useEffect(() => {
+    if (!showExportDropdown) return;
+    const handleClickOutside = (e) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) {
+        setShowExportDropdown(false);
+        setShowPdfSubmenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showExportDropdown]);
+
   if (!config) {
     if (previewNotFound) {
       return (
@@ -1407,12 +1460,31 @@ export default function Results() {
       retainer: modeKey === 'retainer' ? newPopularIndex : (popularPackageIndex?.retainer ?? 2)
     };
 
-    setPopularPackageIndex(updatedPopularIndex);
-    updateConfigMultiple({
+    const updates = {
       active_packages: updatedActivePackages,
       popularPackageIndex: updatedPopularIndex
-    });
-    
+    };
+
+    // Remove cost data for deleted package
+    const costData = currentConfig.cost_data;
+    if (costData && typeof costData === 'object') {
+      const newCostData = { ...costData };
+      for (const key of ['onetime', 'retainer']) {
+        if (newCostData[key] && newCostData[key][tierToDelete]) {
+          const modeCopy = { ...newCostData[key] };
+          delete modeCopy[tierToDelete];
+          newCostData[key] = modeCopy;
+        }
+      }
+      updates.cost_data = newCostData;
+    }
+
+    updateConfigMultiple(updates);
+
+    if (costCalculatorTier === tierToDelete) {
+      setCostCalculatorTier(null);
+    }
+
     setShowDeleteModal(false);
     setPackageToDelete(null);
   };
@@ -1517,33 +1589,49 @@ export default function Results() {
       }
     };
 
+    const hasReachedMaxLength = typeof maxLength === 'number' && editValue.length >= maxLength;
+
     if (isEditing) {
       return multiline ? (
-        <Textarea
-          ref={editRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onClick={(e) => e.stopPropagation()}
-          className={`${className || ''} min-h-[60px] ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
-          autoFocus
-          maxLength={maxLength}
-          placeholder={placeholder}
-          style={{ borderColor: brandColor }}
-        />
+        <>
+          <Textarea
+            ref={editRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className={`${className || ''} min-h-[60px] resize-none overflow-hidden ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
+            autoFocus
+            maxLength={maxLength}
+            placeholder={placeholder}
+            style={{ borderColor: brandColor }}
+          />
+          {hasReachedMaxLength && (
+            <p className={`mt-1 text-xs ${darkMode ? 'text-red-100' : 'text-red-600'}`}>
+              Character limit reached ({maxLength})
+            </p>
+          )}
+        </>
       ) : (
-        <Input
-          ref={editRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onClick={(e) => e.stopPropagation()}
-          className={`${className || ''} ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
-          autoFocus
-          maxLength={maxLength}
-          placeholder={placeholder}
-          style={{ borderColor: brandColor }}
-        />
+        <>
+          <Input
+            ref={editRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className={`${className || ''} ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
+            autoFocus
+            maxLength={maxLength}
+            placeholder={placeholder}
+            style={{ borderColor: brandColor }}
+          />
+          {hasReachedMaxLength && (
+            <p className={`mt-1 text-xs ${darkMode ? 'text-red-100' : 'text-red-600'}`}>
+              Character limit reached ({maxLength})
+            </p>
+          )}
+        </>
       );
     }
 
@@ -2113,6 +2201,9 @@ export default function Results() {
     const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
       packages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
     );
+    const bonusTemplate = Array.from({ length: maxBonuses }, (_, idx) =>
+      packages.find(p => !p.isCustomOffer && p.bonuses[idx])?.bonuses[idx] || ''
+    );
     const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
     const bonusesMinHeight = packages.length === 4 ? maxBonuses * 28 : maxBonuses * 32;
     
@@ -2360,7 +2451,7 @@ export default function Results() {
 
                 {pkg.description !== null ? (
                   <div
-                    className={`mb-6 rounded-xl relative group/desc overflow-y-auto ${
+                    className={`mb-6 rounded-xl relative group/desc overflow-hidden ${
                       packages.length === 4 ? 'p-3 min-h-[88px] max-h-[88px]' : 'p-4 min-h-[96px] max-h-[96px]'
                     }`}
                     style={{ backgroundColor: `${brandColor}15` }}
@@ -2396,6 +2487,18 @@ export default function Results() {
                   >
                     + Add description
                   </button>
+                )}
+
+                {!isPreviewMode && (
+                  <CostCalculatorTrigger
+                    {...getCostCalculatorDisplay(config.cost_data?.[modeKey]?.[tierName], pkg.price, currencySymbol)}
+                    onClick={() => openCostCalculator(tierName)}
+                    isMobile={isMobileView}
+                    showNewBadge={!hasOpenedCalculatorOnce()}
+                    showNudgeTooltip={!hasNudgeBeenDismissed()}
+                    onNudgeDismiss={setNudgeDismissed}
+                    darkMode={false}
+                  />
                 )}
 
                 <div className={`space-y-3 mb-6`}>
@@ -2476,23 +2579,48 @@ export default function Results() {
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${bonusesMinHeight}px` }}>
-                      {pkg.bonuses.map((bonus, idx) => (
-                        <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
-                          {(provided) => (
-                            <div ref={provided.innerRef} {...provided.draggableProps}>
-                              <EditableListItem
-                                value={bonus}
-                                onSave={(newValue) => updateBonus(tierName, idx, newValue)}
-                                onDelete={() => deleteBonus(tierName, idx)}
-                                icon={Plus}
-                                iconClassName="text-green-500"
-                                brandColor={brandColor}
-                                dragHandleProps={provided.dragHandleProps}
-                              />
+                      {bonusTemplate.map((templateBonus, idx) => {
+                        const bonus = pkg.bonuses[idx];
+                        const hasBonus = idx < pkg.bonuses.length;
+
+                        if (!hasBonus) {
+                          if (!showExcludedDeliverables) {
+                            return <div key={`bonus-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                          }
+                          return (
+                            <div
+                              key={`bonus-missing-${tierName}-${idx}`}
+                              className="flex items-start gap-2 rounded px-2 py-1"
+                            >
+                              <div className="p-1 mt-0.5">
+                                <GripVertical className="w-4 h-4 text-transparent" />
+                              </div>
+                              <X className="w-5 h-5 mt-0.5 text-gray-300 flex-shrink-0" />
+                              <span className="text-sm text-gray-400 flex-1">
+                                {templateBonus}
+                              </span>
                             </div>
-                          )}
-                        </Draggable>
-                      ))}
+                          );
+                        }
+
+                        return (
+                          <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
+                            {(provided) => (
+                              <div ref={provided.innerRef} {...provided.draggableProps}>
+                                <EditableListItem
+                                  value={bonus}
+                                  onSave={(newValue) => updateBonus(tierName, idx, newValue)}
+                                  onDelete={() => deleteBonus(tierName, idx)}
+                                  icon={Plus}
+                                  iconClassName="text-green-500"
+                                  brandColor={brandColor}
+                                  dragHandleProps={provided.dragHandleProps}
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
                       {provided.placeholder}
                     </div>
                   )}
@@ -2542,6 +2670,9 @@ export default function Results() {
     const maxBonuses = Math.max(...packages.filter(p => !p.isCustomOffer).map(p => p.bonuses.length), 0);
     const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
       packages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
+    );
+    const bonusTemplate = Array.from({ length: maxBonuses }, (_, idx) =>
+      packages.find(p => !p.isCustomOffer && p.bonuses[idx])?.bonuses[idx] || ''
     );
     const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
     const bonusesMinHeight = packages.length === 4 ? maxBonuses * 28 : maxBonuses * 32;
@@ -2789,7 +2920,7 @@ export default function Results() {
 
                 {pkg.description !== null ? (
                   <div
-                    className={`mb-6 rounded-xl relative group/desc overflow-y-auto ${
+                    className={`mb-6 rounded-xl relative group/desc overflow-hidden ${
                       packages.length === 4 ? 'p-3 min-h-[88px] max-h-[88px]' : 'p-4 min-h-[96px] max-h-[96px]'
                     }`}
                     style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
@@ -2825,6 +2956,18 @@ export default function Results() {
                   >
                     + Add description
                   </button>
+                )}
+
+                {!isPreviewMode && (
+                  <CostCalculatorTrigger
+                    {...getCostCalculatorDisplay(config.cost_data?.[modeKey]?.[tierName], pkg.price, currencySymbol)}
+                    onClick={() => openCostCalculator(tierName)}
+                    isMobile={isMobileView}
+                    showNewBadge={!hasOpenedCalculatorOnce()}
+                    showNudgeTooltip={!hasNudgeBeenDismissed()}
+                    onNudgeDismiss={setNudgeDismissed}
+                    darkMode={true}
+                  />
                 )}
 
                 <div className={`space-y-3 mb-6`}>
@@ -2902,24 +3045,49 @@ export default function Results() {
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${bonusesMinHeight}px` }}>
-                      {pkg.bonuses.map((bonus, idx) => (
-                        <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
-                          {(provided) => (
-                            <div ref={provided.innerRef} {...provided.draggableProps}>
-                              <EditableListItem
-                                value={bonus}
-                                onSave={(newValue) => updateBonus(tierName, idx, newValue)}
-                                onDelete={() => deleteBonus(tierName, idx)}
-                                icon={Plus}
-                                iconClassName="text-yellow-400"
-                                darkMode={true}
-                                brandColor={brandColor}
-                                dragHandleProps={provided.dragHandleProps}
-                              />
+                      {bonusTemplate.map((templateBonus, idx) => {
+                        const bonus = pkg.bonuses[idx];
+                        const hasBonus = idx < pkg.bonuses.length;
+
+                        if (!hasBonus) {
+                          if (!showExcludedDeliverables) {
+                            return <div key={`bonus-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                          }
+                          return (
+                            <div
+                              key={`bonus-missing-${tierName}-${idx}`}
+                              className="flex items-start gap-2 rounded px-2 py-1"
+                            >
+                              <div className="p-1 mt-0.5">
+                                <GripVertical className="w-4 h-4 text-transparent" />
+                              </div>
+                              <X className="w-5 h-5 mt-0.5 text-white/30 flex-shrink-0" />
+                              <span className="text-sm text-white/40 flex-1">
+                                {templateBonus}
+                              </span>
                             </div>
-                          )}
-                        </Draggable>
-                      ))}
+                          );
+                        }
+
+                        return (
+                          <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
+                            {(provided) => (
+                              <div ref={provided.innerRef} {...provided.draggableProps}>
+                                <EditableListItem
+                                  value={bonus}
+                                  onSave={(newValue) => updateBonus(tierName, idx, newValue)}
+                                  onDelete={() => deleteBonus(tierName, idx)}
+                                  icon={Plus}
+                                  iconClassName="text-yellow-400"
+                                  darkMode={true}
+                                  brandColor={brandColor}
+                                  dragHandleProps={provided.dragHandleProps}
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        );
+                      })}
                       {provided.placeholder}
                     </div>
                   )}
@@ -3159,13 +3327,18 @@ export default function Results() {
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
                     const hasBonus = i < pkg.bonuses.length;
-                    if (!hasBonus) {
+                    const bonusLabel = hasBonus ? bonus : (previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i] || '');
+                    if (!hasBonus && !showExcludedDeliverables) {
                       return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
                     }
                     return (
                       <div key={i} className="flex items-start gap-1.5">
-                        <Plus className={`flex-shrink-0 mt-0.5 text-green-500 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
-                        <span className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonus}</span>
+                        {hasBonus ? (
+                          <Plus className={`flex-shrink-0 mt-0.5 text-green-500 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        ) : (
+                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        )}
+                        <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-400'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonusLabel}</span>
                       </div>
                     );
                   })}
@@ -3392,13 +3565,18 @@ export default function Results() {
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
                     const hasBonus = i < pkg.bonuses.length;
-                    if (!hasBonus) {
+                    const bonusLabel = hasBonus ? bonus : (previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i] || '');
+                    if (!hasBonus && !showExcludedDeliverables) {
                       return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
                     }
                     return (
                       <div key={i} className="flex items-start gap-1.5">
-                        <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
-                        <span className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonus}</span>
+                        {hasBonus ? (
+                          <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        ) : (
+                          <X className={`flex-shrink-0 mt-0.5 text-white/30 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                        )}
+                        <span className={`${hasBonus ? 'text-white' : 'text-white/40'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonusLabel}</span>
                       </div>
                     );
                   })}
@@ -3492,9 +3670,28 @@ export default function Results() {
     window.location.href = pendingUrl;
   };
 
+  const LAUNCHBOX_LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68e6df240580e3bf55058574/655c15688_LaunchBoxlogo_E3copy.png';
+
   if (isPreviewMode) {
     return (
-      <div className="min-h-screen py-6 md:py-12" style={{ backgroundColor: '#F5F5F7' }}>
+      <div className="min-h-screen py-6 md:py-12 relative" style={{ backgroundColor: '#F5F5F7' }}>
+        {/* Export loading overlay */}
+        {(exporting || exportingPdf) && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/60 backdrop-blur-md">
+            <div className="flex flex-col items-center gap-6">
+              <img
+                src={LAUNCHBOX_LOGO_URL}
+                alt="LaunchBox"
+                className="h-16 w-auto object-contain"
+              />
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink" />
+                <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink-2" />
+                <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink-3" />
+              </div>
+            </div>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div ref={exportRef}>
           <div className="text-center">
@@ -3680,7 +3877,24 @@ export default function Results() {
   };
 
   return (
-    <div className="min-h-screen py-12" style={{ backgroundColor: '#F5F5F7' }}>
+    <div className="min-h-screen py-12 relative" style={{ backgroundColor: '#F5F5F7' }}>
+      {/* Export loading overlay */}
+      {(exporting || exportingPdf) && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/60 backdrop-blur-md">
+          <div className="flex flex-col items-center gap-6">
+            <img
+              src={LAUNCHBOX_LOGO_URL}
+              alt="LaunchBox"
+              className="h-16 w-auto object-contain"
+            />
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink" />
+              <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink-2" />
+              <span className="w-2 h-2 rounded-full bg-gray-600 animate-dots-blink-3" />
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center gap-4 mb-8">
           {config?.from_template && (
@@ -4056,15 +4270,6 @@ export default function Results() {
         )}
 
         <AnimatePresence mode="wait">
-          <div className="flex justify-center mb-6">
-            <Button
-              variant="outline"
-              onClick={() => updateConfig('show_package_buttons_in_edit_mode', !showPackageButtonsInEditMode)}
-              className="rounded-full border-2 border-gray-200 hover:bg-gray-50"
-            >
-              {showPackageButtonsInEditMode ? 'Hide CTA Buttons in Edit Mode' : 'Show CTA Buttons in Edit Mode'}
-            </Button>
-          </div>
           <motion.div
             key={`${currentDesign}-${pricingMode}`}
             initial={{ opacity: 0, x: 20 }}
@@ -4072,6 +4277,7 @@ export default function Results() {
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
             className="mb-12"
+            style={costCalculatorTier ? { pointerEvents: 'none' } : undefined}
           >
             <div ref={exportRef}>{renderCurrentDesign()}</div>
 
@@ -4090,7 +4296,10 @@ export default function Results() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="text-center space-y-4 mb-12">
+        <div
+          className="text-center space-y-4 mb-12"
+          style={costCalculatorTier ? { pointerEvents: 'none' } : undefined}
+        >
           {config.guarantee && (
             <div className="bg-white rounded-xl p-6 shadow-md max-w-3xl mx-auto border-2 border-gray-200 relative group">
               <button
@@ -4155,43 +4364,66 @@ export default function Results() {
         </div>
 
         <div className="flex justify-center gap-4 flex-wrap">
-          <button
-            onClick={() => exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, isPreviewMode, setPricingMode })}
-            disabled={exporting}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            {exporting ? 'Exporting...' : 'Export image'}
-          </button>
-          <div className="relative">
+          <div className="relative" ref={exportDropdownRef}>
             <button
-              onClick={() => !exportingPdf && setShowPdfOptions((prev) => !prev)}
-              disabled={exportingPdf}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!exporting && !exportingPdf) setShowExportDropdown((prev) => !prev);
+              }}
+              disabled={exporting || exportingPdf}
               className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
-              {exportingPdf ? 'Exporting PDF...' : 'Export PDF'}
+              {exporting ? 'Exporting...' : exportingPdf ? 'Exporting PDF...' : 'Export'}
+              {showExportDropdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-            {showPdfOptions && !exportingPdf && (
-              <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden z-20 min-w-[180px]">
-                <button
-                  onClick={async () => {
-                    setShowPdfOptions(false);
-                    await downloadAsPdf('portrait');
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Portrait
-                </button>
-                <button
-                  onClick={async () => {
-                    setShowPdfOptions(false);
-                    await downloadAsPdf('landscape');
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100"
-                >
-                  Landscape
-                </button>
+            {showExportDropdown && !exporting && !exportingPdf && (
+              <div className="absolute bottom-full mb-2 left-0 z-20 min-w-[180px]">
+                <div className="relative">
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden">
+                    <button
+                      onClick={async () => {
+                        setShowExportDropdown(false);
+                        setShowPdfSubmenu(false);
+                        await exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, isPreviewMode, setPricingMode });
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl"
+                    >
+                      Image
+                    </button>
+                    <button
+                      onClick={() => setShowPdfSubmenu((prev) => !prev)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between border-t border-gray-100 rounded-b-xl"
+                    >
+                      PDF
+                      <ChevronRight className={`w-4 h-4 transition-transform ${showPdfSubmenu ? 'rotate-90' : ''}`} />
+                    </button>
+                  </div>
+                  {showPdfSubmenu && (
+                    <div className="absolute left-full top-10 ml-1 bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden z-30 min-w-[120px]">
+                      <button
+                        onClick={async () => {
+                          setShowExportDropdown(false);
+                          setShowPdfSubmenu(false);
+                          await downloadAsPdf('portrait');
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl"
+                      >
+                        Portrait
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setShowExportDropdown(false);
+                          setShowPdfSubmenu(false);
+                          await downloadAsPdf('landscape');
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 rounded-b-xl"
+                      >
+                        Landscape
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -4251,6 +4483,39 @@ export default function Results() {
           )}
         </div>
       </div>
+
+      {/* Cost Calculator Panel */}
+      {!isPreviewMode && costCalculatorTier && packages.find((p) => p.tier === costCalculatorTier) && (
+        <CostCalculatorPanel
+          isOpen={!!costCalculatorTier}
+          onClose={() => setCostCalculatorTier(null)}
+          packageName={packages.find((p) => p.tier === costCalculatorTier)?.name || costCalculatorTier}
+          packagePrice={packages.find((p) => p.tier === costCalculatorTier)?.price ?? 0}
+          currencySymbol={currencySymbol}
+          costData={config.cost_data?.[getCurrentModeKey()]?.[costCalculatorTier]}
+          onSave={(data) => {
+            updateCostData(costCalculatorTier, data);
+            setTimeout(() => silentSave(), 500);
+          }}
+          onApplySuggestedPrice={(newPrice) => {
+            const tierName = costCalculatorTier;
+            if (pricingMode === 'one-time') {
+              const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
+              updateConfigMultiple({
+                [`price_${tierName}`]: newPrice,
+                [`price_${tierName}_retainer`]: retainerPrice
+              });
+            } else {
+              updateConfig(`price_${tierName}_retainer`, newPrice);
+            }
+            setTimeout(() => silentSave(), 500);
+          }}
+          isMobile={isMobileView}
+          tiers={packages.filter((p) => !p.isCustomOffer).map((p) => ({ tier: p.tier, name: p.name, price: p.price }))}
+          currentTier={costCalculatorTier}
+          onTierChange={setCostCalculatorTier}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
