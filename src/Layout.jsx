@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare, BarChart2 } from 'lucide-react';
+import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare, BarChart2, FileSignature } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient, { supabase } from '@/lib/supabaseClient';
 import HelpButton from '@/components/HelpButton';
@@ -69,6 +69,7 @@ export default function Layout({ children, currentPageName }) {
 
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [packageBuilderExpanded, setPackageBuilderExpanded] = React.useState(false);
+  const [contractsExpanded, setContractsExpanded] = React.useState(false);
   const [isMobileView, setIsMobileView] = React.useState(false);
   const [brandColor] = React.useState('#ff0044');
   const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
@@ -89,6 +90,7 @@ export default function Layout({ children, currentPageName }) {
   }, []);
   
   const isResultsPage = currentPageName === 'Results';
+  const isContractSignPage = currentPageName === 'ContractSign';
   const isPublicPrettyPreviewPath = React.useMemo(() => {
     try {
       if (typeof window === 'undefined') return false;
@@ -102,7 +104,7 @@ export default function Layout({ children, currentPageName }) {
   
   React.useEffect(() => {
     const checkAuthAndRedirect = async () => {
-      const isPublicAccessAllowed = isWelcome || (isResultsPage && (isPreview || isPublicPrettyPreviewPath));
+      const isPublicAccessAllowed = isWelcome || isContractSignPage || (isResultsPage && (isPreview || isPublicPrettyPreviewPath));
 
       if (isPublicAccessAllowed) {
         setIsCheckingAuth(false);
@@ -152,9 +154,12 @@ export default function Layout({ children, currentPageName }) {
     if (['PackageBuilder', 'Templates', 'MyPackages'].includes(currentPageName)) {
       setPackageBuilderExpanded(true);
     }
+    if (['Contracts', 'ContractTemplates'].includes(currentPageName)) {
+      setContractsExpanded(true);
+    }
 
     return () => window.removeEventListener('resize', checkMobile);
-  }, [currentPageName, isPreview, isWelcome, isResultsPage, isPublicPrettyPreviewPath]);
+  }, [currentPageName, isPreview, isWelcome, isResultsPage, isPublicPrettyPreviewPath, isContractSignPage]);
   
   const getDarkerBrandColor = (color) => {
     if (!color || typeof color !== 'string' || !color.startsWith('#')) return '#cc0033';
@@ -177,8 +182,8 @@ export default function Layout({ children, currentPageName }) {
 
   const darkerBrandColor = getDarkerBrandColor(brandColor);
 
-  // Don't show layout for welcome or preview
-  if (isWelcome || (isResultsPage && (isPreview || isPublicPrettyPreviewPath))) {
+  // Don't show layout for welcome, contract sign, or preview
+  if (isWelcome || isContractSignPage || (isResultsPage && (isPreview || isPublicPrettyPreviewPath))) {
     return <ErrorBoundary>{children}</ErrorBoundary>;
   }
 
@@ -329,6 +334,51 @@ export default function Layout({ children, currentPageName }) {
                     to={createPageUrl('Templates')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
                       currentPageName === 'Templates'
+                        ? 'text-[#ff0044] bg-red-50 font-medium'
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <LayoutTemplate className="w-4 h-4" />
+                    Templates
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <button
+                onClick={() => setContractsExpanded(!contractsExpanded)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+                  ['Contracts', 'ContractTemplates'].includes(currentPageName)
+                    ? 'text-[#ff0044] bg-red-50 font-medium'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileSignature className="w-5 h-5" />
+                  Contracts
+                </div>
+                {contractsExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+
+              {contractsExpanded && (
+                <div className="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-4">
+                  <Link 
+                    to={createPageUrl('Contracts')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                      currentPageName === 'Contracts'
+                        ? 'text-[#ff0044] bg-red-50 font-medium'
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <FileSignature className="w-4 h-4" />
+                    My Contracts
+                  </Link>
+
+                  <Link 
+                    to={createPageUrl('ContractTemplates')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                      currentPageName === 'ContractTemplates'
                         ? 'text-[#ff0044] bg-red-50 font-medium'
                         : 'text-gray-600 hover:bg-gray-50'
                     }`}

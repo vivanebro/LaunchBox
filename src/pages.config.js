@@ -49,6 +49,10 @@
  */
 import Admin from './pages/Admin';
 import Analytics from './pages/Analytics';
+import ContractEditor from './pages/ContractEditor';
+import Contracts from './pages/Contracts';
+import ContractSign from './pages/ContractSign';
+import ContractTemplates from './pages/ContractTemplates';
 import Dashboard from './pages/Dashboard';
 import HelpRequests from './pages/HelpRequests';
 import Home from './pages/Home';
@@ -64,6 +68,10 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "Admin": Admin,
     "Analytics": Analytics,
+    "ContractEditor": ContractEditor,
+    "Contracts": Contracts,
+    "ContractSign": ContractSign,
+    "ContractTemplates": ContractTemplates,
     "Dashboard": Dashboard,
     "HelpRequests": HelpRequests,
     "Home": Home,

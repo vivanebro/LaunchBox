@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, CircleHelp } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -58,6 +58,7 @@ export function CostCalculatorTrigger({
       : 'Calculate Your Cost';
 
   const isBlinking = state === 'first_visit';
+  const isCalculateYourCostState = label === 'Calculate Your Cost';
 
   const content = (
     <button
@@ -103,27 +104,23 @@ export function CostCalculatorTrigger({
           New
         </span>
       )}
-      {isMobile && (state === 'first_visit' || state === 'opened_incomplete') && (
-        <span className={cn('flex items-center gap-1 text-xs', darkMode ? 'text-white/60' : 'text-gray-500')}>
-          <Lock className="w-3 h-3" />
-          Only you
-        </span>
-      )}
-    </button>
-  );
-
-  if (isMobile) {
-    return <div className="my-3">{content}</div>;
-  }
-
-  return (
-    <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="my-3">{content}</div>
+          <span
+            className={cn(
+              'inline-flex items-center justify-center rounded-full',
+              'w-4 h-4',
+              darkMode ? 'text-white/65 hover:text-white/85' : 'text-gray-500 hover:text-gray-700'
+            )}
+            aria-label="Cost calculator help"
+          >
+            <CircleHelp className="w-3.5 h-3.5" />
+          </span>
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-[200px]">
-          {showNudgeTooltip ? (
+        <TooltipContent side="top" className="max-w-[240px]">
+          {isCalculateYourCostState ? (
+            <p>Clients won't see this. Please click to calculate your costs and profit margins.</p>
+          ) : showNudgeTooltip ? (
             <p>
               Check if your price covers your costs. Only visible to you.
               <button
@@ -143,6 +140,18 @@ export function CostCalculatorTrigger({
           )}
         </TooltipContent>
       </Tooltip>
+      {isMobile && (state === 'first_visit' || state === 'opened_incomplete') && (
+        <span className={cn('flex items-center gap-1 text-xs', darkMode ? 'text-white/60' : 'text-gray-500')}>
+          <Lock className="w-3 h-3" />
+          Only you
+        </span>
+      )}
+    </button>
+  );
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <div className="my-3">{content}</div>
     </TooltipProvider>
   );
 }

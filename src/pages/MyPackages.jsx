@@ -10,6 +10,17 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { fetchAnalyticsForPackages } from '@/lib/packageAnalytics';
 import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
 
+const getCurrencySymbol = (currency) => {
+  const symbols = {
+    USD: '$',
+    EUR: '€',
+    GBP: '£',
+    AUD: 'A$',
+    ILS: '₪'
+  };
+  return symbols[currency] || '$';
+};
+
 export default function MyPackages() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -176,6 +187,24 @@ export default function MyPackages() {
     setEditedName('');
   };
 
+  const getPackageMode = (pkg) => (pkg.pricingMode === 'retainer' ? 'retainer' : 'one-time');
+
+  const getTierPrice = (pkg, tier) => {
+    const mode = getPackageMode(pkg);
+    const modeKey = mode === 'retainer' ? `price_${tier}_retainer` : `price_${tier}`;
+    const fallbackKey = mode === 'retainer' ? `price_${tier}` : `price_${tier}_retainer`;
+    const rawValue = pkg[modeKey] ?? pkg[fallbackKey] ?? 0;
+    const parsed = Number(rawValue);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const getTierLabel = (pkg, tier) => {
+    const mode = getPackageMode(pkg);
+    const modeKey = mode === 'retainer' ? 'retainer' : 'onetime';
+    const fallbackKey = mode === 'retainer' ? 'onetime' : 'retainer';
+    return pkg.package_names?.[modeKey]?.[tier] || pkg.package_names?.[fallbackKey]?.[tier] || tier.charAt(0).toUpperCase() + tier.slice(1);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
@@ -229,6 +258,10 @@ export default function MyPackages() {
                 const showNudge1 = a.clicks === 0 && hoursAgo > 24 && hoursAgo < 168;
                 const showNudge2 = daysAgo >= 7 && a.views > 0;
                 const showNudge3 = a.clicks === 0 && a.avgTime >= 120 && hoursAgo < 168;
+                const currencySymbol = getCurrencySymbol(pkg.currency || 'USD');
+                const starterPrice = getTierPrice(pkg, 'starter');
+                const growthPrice = getTierPrice(pkg, 'growth');
+                const premiumPrice = getTierPrice(pkg, 'premium');
 
                 const Nudge = ({ id, text, emoji }) => {
                   const [dismissed, setDismissed] = React.useState(
@@ -331,26 +364,26 @@ export default function MyPackages() {
                       <div className="flex items-center justify-between">
                         <div className="text-center">
                           <div className="text-lg font-bold text-gray-900">
-                            ${pkg.price_starter?.toLocaleString() || '0'}
+                            {currencySymbol}{starterPrice.toLocaleString()}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {pkg.package_names?.onetime?.starter || 'Starter'}
+                            {getTierLabel(pkg, 'starter')}
                           </div>
                         </div>
                         <div className="text-center">
                           <div className="text-lg font-bold" style={{ color: pkg.brand_color || '#ff0044' }}>
-                            ${pkg.price_growth?.toLocaleString() || '0'}
+                            {currencySymbol}{growthPrice.toLocaleString()}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {pkg.package_names?.onetime?.growth || 'Growth'}
+                            {getTierLabel(pkg, 'growth')}
                           </div>
                         </div>
                         <div className="text-center">
                           <div className="text-lg font-bold text-gray-900">
-                            ${pkg.price_premium?.toLocaleString() || '0'}
+                            {currencySymbol}{premiumPrice.toLocaleString()}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {pkg.package_names?.onetime?.premium || 'Premium'}
+                            {getTierLabel(pkg, 'premium')}
                           </div>
                         </div>
                       </div>

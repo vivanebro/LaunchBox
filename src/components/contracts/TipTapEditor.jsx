@@ -1,0 +1,152 @@
+import React from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import { MergeField, extractMergeFieldKeys } from './MergeFieldExtension';
+import TipTapToolbar from './TipTapToolbar';
+
+const CONTRACT_STYLES = `
+  .contract-editor .tiptap {
+    outline: none;
+    min-height: 400px;
+    padding: 24px;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1a1a1a;
+  }
+  .contract-editor .tiptap h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 1em 0 0.5em;
+    color: var(--accent-color, #ff0044);
+  }
+  .contract-editor .tiptap h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0.75em 0 0.4em;
+    color: var(--accent-color, #ff0044);
+  }
+  .contract-editor .tiptap p {
+    margin: 0.5em 0;
+  }
+  .contract-editor .tiptap ul,
+  .contract-editor .tiptap ol {
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+  }
+  .contract-editor .tiptap li {
+    margin: 0.25em 0;
+  }
+  .contract-editor .tiptap hr {
+    border: none;
+    border-top: 2px solid var(--accent-color, #ff0044);
+    margin: 1.5em 0;
+    opacity: 0.3;
+  }
+`;
+
+export default function TipTapEditor({ value, onChange, onMergeFieldsChange, accentColor = '#ff0044' }) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      MergeField,
+    ],
+    content: (() => {
+      if (!value) return '';
+      try { return JSON.parse(value); } catch { return value; }
+    })(),
+    onUpdate: ({ editor }) => {
+      const json = JSON.stringify(editor.getJSON());
+      onChange?.(json);
+      const fields = extractMergeFieldKeys(editor.getJSON());
+      onMergeFieldsChange?.(fields);
+    },
+  });
+
+  const handleInsertMergeField = (field) => {
+    if (!editor) return;
+    editor.chain().focus().insertMergeField({ key: field.key, label: field.label }).run();
+    const fields = extractMergeFieldKeys(editor.getJSON());
+    onMergeFieldsChange?.(fields);
+  };
+
+  return (
+    <>
+      <style>{CONTRACT_STYLES}</style>
+      <div
+        className="contract-editor border border-gray-200 rounded-xl overflow-hidden bg-white"
+        style={{ '--accent-color': accentColor }}
+      >
+        <TipTapToolbar editor={editor} onInsertMergeField={handleInsertMergeField} />
+        <EditorContent editor={editor} />
+      </div>
+    </>
+  );
+}
+
+/**
+ * Render TipTap JSON to HTML string (for signing page).
+ */
+export function renderContractToHtml(body, accentColor = '#ff0044') {
+  if (!body) return '';
+  let doc;
+  try { doc = JSON.parse(body); } catch { return body; }
+
+  const renderNode = (node) => {
+    if (!node) return '';
+    if (node.type === 'text') {
+      let text = escapeHtml(node.text || '');
+      if (node.marks) {
+        node.marks.forEach(mark => {
+          if (mark.type === 'bold') text = `<strong>${text}</strong>`;
+          if (mark.type === 'italic') text = `<em>${text}</em>`;
+          if (mark.type === 'underline') text = `<u>${text}</u>`;
+        });
+      }
+      return text;
+    }
+    if (node.type === 'mergeField') {
+      return `<span data-merge-field="${node.attrs?.key}" style="background:#fff0f3;border:1px solid ${accentColor};border-radius:4px;padding:1px 6px;color:${accentColor};font-size:0.875em;">{${node.attrs?.key}}</span>`;
+    }
+    const children = (node.content || []).map(renderNode).join('');
+    switch (node.type) {
+      case 'doc': return children;
+      case 'paragraph': return `<p style="margin:0.5em 0;">${children || '&nbsp;'}</p>`;
+      case 'heading': {
+        const level = node.attrs?.level || 1;
+        return `<h${level} style="font-size:${level === 1 ? '24px' : '18px'};font-weight:700;color:${accentColor};margin:1em 0 0.5em;">${children}</h${level}>`;
+      }
+      case 'bulletList': return `<ul style="padding-left:1.5em;margin:0.5em 0;">${children}</ul>`;
+      case 'orderedList': return `<ol style="padding-left:1.5em;margin:0.5em 0;">${children}</ol>`;
+      case 'listItem': return `<li style="margin:0.25em 0;">${children}</li>`;
+      case 'horizontalRule': return `<hr style="border:none;border-top:2px solid ${accentColor};margin:1.5em 0;opacity:0.3;" />`;
+      case 'hardBreak': return '<br />';
+      default: return children;
+    }
+  };
+
+  return renderNode(doc);
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Replace {key} placeholders in rendered HTML with stored values.
+ */
+export function replaceMergeFields(html, mergeFieldDefinitions = []) {
+  let result = html;
+  mergeFieldDefinitions.forEach(({ key, value }) => {
+    if (!key) return;
+    const safeValue = escapeHtml(String(value || ''));
+    result = result.replace(
+      new RegExp(`<span[^>]*data-merge-field="${key}"[^>]*>\\{${key}\\}</span>`, 'g'),
+      safeValue
+    );
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), safeValue);
+  });
+  return result;
+}

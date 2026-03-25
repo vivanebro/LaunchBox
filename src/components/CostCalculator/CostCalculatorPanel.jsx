@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { X, Lock, Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, CircleHelp } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,23 @@ const formatCurrency = (n, symbol = '$') => {
   if (n == null || isNaN(n)) return `${symbol}0`;
   return `${symbol}${Math.round(n).toLocaleString()}`;
 };
+
+const FieldHelp = ({ text }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button
+        type="button"
+        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        aria-label="Field help"
+      >
+        <CircleHelp className="w-4 h-4" />
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
+      {text} This is private and only visible to you, not your client.
+    </TooltipContent>
+  </Tooltip>
+);
 
 export function CostCalculatorPanel({
   isOpen,
@@ -237,9 +255,10 @@ export function CostCalculatorPanel({
     : 'fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col border-l border-gray-200';
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
+    <TooltipProvider delayDuration={200}>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
           key="cost-calculator-panel"
           ref={panelRef}
           initial={{ opacity: 0, x: 40 }}
@@ -359,21 +378,35 @@ export function CostCalculatorPanel({
                 <div key={cat._id} className="space-y-2">
                   <div className="flex items-center gap-2">
                     {editingCategoryId === cat._id ? (
-                      <Input
-                        value={editingCategoryName}
-                        onChange={(e) => setEditingCategoryName(e.target.value)}
-                        onBlur={commitEditName}
-                        onKeyDown={(e) => e.key === 'Enter' && commitEditName()}
-                        className="flex-1 h-11 min-h-[44px]"
-                        autoFocus
-                      />
+                      <div className="flex-1 flex items-center justify-start gap-1.5">
+                        <Input
+                          value={editingCategoryName}
+                          onChange={(e) => setEditingCategoryName(e.target.value)}
+                          onBlur={commitEditName}
+                          onKeyDown={(e) => e.key === 'Enter' && commitEditName()}
+                          className="h-11 min-h-[44px] w-[230px] max-w-full"
+                          autoFocus
+                        />
+                        <FieldHelp
+                          text={cat.type === 'time'
+                            ? 'Name this time-based cost item, then enter quantity, unit, and your rate.'
+                            : 'Enter the total amount for this cost category.'}
+                        />
+                      </div>
                     ) : (
-                      <button
-                        onClick={() => startEditName(cat)}
-                        className="flex-1 text-left text-sm font-medium text-gray-700 hover:text-gray-900 min-h-[44px] flex items-center px-3 -ml-1 rounded"
-                      >
-                        {cat.name}
-                      </button>
+                      <div className="flex-1 flex items-center justify-start gap-1.5">
+                        <button
+                          onClick={() => startEditName(cat)}
+                          className="text-left text-sm font-medium text-gray-700 hover:text-gray-900 min-h-[44px] inline-flex items-center px-1 rounded"
+                        >
+                          {cat.name}
+                        </button>
+                        <FieldHelp
+                          text={cat.type === 'time'
+                            ? 'Name this time-based cost item, then enter quantity, unit, and your rate.'
+                            : 'Enter the total amount for this cost category.'}
+                        />
+                      </div>
                     )}
                     {categories.length > 1 && (
                       <button
@@ -530,6 +563,7 @@ export function CostCalculatorPanel({
                 </div>
                 <div className="pt-2 flex items-center gap-2">
                   <span className="text-sm text-gray-600">Target margin</span>
+                  <FieldHelp text="Set your desired profit margin percentage to get a suggested minimum package price." />
                   <Input
                     type="number"
                     inputMode="decimal"
@@ -628,8 +662,9 @@ export function CostCalculatorPanel({
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </TooltipProvider>
   );
 }

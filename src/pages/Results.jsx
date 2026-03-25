@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { toPng } from 'html-to-image';
@@ -12,9 +12,10 @@ import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 import { logPackageView, startTimeTracking, logButtonClick } from '@/lib/packageAnalytics';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
 import { CostCalculatorPanel } from '@/components/CostCalculator/CostCalculatorPanel';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   CostCalculatorTrigger,
   getCostCalculatorDisplay,
@@ -23,6 +24,7 @@ import {
   hasNudgeBeenDismissed,
   setNudgeDismissed,
 } from '@/components/CostCalculator/CostCalculatorTrigger';
+import { extractMergeFieldKeys } from '@/components/contracts/MergeFieldExtension';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
 
@@ -90,8 +92,108 @@ const getCTAOptionEmoji = (optionId) => {
   return emojis[optionId] || '✏️';
 };
 
+const buildContractSignUrl = (shareableLink) => {
+  if (!shareableLink) return '';
+  return `${typeof window !== 'undefined' ? window.location.origin : ''}${createPageUrl('ContractSign')}?shareId=${shareableLink}`;
+};
+
+const getTierPriceForConfig = (c, modeKey, tier) => {
+  if (!c) return 0;
+  const onetime = {
+    starter: c.price_starter,
+    growth: c.price_growth,
+    premium: c.price_premium,
+    elite: c.price_elite || 0,
+  };
+  const retainer = {
+    starter: c.price_starter_retainer,
+    growth: c.price_growth_retainer,
+    premium: c.price_premium_retainer,
+    elite: c.price_elite_retainer || 0,
+  };
+  const table = modeKey === 'retainer' ? retainer : onetime;
+  const v = table[tier];
+  return v == null ? 0 : Number(v);
+};
+
+const formatMergeFieldPrice = (amount, currencySymbol) => {
+  if (amount == null || amount === '') return '';
+  const n = Number(amount);
+  if (Number.isNaN(n)) return '';
+  return `${currencySymbol}${Math.round(n).toLocaleString()}`;
+};
+
+/** Build merge_field_definitions from template body + current package tier (package name, price, date auto-filled). */
+const buildMergeFieldDefinitionsFromTemplateBody = (bodyJson, cfg, tier, modeKey, currencySymbol) => {
+  if (bodyJson == null || bodyJson === '') return [];
+  let doc;
+  try {
+    doc = typeof bodyJson === 'string' ? JSON.parse(bodyJson) : bodyJson;
+  } catch {
+    return [];
+  }
+  const fields = extractMergeFieldKeys(doc);
+  const packageName = cfg?.package_names?.[modeKey]?.[tier] ?? '';
+  const price = getTierPriceForConfig(cfg, modeKey, tier);
+  const priceStr = formatMergeFieldPrice(price, currencySymbol);
+  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  return fields.map(({ key, label }) => {
+    const k = (key || '').toLowerCase();
+    let value = '';
+    if (k === 'package_name' || k === 'project_name' || k === 'package') value = packageName;
+    else if (k === 'price' || k === 'total_price' || k === 'amount' || k === 'total') value = priceStr;
+    else if (k === 'date' || k === 'contract_date' || k === 'today') value = dateStr;
+    return { key, label: label || key, value };
+  });
+};
+
+const TIER_SCOPED_MERGE_KEYS = new Set([
+  'package_name', 'project_name', 'package', 'price', 'total_price', 'amount', 'total', 'date', 'contract_date', 'today',
+]);
+
+const contractBodyHasTierScopedMergeFields = (bodyJson) => {
+  if (bodyJson == null || bodyJson === '') return false;
+  let doc;
+  try {
+    doc = typeof bodyJson === 'string' ? JSON.parse(bodyJson) : bodyJson;
+  } catch {
+    return false;
+  }
+  const fields = extractMergeFieldKeys(doc);
+  return fields.some(({ key }) => TIER_SCOPED_MERGE_KEYS.has((key || '').toLowerCase()));
+};
+
+const extractShareIdFromContractSignUrl = (url) => {
+  if (!url) return '';
+  try {
+    const u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    const id = u.searchParams.get('shareId');
+    if (id) return id;
+  } catch {
+    /* relative URL */
+  }
+  const m = String(url).match(/shareId=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+};
+
+/** Tier-specific merge keys from package config; other keys inherit from the base contract (e.g. client name). */
+const buildMergeDefsForTierClone = (baseContract, cfg, tier, modeKey, currencySymbol) => {
+  const fresh = buildMergeFieldDefinitionsFromTemplateBody(baseContract.body, cfg, tier, modeKey, currencySymbol);
+  const baseDefs = baseContract.merge_field_definitions || [];
+  const baseByKey = Object.fromEntries(baseDefs.map((d) => [d.key, d]));
+  return fresh.map((f) => {
+    const k = (f.key || '').toLowerCase();
+    if (TIER_SCOPED_MERGE_KEYS.has(k)) return f;
+    const b = baseByKey[f.key];
+    if (b && String(b.value || '').trim()) return { ...f, value: b.value };
+    return f;
+  });
+};
+
 export default function Results() {
   const { creator, slug } = useParams();
+  const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [pricingMode, setPricingMode] = useState('one-time');
   const [currentDesign, setCurrentDesign] = useState(1);
@@ -111,6 +213,12 @@ export default function Results() {
   const [configureModalLink, setConfigureModalLink] = useState('');
   const [configureModalCustomLabel, setConfigureModalCustomLabel] = useState('');
   const [configureModalCopyToAll, setConfigureModalCopyToAll] = useState(false);
+  const [configureModalSignSource, setConfigureModalSignSource] = useState('launchbox'); // 'launchbox' | 'external'
+  const [userContracts, setUserContracts] = useState([]);
+  const [userContractTemplates, setUserContractTemplates] = useState([]);
+  /** After picking a contract template: unfilled merge fields can be filled in-modal before save. */
+  const [templateMergeFieldsModal, setTemplateMergeFieldsModal] = useState(null);
+  const [savingTemplateMerge, setSavingTemplateMerge] = useState(false);
   const [editingToggleLabels, setEditingToggleLabels] = useState(false);
   const [tempLabelOnetime, setTempLabelOnetime] = useState('');
   const [tempLabelRetainer, setTempLabelRetainer] = useState('');
@@ -811,6 +919,11 @@ export default function Results() {
     setConfigureModalOption(existingType || 'lock_your_spot');
     setConfigureModalLink(existingLink);
     setConfigureModalCustomLabel(existingType === 'custom' ? existingLabel : '');
+    // Detect sign source for sign_contract
+    const isLaunchBoxContract = existingType === 'sign_contract' && existingLink && (
+      existingLink.includes('shareId=') || existingLink.includes('/contractsign')
+    );
+    setConfigureModalSignSource(isLaunchBoxContract ? 'launchbox' : 'external');
   };
 
   const closeConfigureModal = () => {
@@ -820,9 +933,10 @@ export default function Results() {
     setConfigureModalLink('');
     setConfigureModalCustomLabel('');
     setConfigureModalCopyToAll(false);
+    setConfigureModalSignSource('launchbox');
   };
 
-  const saveConfigureModal = () => {
+  const saveConfigureModal = async () => {
     if (!configureModalTier) return;
     const modeKey = getCurrentModeKey();
     const selectedOption = BUTTON_OPTIONS.find(o => o.id === configureModalOption);
@@ -834,13 +948,78 @@ export default function Results() {
     const currentLinks = config?.button_links || {};
     const currentModeLinks = (currentLinks[modeKey] && typeof currentLinks[modeKey] === 'object') ? { ...currentLinks[modeKey] } : {};
 
+    const cfg = configRef.current || config;
+    const sym = getCurrencySymbol(cfg?.currency || 'USD');
+    const tiersForMode = cfg?.active_packages?.[modeKey] || ['starter', 'growth', 'premium'];
+
+    const isLaunchBoxSign =
+      configureModalOption === 'sign_contract' &&
+      configureModalSignSource === 'launchbox' &&
+      linkValue &&
+      (linkValue.includes('shareId=') || linkValue.toLowerCase().includes('contractsign'));
+
+    const shareId = extractShareIdFromContractSignUrl(linkValue);
+    let baseContract = shareId ? userContracts.find((c) => c.shareable_link === shareId) : null;
+    if (!baseContract && shareId && isLaunchBoxSign) {
+      try {
+        const found = await supabaseClient.entities.Contract.filter({ shareable_link: shareId }, '-created_at');
+        baseContract = found?.[0] || null;
+      } catch (e) {
+        console.error('Could not load contract by share link:', e);
+      }
+    }
+
+    const usePerTierLaunchBoxContracts =
+      configureModalCopyToAll &&
+      isLaunchBoxSign &&
+      baseContract &&
+      contractBodyHasTierScopedMergeFields(baseContract.body);
+
     if (configureModalCopyToAll) {
-      packages.forEach((pkg) => {
-        currentModeLinks[pkg.tier] = linkValue;
-        currentModeLinks[pkg.tier + '_label'] = label;
-        currentModeLinks[pkg.tier + '_type'] = configureModalOption;
-        currentModeLinks[pkg.tier + '_removed'] = false;
-      });
+      if (usePerTierLaunchBoxContracts) {
+        const createdContracts = [];
+        for (const tier of tiersForMode) {
+          if (tier === configureModalTier) {
+            currentModeLinks[tier] = linkValue;
+          } else {
+            const mergeDefs = buildMergeDefsForTierClone(baseContract, cfg, tier, modeKey, sym);
+            try {
+              const created = await supabaseClient.entities.Contract.create({
+                name: baseContract.name,
+                body: baseContract.body,
+                shareable_link: crypto.randomUUID(),
+                accent_color: baseContract.accent_color || '#ff0044',
+                merge_field_definitions: mergeDefs,
+                status: 'draft',
+                linked_package_id: packageId || null,
+                logo_url: baseContract.logo_url || null,
+                custom_confirmation_message: baseContract.custom_confirmation_message ?? null,
+                custom_button_label: baseContract.custom_button_label ?? null,
+                custom_button_link: baseContract.custom_button_link ?? null,
+                ...(baseContract.expires_at ? { expires_at: baseContract.expires_at } : {}),
+              });
+              createdContracts.push(created);
+              currentModeLinks[tier] = buildContractSignUrl(created.shareable_link);
+            } catch (e) {
+              console.error('Failed to clone contract for tier', tier, e);
+              currentModeLinks[tier] = linkValue;
+            }
+          }
+          currentModeLinks[tier + '_label'] = label;
+          currentModeLinks[tier + '_type'] = configureModalOption;
+          currentModeLinks[tier + '_removed'] = false;
+        }
+        if (createdContracts.length > 0) {
+          setUserContracts((prev) => [...createdContracts, ...(prev || [])]);
+        }
+      } else {
+        tiersForMode.forEach((tier) => {
+          currentModeLinks[tier] = linkValue;
+          currentModeLinks[tier + '_label'] = label;
+          currentModeLinks[tier + '_type'] = configureModalOption;
+          currentModeLinks[tier + '_removed'] = false;
+        });
+      }
     } else {
       currentModeLinks[configureModalTier] = linkValue;
       currentModeLinks[configureModalTier + '_label'] = label;
@@ -916,6 +1095,143 @@ export default function Results() {
 
   const getCurrentModeKey = () => {
     return pricingMode === 'one-time' ? 'onetime' : 'retainer';
+  };
+
+  // Load user contracts when configuring Sign Contract CTA
+  useEffect(() => {
+    if (configureModalOption !== 'sign_contract' || !config?.created_by) return;
+    const loadContracts = async () => {
+      try {
+        const [list, templates] = await Promise.all([
+          supabaseClient.entities.Contract.filter(
+            { created_by: config.created_by },
+            '-created_at'
+          ),
+          supabaseClient.entities.ContractTemplate.filter(
+            { created_by: config.created_by },
+            '-created_at'
+          ),
+        ]);
+        const selectableContracts = (list || []).filter(
+          (contract) => contract?.status !== 'signed' && !!contract?.shareable_link
+        );
+        setUserContracts(selectableContracts);
+        setUserContractTemplates(templates || []);
+      } catch (e) {
+        console.error('Failed to load contracts:', e);
+        setUserContracts([]);
+        setUserContractTemplates([]);
+      }
+    };
+    loadContracts();
+  }, [configureModalOption, config?.created_by]);
+
+  const handleLaunchboxContractSelect = async (value) => {
+    if (!value || value.startsWith('section_')) return;
+
+    if (!value?.startsWith('template::')) {
+      setConfigureModalLink(value);
+      return;
+    }
+
+    const templateId = value.replace('template::', '');
+    const selectedTemplate = userContractTemplates.find((t) => t.id === templateId);
+    if (!selectedTemplate) return;
+
+    const cfg = configRef.current || config;
+    const tier = configureModalTier || 'starter';
+    const modeKey = getCurrentModeKey();
+    const sym = getCurrencySymbol(cfg?.currency || 'USD');
+    const mergeDefs = buildMergeFieldDefinitionsFromTemplateBody(
+      selectedTemplate.body,
+      cfg,
+      tier,
+      modeKey,
+      sym
+    );
+
+    try {
+      const newContract = await supabaseClient.entities.Contract.create({
+        name: selectedTemplate.name,
+        body: selectedTemplate.body,
+        shareable_link: crypto.randomUUID(),
+        accent_color: selectedTemplate.accent_color || cfg?.brand_color || '#ff0044',
+        logo_url: selectedTemplate.logo_url || cfg?.logo_url || null,
+        custom_confirmation_message: selectedTemplate.custom_confirmation_message ?? null,
+        custom_button_label: selectedTemplate.custom_button_label ?? null,
+        custom_button_link: selectedTemplate.custom_button_link ?? null,
+        merge_field_definitions: mergeDefs,
+        status: 'draft',
+        linked_package_id: packageId || null,
+      });
+      const newContractUrl = buildContractSignUrl(newContract.shareable_link);
+      if (newContractUrl) {
+        setConfigureModalLink(newContractUrl);
+      }
+      const merged = { ...newContract, merge_field_definitions: mergeDefs };
+      setUserContracts((prev) => [merged, ...(prev || [])]);
+
+      const unfilled = mergeDefs.filter((f) => !String(f.value ?? '').trim());
+      if (unfilled.length > 0) {
+        setTemplateMergeFieldsModal({
+          contractId: newContract.id,
+          templateName: selectedTemplate.name,
+          fullMergeDefs: mergeDefs,
+          unfilledFields: unfilled.map(({ key, label }) => ({ key, label: label || key })),
+          draftValues: Object.fromEntries(unfilled.map((f) => [f.key, ''])),
+          contractNameDraft: '',
+        });
+      } else {
+        setTemplateMergeFieldsModal(null);
+      }
+    } catch (e) {
+      console.error('Failed to create contract from template:', e);
+    }
+  };
+
+  const updateTemplateMergeFieldDraft = (key, value) => {
+    setTemplateMergeFieldsModal((prev) => {
+      if (!prev) return null;
+      return { ...prev, draftValues: { ...prev.draftValues, [key]: value } };
+    });
+  };
+
+  const updateTemplateMergeContractName = (value) => {
+    setTemplateMergeFieldsModal((prev) => (prev ? { ...prev, contractNameDraft: value } : null));
+  };
+
+  const saveTemplateMergeFieldsModal = async () => {
+    const m = templateMergeFieldsModal;
+    if (!m?.contractId || savingTemplateMerge) return;
+    const allFilled = m.unfilledFields.every((f) => String(m.draftValues[f.key] ?? '').trim());
+    if (!allFilled) return;
+
+    setSavingTemplateMerge(true);
+    try {
+      const newMergeDefs = m.fullMergeDefs.map((f) => {
+        const isUnfilled = m.unfilledFields.some((uf) => uf.key === f.key);
+        if (isUnfilled) {
+          return { ...f, value: String(m.draftValues[f.key] ?? '').trim() };
+        }
+        return f;
+      });
+      const name = (m.contractNameDraft || '').trim() || m.templateName;
+      await supabaseClient.entities.Contract.update(m.contractId, {
+        name,
+        merge_field_definitions: newMergeDefs,
+        updated_at: new Date().toISOString(),
+      });
+      setUserContracts((prev) =>
+        (prev || []).map((c) =>
+          c.id === m.contractId ? { ...c, name, merge_field_definitions: newMergeDefs } : c
+        )
+      );
+      setTemplateMergeFieldsModal(null);
+    } catch (e) {
+      console.error('Failed to save contract merge fields:', e);
+    } finally {
+      setSavingTemplateMerge(false);
+    }
   };
 
   const addDeliverable = (tier) => {
@@ -1539,6 +1855,7 @@ export default function Results() {
     onSave,
     className,
     multiline = false,
+    multilineCompact = false,
     placeholder,
     darkMode = false,
     brandColor,
@@ -1600,7 +1917,8 @@ export default function Results() {
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onClick={(e) => e.stopPropagation()}
-            className={`${className || ''} min-h-[60px] resize-none overflow-hidden ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
+            rows={multilineCompact ? 2 : 3}
+            className={`${className || ''} ${multilineCompact ? 'h-[2.5rem] min-h-[2.5rem] max-h-[2.5rem] leading-4 py-1' : 'min-h-[60px]'} resize-none overflow-hidden ${darkMode ? 'bg-white text-gray-900 border-gray-300' : ''}`}
             autoFocus
             maxLength={maxLength}
             placeholder={placeholder}
@@ -1643,14 +1961,27 @@ export default function Results() {
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`${className || ''} cursor-pointer group relative min-w-[50px] inline-block rounded px-2 py-1 transition-all`}
+        className={`${className || ''} cursor-pointer group relative min-w-[50px] inline-block rounded ${multiline && multilineCompact ? 'px-1.5 py-0.5 leading-4' : 'px-2 py-1'} transition-all`}
         style={{
           backgroundColor: (isEditing || isHovered) ? (darkMode ? 'rgba(255,255,255,0.1)' : `${brandColor}1A`) : undefined,
           outline: (isEditing || isHovered) ? `2px solid ${brandColor}` : undefined,
           outlineOffset: '-1px',
         }}
       >
-        {value || <span className="text-gray-400 italic">{placeholder}</span>}
+        {(multiline && multilineCompact) ? (
+          <span
+            className="block overflow-hidden"
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+            }}
+          >
+            {value || <span className="text-gray-400 italic">{placeholder}</span>}
+          </span>
+        ) : (
+          value || <span className="text-gray-400 italic">{placeholder}</span>
+        )}
         <Edit2 className={`w-4 h-4 absolute right-3 -top-1 opacity-0 group-hover:opacity-100 ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
       </div>
     );
@@ -2452,7 +2783,7 @@ export default function Results() {
                 {pkg.description !== null ? (
                   <div
                     className={`mb-6 rounded-xl relative group/desc overflow-hidden ${
-                      packages.length === 4 ? 'p-3 min-h-[88px] max-h-[88px]' : 'p-4 min-h-[96px] max-h-[96px]'
+                      packages.length === 4 ? 'p-2 min-h-[48px] max-h-[48px]' : 'p-4 min-h-[64px] max-h-[64px]'
                     }`}
                     style={{ backgroundColor: `${brandColor}15` }}
                   >
@@ -2469,8 +2800,9 @@ export default function Results() {
                     <EditableText
                       value={pkg.description}
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                      className="text-sm text-gray-700"
+                      className="block w-full text-sm text-gray-700"
                       multiline={true}
+                      multilineCompact={true}
                       maxLength={120}
                       placeholder="Describe who this package is best for"
                       brandColor={brandColor}
@@ -2921,7 +3253,7 @@ export default function Results() {
                 {pkg.description !== null ? (
                   <div
                     className={`mb-6 rounded-xl relative group/desc overflow-hidden ${
-                      packages.length === 4 ? 'p-3 min-h-[88px] max-h-[88px]' : 'p-4 min-h-[96px] max-h-[96px]'
+                      packages.length === 4 ? 'p-2 min-h-[48px] max-h-[48px]' : 'p-4 min-h-[64px] max-h-[64px]'
                     }`}
                     style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
                   >
@@ -2938,8 +3270,9 @@ export default function Results() {
                     <EditableText
                       value={pkg.description}
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                      className="text-sm text-white"
+                      className="block w-full text-sm text-white"
                       multiline={true}
+                      multilineCompact={true}
                       maxLength={120}
                       placeholder="Describe who this package is best for"
                       darkMode={true}
@@ -3141,7 +3474,7 @@ export default function Results() {
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
     const deliverablesHeight = deliverablesMinHeight + Math.max(0, maxDeliverables - 1) * rowGap;
     const bonusesHeight = maxBonuses > 0 ? (previewPackages.length === 4 ? maxBonuses * 24 : maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
-    const descHeight = previewPackages.length === 4 ? 72 : 88;
+    const descHeight = previewPackages.length === 4 ? 48 : 64;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
     );
@@ -3275,13 +3608,23 @@ export default function Results() {
               )}
 
               <div
-                className={`rounded-xl mb-4 overflow-y-auto ${
+                className={`rounded-xl mb-4 overflow-hidden ${
                   previewPackages.length === 4 ? 'p-2' : 'p-4'
                 }`}
                 style={{ height: `${descHeight}px`, minHeight: `${descHeight}px`, backgroundColor: pkg.description != null ? `${brandColor}15` : 'transparent' }}
               >
                 {pkg.description != null && (
-                  <p className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
+                  <p
+                    className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {pkg.description}
+                  </p>
                 )}
               </div>
 
@@ -3392,7 +3735,7 @@ export default function Results() {
     const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
     const deliverablesHeight = deliverablesMinHeight + Math.max(0, maxDeliverables - 1) * rowGap;
     const bonusesHeight = maxBonuses > 0 ? (previewPackages.length === 4 ? maxBonuses * 24 : maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
-    const descHeight = previewPackages.length === 4 ? 72 : 88;
+    const descHeight = previewPackages.length === 4 ? 48 : 64;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
     );
@@ -3516,13 +3859,23 @@ export default function Results() {
               )}
 
               <div
-                className={`rounded-xl mb-4 overflow-y-auto ${
+                className={`rounded-xl mb-4 overflow-hidden ${
                   previewPackages.length === 4 ? 'p-2' : 'p-4'
                 }`}
                 style={{ height: `${descHeight}px`, minHeight: `${descHeight}px`, backgroundColor: pkg.description != null ? 'rgba(255, 255, 255, 0.15)' : 'transparent' }}
               >
                 {pkg.description != null && (
-                  <p className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{pkg.description}</p>
+                  <p
+                    className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {pkg.description}
+                  </p>
                 )}
               </div>
 
@@ -4626,6 +4979,115 @@ export default function Results() {
         )}
       </AnimatePresence>
 
+      {/* Template merge fields (after creating a contract from a template with blank merge fields) */}
+      <AnimatePresence>
+        {templateMergeFieldsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/55 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+            onClick={() => !savingTemplateMerge && setTemplateMergeFieldsModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ type: 'spring', duration: 0.35 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="px-8 pt-8 pb-4 text-center shrink-0"
+                style={{
+                  background: `linear-gradient(180deg, ${brandColor}12 0%, transparent 55%)`,
+                }}
+              >
+                <div
+                  className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-inner"
+                  style={{ backgroundColor: `${brandColor}18` }}
+                >
+                  <Sparkles className="w-8 h-8" style={{ color: brandColor }} />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">This template has blank fields</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  Package name, date, and price were filled from this package automatically. Complete the fields below before you send the link to your client.
+                </p>
+              </div>
+              <div className="px-8 pb-6 overflow-y-auto flex-1 min-h-0 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Contract name <span className="text-gray-400 font-normal normal-case">(optional)</span>
+                  </label>
+                  <Input
+                    value={templateMergeFieldsModal.contractNameDraft}
+                    onChange={(e) => updateTemplateMergeContractName(e.target.value)}
+                    placeholder={templateMergeFieldsModal.templateName}
+                    className="h-11 rounded-xl border-gray-200"
+                    disabled={savingTemplateMerge}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Leave blank to use the template name: <span className="font-medium text-gray-500">{templateMergeFieldsModal.templateName}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Fill in required fields</p>
+                  <div className="space-y-3">
+                    {templateMergeFieldsModal.unfilledFields.map((f) => (
+                      <div key={f.key}>
+                        <label className="block text-sm font-medium text-gray-800 mb-1">
+                          {f.label}
+                          <span className="text-gray-400 font-mono text-xs font-normal ml-1.5">{`{${f.key}}`}</span>
+                        </label>
+                        <Input
+                          value={templateMergeFieldsModal.draftValues[f.key] ?? ''}
+                          onChange={(e) => updateTemplateMergeFieldDraft(f.key, e.target.value)}
+                          placeholder={`Enter ${f.label.toLowerCase()}`}
+                          className="h-11 rounded-xl border-gray-200"
+                          disabled={savingTemplateMerge}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 h-12 rounded-2xl border-gray-200 font-semibold"
+                    onClick={() => setTemplateMergeFieldsModal(null)}
+                    disabled={savingTemplateMerge}
+                  >
+                    I&apos;ll do it later
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1 h-12 rounded-2xl text-white font-semibold shadow-md disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
+                    style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                    onClick={saveTemplateMergeFieldsModal}
+                    disabled={
+                      savingTemplateMerge
+                      || !templateMergeFieldsModal.unfilledFields.every((f) =>
+                        String(templateMergeFieldsModal.draftValues[f.key] ?? '').trim()
+                      )
+                    }
+                  >
+                    {savingTemplateMerge ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        Saving…
+                      </>
+                    ) : (
+                      'Save Contract'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Configure Button Modal - bottom sheet on mobile, centered modal on desktop */}
       {configureModalTier && isMobileView ? (
         <Sheet open={!!configureModalTier} onOpenChange={(open) => !open && closeConfigureModal()}>
@@ -4639,17 +5101,17 @@ export default function Results() {
               {configureModalStep === 1 ? (
                 <>
                   <p className="text-gray-600 text-sm mb-4">What should this button do?</p>
-                  <div className="space-y-2 mb-6">
+                  <div className="space-y-3 mb-6">
                     {BUTTON_OPTIONS.map((opt) => (
                       <button
                         key={opt.id}
                         onClick={() => setConfigureModalOption(opt.id)}
-                        className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
+                        className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${
                           configureModalOption === opt.id
-                            ? 'border-gray-900 bg-gray-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'bg-white'
+                            : 'bg-white/80'
                         }`}
-                        style={configureModalOption === opt.id ? { borderColor: brandColor, backgroundColor: `${brandColor}08` } : {}}
+                        style={configureModalOption === opt.id ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
                       >
                         <span className="text-lg flex-shrink-0">{getCTAOptionEmoji(opt.id)}</span>
                         <div className="flex-1 min-w-0">
@@ -4671,6 +5133,121 @@ export default function Results() {
                   >
                     Next
                   </Button>
+                </>
+              ) : configureModalOption === 'sign_contract' ? (
+                <>
+                  <div className="mb-4">
+                    <span className="text-sm font-medium text-gray-700">Sign Contract</span>
+                  </div>
+                  <div className="space-y-3 mb-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfigureModalSignSource('launchbox');
+                        const keep = userContracts.find(c => buildContractSignUrl(c.shareable_link) === configureModalLink);
+                        const firstTemplateValue = userContractTemplates[0] ? `template::${userContractTemplates[0].id}` : '';
+                        const fallback = userContracts[0] ? buildContractSignUrl(userContracts[0].shareable_link) : firstTemplateValue;
+                        setConfigureModalLink(keep ? configureModalLink : fallback);
+                      }}
+                      className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'launchbox' ? 'bg-white' : 'bg-white/80'}`}
+                      style={configureModalSignSource === 'launchbox' ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
+                    >
+                      <FileSignature className="w-5 h-5 flex-shrink-0" style={{ color: brandColor }} />
+                      <span className="font-medium">Use a LaunchBox contract</span>
+                      {configureModalSignSource === 'launchbox' && <Check className="w-5 h-5 flex-shrink-0 ml-auto" style={{ color: brandColor }} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setConfigureModalSignSource('external'); setConfigureModalLink(configureModalSignSource === 'launchbox' ? '' : configureModalLink); }}
+                      className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'external' ? 'bg-white' : 'bg-white/80'}`}
+                      style={configureModalSignSource === 'external' ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
+                    >
+                      <LinkIcon className="w-5 h-5 flex-shrink-0" />
+                      <span className="font-medium">Use an external link</span>
+                      {configureModalSignSource === 'external' && <Check className="w-5 h-5 flex-shrink-0 ml-auto" style={{ color: brandColor }} />}
+                    </button>
+                  </div>
+                  {configureModalSignSource === 'launchbox' ? (
+                    (userContractTemplates.length > 0 || userContracts.length > 0) ? (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Select contract</label>
+                        <Select value={configureModalLink || ''} onValueChange={handleLaunchboxContractSelect}>
+                          <SelectTrigger
+                            className="w-full h-12 rounded-xl border-0 bg-white px-4 text-base shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-0"
+                            style={{ boxShadow: configureModalLink ? `0 0 0 2px ${brandColor}25, 0 10px 30px -18px ${brandColor}80` : undefined }}
+                          >
+                            <SelectValue placeholder="Choose from templates or contracts…" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-0 shadow-xl">
+                            {userContractTemplates.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Use From Templates:</div>
+                                {userContractTemplates.map((t) => (
+                                  <SelectItem key={`template-${t.id}`} value={`template::${t.id}`}>
+                                    {t.name}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                            {userContractTemplates.length > 0 && userContracts.length > 0 && (
+                              <div className="my-1 h-px bg-gray-100" />
+                            )}
+                            {userContracts.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Use From Your Contracts:</div>
+                                {userContracts.map((c) => {
+                                  const url = buildContractSignUrl(c.shareable_link);
+                                  if (!url) return null;
+                                  return (
+                                    <SelectItem key={c.id} value={url}>
+                                      {c.name}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="mb-4 p-4 rounded-2xl bg-white text-center shadow-sm">
+                        <p className="text-sm text-gray-600 mb-3">You don&apos;t have any contracts yet.</p>
+                        <Button
+                          type="button"
+                          onClick={() => { closeConfigureModal(); navigate(createPageUrl('Contracts')); }}
+                          className="gap-2 bg-[#ff0044] hover:bg-[#cc0033] text-white"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Create your first contract
+                        </Button>
+                      </div>
+                    )
+                  ) : (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Paste your e-signature link</label>
+                      <Input
+                        value={configureModalLink}
+                        onChange={(e) => setConfigureModalLink(e.target.value)}
+                        placeholder="https://docu.sign/… or your signing tool link"
+                        className="w-full h-12 text-base rounded-xl border-0 shadow-sm focus:shadow-md"
+                        style={{ boxShadow: `0 0 0 2px ${brandColor}20, 0 10px 30px -18px ${brandColor}80` }}
+                      />
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 mb-4">
+                    If no link is attached, this button won&apos;t be visible to clients.
+                  </p>
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white mb-6 shadow-sm">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Apply to all packages</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Use this link for every CTA button</p>
+                    </div>
+                    <Switch checked={configureModalCopyToAll} onCheckedChange={setConfigureModalCopyToAll} />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={() => setConfigureModalStep(1)} className="flex-1 h-12 rounded-full border-0 shadow-sm hover:shadow-md text-gray-700 hover:bg-white font-semibold">Back</Button>
+                    <Button onClick={saveConfigureModal} className="flex-1 h-12 rounded-full text-white font-semibold" style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}>Save</Button>
+                  </div>
                 </>
               ) : (
                 <>
@@ -4771,17 +5348,17 @@ export default function Results() {
               {configureModalStep === 1 ? (
                 <>
                   <p className="text-gray-600 text-sm mb-4">What should this button do?</p>
-                  <div className="space-y-2 mb-6">
+                  <div className="space-y-3 mb-6">
                     {BUTTON_OPTIONS.map((opt) => (
                       <button
                         key={opt.id}
                         onClick={() => setConfigureModalOption(opt.id)}
-                        className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-3 ${
+                        className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${
                           configureModalOption === opt.id
-                            ? 'border-gray-900 bg-gray-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'bg-white'
+                            : 'bg-white/80'
                         }`}
-                        style={configureModalOption === opt.id ? { borderColor: brandColor, backgroundColor: `${brandColor}08` } : {}}
+                        style={configureModalOption === opt.id ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
                       >
                         <span className="text-lg flex-shrink-0">{getCTAOptionEmoji(opt.id)}</span>
                         <div className="flex-1 min-w-0">
@@ -4803,6 +5380,121 @@ export default function Results() {
                   >
                     Next
                   </Button>
+                </>
+              ) : configureModalOption === 'sign_contract' ? (
+                <>
+                  <div className="mb-4">
+                    <span className="text-sm font-medium text-gray-700">Sign Contract</span>
+                  </div>
+                  <div className="space-y-3 mb-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfigureModalSignSource('launchbox');
+                        const keep = userContracts.find(c => buildContractSignUrl(c.shareable_link) === configureModalLink);
+                        const firstTemplateValue = userContractTemplates[0] ? `template::${userContractTemplates[0].id}` : '';
+                        const fallback = userContracts[0] ? buildContractSignUrl(userContracts[0].shareable_link) : firstTemplateValue;
+                        setConfigureModalLink(keep ? configureModalLink : fallback);
+                      }}
+                      className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'launchbox' ? 'bg-white' : 'bg-white/80'}`}
+                      style={configureModalSignSource === 'launchbox' ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
+                    >
+                      <FileSignature className="w-5 h-5 flex-shrink-0" style={{ color: brandColor }} />
+                      <span className="font-medium">Use a LaunchBox contract</span>
+                      {configureModalSignSource === 'launchbox' && <Check className="w-5 h-5 flex-shrink-0 ml-auto" style={{ color: brandColor }} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setConfigureModalSignSource('external'); setConfigureModalLink(configureModalSignSource === 'launchbox' ? '' : configureModalLink); }}
+                      className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'external' ? 'bg-white' : 'bg-white/80'}`}
+                      style={configureModalSignSource === 'external' ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
+                    >
+                      <LinkIcon className="w-5 h-5 flex-shrink-0" />
+                      <span className="font-medium">Use an external link</span>
+                      {configureModalSignSource === 'external' && <Check className="w-5 h-5 flex-shrink-0 ml-auto" style={{ color: brandColor }} />}
+                    </button>
+                  </div>
+                  {configureModalSignSource === 'launchbox' ? (
+                    (userContractTemplates.length > 0 || userContracts.length > 0) ? (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Select contract</label>
+                        <Select value={configureModalLink || ''} onValueChange={handleLaunchboxContractSelect}>
+                          <SelectTrigger
+                            className="w-full h-12 rounded-xl border-0 bg-white px-4 text-base shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-0"
+                            style={{ boxShadow: configureModalLink ? `0 0 0 2px ${brandColor}25, 0 10px 30px -18px ${brandColor}80` : undefined }}
+                          >
+                            <SelectValue placeholder="Choose from templates or contracts…" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-0 shadow-xl">
+                            {userContractTemplates.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Use From Templates:</div>
+                                {userContractTemplates.map((t) => (
+                                  <SelectItem key={`template-mobile-${t.id}`} value={`template::${t.id}`}>
+                                    {t.name}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                            {userContractTemplates.length > 0 && userContracts.length > 0 && (
+                              <div className="my-1 h-px bg-gray-100" />
+                            )}
+                            {userContracts.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Use From Your Contracts:</div>
+                                {userContracts.map((c) => {
+                                  const url = buildContractSignUrl(c.shareable_link);
+                                  if (!url) return null;
+                                  return (
+                                    <SelectItem key={c.id} value={url}>
+                                      {c.name}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="mb-4 p-4 rounded-2xl bg-white text-center shadow-sm">
+                        <p className="text-sm text-gray-600 mb-3">You don&apos;t have any contracts yet.</p>
+                        <Button
+                          type="button"
+                          onClick={() => { closeConfigureModal(); navigate(createPageUrl('Contracts')); }}
+                          className="gap-2 bg-[#ff0044] hover:bg-[#cc0033] text-white"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Create your first contract
+                        </Button>
+                      </div>
+                    )
+                  ) : (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Paste your e-signature link</label>
+                      <Input
+                        value={configureModalLink}
+                        onChange={(e) => setConfigureModalLink(e.target.value)}
+                        placeholder="https://docu.sign/… or your signing tool link"
+                        className="w-full h-12 text-base rounded-xl border-0 shadow-sm focus:shadow-md"
+                        style={{ boxShadow: `0 0 0 2px ${brandColor}20, 0 10px 30px -18px ${brandColor}80` }}
+                      />
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 mb-4">
+                    If no link is attached, this button won&apos;t be visible to clients.
+                  </p>
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white mb-6 shadow-sm">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Apply to all packages</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Use this link for every CTA button</p>
+                    </div>
+                    <Switch checked={configureModalCopyToAll} onCheckedChange={setConfigureModalCopyToAll} />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={() => setConfigureModalStep(1)} className="flex-1 h-12 rounded-full border-0 shadow-sm hover:shadow-md text-gray-700 hover:bg-white font-semibold">Back</Button>
+                    <Button onClick={saveConfigureModal} className="flex-1 h-12 rounded-full text-white font-semibold" style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}>Save</Button>
+                  </div>
                 </>
               ) : (
                 <>

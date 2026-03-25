@@ -64,6 +64,28 @@ const TABLE_COLUMNS = {
     'id', 'report_date', 'total_packages', 'auto_fixed', 'needs_attention',
     'fixes', 'issues', 'report_text', 'status', 'created_date', 'updated_date',
   ]),
+  contracts: new Set([
+    'id', 'created_by', 'name', 'body', 'merge_field_definitions',
+    'logo_url', 'accent_color', 'custom_confirmation_message',
+    'custom_button_label', 'custom_button_link', 'status',
+    'shareable_link', 'linked_package_id', 'expires_at',
+    'created_at', 'updated_at',
+  ]),
+  contract_templates: new Set([
+    'id', 'created_by', 'name', 'body',
+    'logo_url', 'accent_color', 'custom_confirmation_message',
+    'custom_button_label', 'custom_button_link',
+    'created_at', 'updated_at',
+  ]),
+  signed_contracts: new Set([
+    'id', 'contract_id', 'client_name', 'client_email', 'signed_body',
+    'signature_image', 'signed_at', 'client_ip', 'pdf_url',
+    'client_folder_id', 'created_at',
+  ]),
+  notifications: new Set([
+    'id', 'created_by', 'type', 'title', 'message', 'metadata',
+    'is_read', 'is_viewed_celebration', 'created_at',
+  ]),
 };
 
 const stripUnknownFields = (tableName, data) => {
@@ -175,6 +197,10 @@ export const entities = {
   AccessCode: createEntityHelper('access_codes'),
   HealthReport: createEntityHelper('health_reports'),
   HelpRequest: createEntityHelper('help_requests'),
+  Contract: createEntityHelper('contracts'),
+  ContractTemplate: createEntityHelper('contract_templates'),
+  SignedContract: createEntityHelper('signed_contracts'),
+  Notification: createEntityHelper('notifications'),
 };
 
 export const entitiesAsServiceRole = {
@@ -183,6 +209,10 @@ export const entitiesAsServiceRole = {
   AccessCode: createEntityHelper('access_codes', true),
   HealthReport: createEntityHelper('health_reports', true),
   HelpRequest: createEntityHelper('help_requests', true),
+  Contract: createEntityHelper('contracts', true),
+  ContractTemplate: createEntityHelper('contract_templates', true),
+  SignedContract: createEntityHelper('signed_contracts', true),
+  Notification: createEntityHelper('notifications', true),
 };
 
 export const auth = {
