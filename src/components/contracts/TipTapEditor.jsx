@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -8,7 +8,7 @@ import TipTapToolbar from './TipTapToolbar';
 const CONTRACT_STYLES = `
   .contract-editor .tiptap {
     outline: none;
-    min-height: 400px;
+    min-height: 1120px;
     padding: 24px;
     font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 14px;
@@ -64,6 +64,12 @@ export default function TipTapEditor({ value, onChange, onMergeFieldsChange, acc
       onMergeFieldsChange?.(fields);
     },
   });
+
+  useEffect(() => {
+    if (!editor) return;
+    const fields = extractMergeFieldKeys(editor.getJSON());
+    onMergeFieldsChange?.(fields);
+  }, [editor, value, onMergeFieldsChange]);
 
   const handleInsertMergeField = (field) => {
     if (!editor) return;

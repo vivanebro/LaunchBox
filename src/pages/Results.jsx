@@ -97,34 +97,11 @@ const buildContractSignUrl = (shareableLink) => {
   return `${typeof window !== 'undefined' ? window.location.origin : ''}${createPageUrl('ContractSign')}?shareId=${shareableLink}`;
 };
 
-const getTierPriceForConfig = (c, modeKey, tier) => {
-  if (!c) return 0;
-  const onetime = {
-    starter: c.price_starter,
-    growth: c.price_growth,
-    premium: c.price_premium,
-    elite: c.price_elite || 0,
-  };
-  const retainer = {
-    starter: c.price_starter_retainer,
-    growth: c.price_growth_retainer,
-    premium: c.price_premium_retainer,
-    elite: c.price_elite_retainer || 0,
-  };
-  const table = modeKey === 'retainer' ? retainer : onetime;
-  const v = table[tier];
-  return v == null ? 0 : Number(v);
-};
+const PRICE_MERGE_KEYS = new Set(['price', 'total_price', 'amount', 'total']);
+const DATE_MERGE_KEYS = new Set(['date', 'contract_date', 'today']);
 
-const formatMergeFieldPrice = (amount, currencySymbol) => {
-  if (amount == null || amount === '') return '';
-  const n = Number(amount);
-  if (Number.isNaN(n)) return '';
-  return `${currencySymbol}${Math.round(n).toLocaleString()}`;
-};
-
-/** Build merge_field_definitions from template body + current package tier (package name, price, date auto-filled). */
-const buildMergeFieldDefinitionsFromTemplateBody = (bodyJson, cfg, tier, modeKey, currencySymbol) => {
+/** Build merge_field_definitions from template body + current package tier (only package name auto-filled). */
+const buildMergeFieldDefinitionsFromTemplateBody = (bodyJson, cfg, tier, modeKey) => {
   if (bodyJson == null || bodyJson === '') return [];
   let doc;
   try {
@@ -134,16 +111,13 @@ const buildMergeFieldDefinitionsFromTemplateBody = (bodyJson, cfg, tier, modeKey
   }
   const fields = extractMergeFieldKeys(doc);
   const packageName = cfg?.package_names?.[modeKey]?.[tier] ?? '';
-  const price = getTierPriceForConfig(cfg, modeKey, tier);
-  const priceStr = formatMergeFieldPrice(price, currencySymbol);
-  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return fields.map(({ key, label }) => {
     const k = (key || '').toLowerCase();
     let value = '';
     if (k === 'package_name' || k === 'project_name' || k === 'package') value = packageName;
-    else if (k === 'price' || k === 'total_price' || k === 'amount' || k === 'total') value = priceStr;
-    else if (k === 'date' || k === 'contract_date' || k === 'today') value = dateStr;
+    else if (PRICE_MERGE_KEYS.has(k)) value = '';
+    else if (DATE_MERGE_KEYS.has(k)) value = '';
     return { key, label: label || key, value };
   });
 };
@@ -151,6 +125,9 @@ const buildMergeFieldDefinitionsFromTemplateBody = (bodyJson, cfg, tier, modeKey
 const TIER_SCOPED_MERGE_KEYS = new Set([
   'package_name', 'project_name', 'package', 'price', 'total_price', 'amount', 'total', 'date', 'contract_date', 'today',
 ]);
+
+const getTodayMergeDate = () =>
+  new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
 const contractBodyHasTierScopedMergeFields = (bodyJson) => {
   if (bodyJson == null || bodyJson === '') return false;
@@ -178,8 +155,8 @@ const extractShareIdFromContractSignUrl = (url) => {
 };
 
 /** Tier-specific merge keys from package config; other keys inherit from the base contract (e.g. client name). */
-const buildMergeDefsForTierClone = (baseContract, cfg, tier, modeKey, currencySymbol) => {
-  const fresh = buildMergeFieldDefinitionsFromTemplateBody(baseContract.body, cfg, tier, modeKey, currencySymbol);
+const buildMergeDefsForTierClone = (baseContract, cfg, tier, modeKey) => {
+  const fresh = buildMergeFieldDefinitionsFromTemplateBody(baseContract.body, cfg, tier, modeKey);
   const baseDefs = baseContract.merge_field_definitions || [];
   const baseByKey = Object.fromEntries(baseDefs.map((d) => [d.key, d]));
   return fresh.map((f) => {
@@ -216,6 +193,7 @@ export default function Results() {
   const [configureModalSignSource, setConfigureModalSignSource] = useState('launchbox'); // 'launchbox' | 'external'
   const [userContracts, setUserContracts] = useState([]);
   const [userContractTemplates, setUserContractTemplates] = useState([]);
+  const [isLoadingUserContracts, setIsLoadingUserContracts] = useState(false);
   /** After picking a contract template: unfilled merge fields can be filled in-modal before save. */
   const [templateMergeFieldsModal, setTemplateMergeFieldsModal] = useState(null);
   const [savingTemplateMerge, setSavingTemplateMerge] = useState(false);
@@ -242,6 +220,17 @@ export default function Results() {
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
   const currencySymbol = getCurrencySymbol(config?.currency || 'USD');
+  const selectableLaunchBoxContracts = (userContracts || []).filter(
+    (contract) => contract?.status === 'draft' && !!contract?.shareable_link
+  );
+  const linkedContractShareId = extractShareIdFromContractSignUrl(configureModalLink);
+  const linkedLaunchBoxContract = linkedContractShareId
+    ? (userContracts || []).find((contract) => contract?.shareable_link === linkedContractShareId)
+    : null;
+  const launchboxContractsForDropdown =
+    linkedLaunchBoxContract && !selectableLaunchBoxContracts.some((contract) => contract.id === linkedLaunchBoxContract.id)
+      ? [linkedLaunchBoxContract, ...selectableLaunchBoxContracts]
+      : selectableLaunchBoxContracts;
   const showExcludedDeliverables = config?.show_excluded_deliverables !== false;
   const showPackageButtonsInEditMode = true;
 
@@ -949,7 +938,6 @@ export default function Results() {
     const currentModeLinks = (currentLinks[modeKey] && typeof currentLinks[modeKey] === 'object') ? { ...currentLinks[modeKey] } : {};
 
     const cfg = configRef.current || config;
-    const sym = getCurrencySymbol(cfg?.currency || 'USD');
     const tiersForMode = cfg?.active_packages?.[modeKey] || ['starter', 'growth', 'premium'];
 
     const isLaunchBoxSign =
@@ -975,6 +963,11 @@ export default function Results() {
       baseContract &&
       contractBodyHasTierScopedMergeFields(baseContract.body);
 
+    const contractsToMarkShared = [];
+    if (isLaunchBoxSign && baseContract?.id) {
+      contractsToMarkShared.push(baseContract.id);
+    }
+
     if (configureModalCopyToAll) {
       if (usePerTierLaunchBoxContracts) {
         const createdContracts = [];
@@ -982,7 +975,7 @@ export default function Results() {
           if (tier === configureModalTier) {
             currentModeLinks[tier] = linkValue;
           } else {
-            const mergeDefs = buildMergeDefsForTierClone(baseContract, cfg, tier, modeKey, sym);
+            const mergeDefs = buildMergeDefsForTierClone(baseContract, cfg, tier, modeKey);
             try {
               const created = await supabaseClient.entities.Contract.create({
                 name: baseContract.name,
@@ -990,7 +983,7 @@ export default function Results() {
                 shareable_link: crypto.randomUUID(),
                 accent_color: baseContract.accent_color || '#ff0044',
                 merge_field_definitions: mergeDefs,
-                status: 'draft',
+                status: 'shared',
                 linked_package_id: packageId || null,
                 logo_url: baseContract.logo_url || null,
                 custom_confirmation_message: baseContract.custom_confirmation_message ?? null,
@@ -999,6 +992,9 @@ export default function Results() {
                 ...(baseContract.expires_at ? { expires_at: baseContract.expires_at } : {}),
               });
               createdContracts.push(created);
+              if (created?.id) {
+                contractsToMarkShared.push(created.id);
+              }
               currentModeLinks[tier] = buildContractSignUrl(created.shareable_link);
             } catch (e) {
               console.error('Failed to clone contract for tier', tier, e);
@@ -1031,6 +1027,19 @@ export default function Results() {
       ...currentLinks,
       [modeKey]: currentModeLinks
     });
+
+    if (contractsToMarkShared.length > 0) {
+      try {
+        const uniqueIds = [...new Set(contractsToMarkShared)];
+        await Promise.all(uniqueIds.map((id) => supabaseClient.entities.Contract.update(id, { status: 'shared' })));
+        setUserContracts((prev) =>
+          (prev || []).map((c) => (uniqueIds.includes(c.id) ? { ...c, status: 'shared' } : c))
+        );
+      } catch (e) {
+        console.error('Failed to mark contracts as shared:', e);
+      }
+    }
+
     closeConfigureModal();
   };
 
@@ -1101,6 +1110,7 @@ export default function Results() {
   useEffect(() => {
     if (configureModalOption !== 'sign_contract' || !config?.created_by) return;
     const loadContracts = async () => {
+      setIsLoadingUserContracts(true);
       try {
         const [list, templates] = await Promise.all([
           supabaseClient.entities.Contract.filter(
@@ -1112,15 +1122,17 @@ export default function Results() {
             '-created_at'
           ),
         ]);
-        const selectableContracts = (list || []).filter(
-          (contract) => contract?.status !== 'signed' && !!contract?.shareable_link
+        const allContracts = (list || []).filter(
+          (contract) => !!contract?.shareable_link
         );
-        setUserContracts(selectableContracts);
+        setUserContracts(allContracts);
         setUserContractTemplates(templates || []);
       } catch (e) {
         console.error('Failed to load contracts:', e);
         setUserContracts([]);
         setUserContractTemplates([]);
+      } finally {
+        setIsLoadingUserContracts(false);
       }
     };
     loadContracts();
@@ -1141,13 +1153,11 @@ export default function Results() {
     const cfg = configRef.current || config;
     const tier = configureModalTier || 'starter';
     const modeKey = getCurrentModeKey();
-    const sym = getCurrencySymbol(cfg?.currency || 'USD');
     const mergeDefs = buildMergeFieldDefinitionsFromTemplateBody(
       selectedTemplate.body,
       cfg,
       tier,
-      modeKey,
-      sym
+      modeKey
     );
 
     try {
@@ -1161,7 +1171,7 @@ export default function Results() {
         custom_button_label: selectedTemplate.custom_button_label ?? null,
         custom_button_link: selectedTemplate.custom_button_link ?? null,
         merge_field_definitions: mergeDefs,
-        status: 'draft',
+        status: 'shared',
         linked_package_id: packageId || null,
       });
       const newContractUrl = buildContractSignUrl(newContract.shareable_link);
@@ -1172,13 +1182,18 @@ export default function Results() {
       setUserContracts((prev) => [merged, ...(prev || [])]);
 
       const unfilled = mergeDefs.filter((f) => !String(f.value ?? '').trim());
-      if (unfilled.length > 0) {
+      const requiredFields = unfilled.filter((f) => !DATE_MERGE_KEYS.has(String(f.key || '').toLowerCase()));
+      const optionalFields = unfilled.filter((f) => DATE_MERGE_KEYS.has(String(f.key || '').toLowerCase()));
+      const fieldsToPrompt = [...requiredFields, ...optionalFields];
+      if (fieldsToPrompt.length > 0) {
         setTemplateMergeFieldsModal({
           contractId: newContract.id,
           templateName: selectedTemplate.name,
           fullMergeDefs: mergeDefs,
-          unfilledFields: unfilled.map(({ key, label }) => ({ key, label: label || key })),
-          draftValues: Object.fromEntries(unfilled.map((f) => [f.key, ''])),
+          unfilledFields: fieldsToPrompt.map(({ key, label }) => ({ key, label: label || key })),
+          requiredFieldKeys: requiredFields.map((f) => f.key),
+          optionalFieldKeys: optionalFields.map((f) => f.key),
+          draftValues: Object.fromEntries(fieldsToPrompt.map((f) => [f.key, ''])),
           contractNameDraft: '',
         });
       } else {
@@ -1203,7 +1218,9 @@ export default function Results() {
   const saveTemplateMergeFieldsModal = async () => {
     const m = templateMergeFieldsModal;
     if (!m?.contractId || savingTemplateMerge) return;
-    const allFilled = m.unfilledFields.every((f) => String(m.draftValues[f.key] ?? '').trim());
+    const requiredKeys = m.requiredFieldKeys || [];
+    const optionalKeys = m.optionalFieldKeys || [];
+    const allFilled = requiredKeys.every((key) => String(m.draftValues[key] ?? '').trim());
     if (!allFilled) return;
 
     setSavingTemplateMerge(true);
@@ -1211,7 +1228,12 @@ export default function Results() {
       const newMergeDefs = m.fullMergeDefs.map((f) => {
         const isUnfilled = m.unfilledFields.some((uf) => uf.key === f.key);
         if (isUnfilled) {
-          return { ...f, value: String(m.draftValues[f.key] ?? '').trim() };
+          const userValue = String(m.draftValues[f.key] ?? '').trim();
+          const isOptionalDate = optionalKeys.includes(f.key);
+          if (isOptionalDate && !userValue) {
+            return { ...f, value: getTodayMergeDate() };
+          }
+          return { ...f, value: userValue };
         }
         return f;
       });
@@ -5011,7 +5033,7 @@ export default function Results() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">This template has blank fields</h3>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  Package name, date, and price were filled from this package automatically. Complete the fields below before you send the link to your client.
+                  Complete the required fields below before you send the link to your client. Date is optional; if left blank, today&apos;s date will be used.
                 </p>
               </div>
               <div className="px-8 pb-6 overflow-y-auto flex-1 min-h-0 space-y-4">
@@ -5038,6 +5060,11 @@ export default function Results() {
                         <label className="block text-sm font-medium text-gray-800 mb-1">
                           {f.label}
                           <span className="text-gray-400 font-mono text-xs font-normal ml-1.5">{`{${f.key}}`}</span>
+                          {(templateMergeFieldsModal.optionalFieldKeys || []).includes(f.key) ? (
+                            <span className="text-gray-400 text-xs font-normal ml-1.5">(optional)</span>
+                          ) : (
+                            <span className="text-rose-500 text-xs font-medium ml-1.5">(required)</span>
+                          )}
                         </label>
                         <Input
                           value={templateMergeFieldsModal.draftValues[f.key] ?? ''}
@@ -5046,6 +5073,11 @@ export default function Results() {
                           className="h-11 rounded-xl border-gray-200"
                           disabled={savingTemplateMerge}
                         />
+                        {(templateMergeFieldsModal.optionalFieldKeys || []).includes(f.key) && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Leave blank to use today&apos;s date automatically.
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -5067,8 +5099,8 @@ export default function Results() {
                     onClick={saveTemplateMergeFieldsModal}
                     disabled={
                       savingTemplateMerge
-                      || !templateMergeFieldsModal.unfilledFields.every((f) =>
-                        String(templateMergeFieldsModal.draftValues[f.key] ?? '').trim()
+                      || !(templateMergeFieldsModal.requiredFieldKeys || []).every((key) =>
+                        String(templateMergeFieldsModal.draftValues[key] ?? '').trim()
                       )
                     }
                   >
@@ -5144,9 +5176,11 @@ export default function Results() {
                       type="button"
                       onClick={() => {
                         setConfigureModalSignSource('launchbox');
-                        const keep = userContracts.find(c => buildContractSignUrl(c.shareable_link) === configureModalLink);
+                        const keep = (configureModalLink || '').startsWith('template::')
+                          ? userContractTemplates.some((t) => `template::${t.id}` === configureModalLink)
+                          : (userContracts || []).some((c) => buildContractSignUrl(c.shareable_link) === configureModalLink);
                         const firstTemplateValue = userContractTemplates[0] ? `template::${userContractTemplates[0].id}` : '';
-                        const fallback = userContracts[0] ? buildContractSignUrl(userContracts[0].shareable_link) : firstTemplateValue;
+                        const fallback = selectableLaunchBoxContracts[0] ? buildContractSignUrl(selectableLaunchBoxContracts[0].shareable_link) : firstTemplateValue;
                         setConfigureModalLink(keep ? configureModalLink : fallback);
                       }}
                       className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'launchbox' ? 'bg-white' : 'bg-white/80'}`}
@@ -5168,7 +5202,14 @@ export default function Results() {
                     </button>
                   </div>
                   {configureModalSignSource === 'launchbox' ? (
-                    (userContractTemplates.length > 0 || userContracts.length > 0) ? (
+                    isLoadingUserContracts ? (
+                      <div className="mb-4 p-4 rounded-2xl bg-white text-center shadow-sm">
+                        <div className="inline-flex items-center gap-2 text-sm text-gray-600">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading contracts...
+                        </div>
+                      </div>
+                    ) : (userContractTemplates.length > 0 || launchboxContractsForDropdown.length > 0) ? (
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">Select contract</label>
                         <Select value={configureModalLink || ''} onValueChange={handleLaunchboxContractSelect}>
@@ -5189,18 +5230,19 @@ export default function Results() {
                                 ))}
                               </>
                             )}
-                            {userContractTemplates.length > 0 && userContracts.length > 0 && (
+                            {userContractTemplates.length > 0 && launchboxContractsForDropdown.length > 0 && (
                               <div className="my-1 h-px bg-gray-100" />
                             )}
-                            {userContracts.length > 0 && (
+                            {launchboxContractsForDropdown.length > 0 && (
                               <>
                                 <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Use From Your Contracts:</div>
-                                {userContracts.map((c) => {
+                                {launchboxContractsForDropdown.map((c) => {
                                   const url = buildContractSignUrl(c.shareable_link);
                                   if (!url) return null;
+                                  const isConnectedSharedContract = linkedLaunchBoxContract?.id === c.id && c.status !== 'draft';
                                   return (
-                                    <SelectItem key={c.id} value={url}>
-                                      {c.name}
+                                    <SelectItem key={c.id} value={url} disabled={isConnectedSharedContract}>
+                                      {c.name}{isConnectedSharedContract ? ' (Connected - shared)' : ''}
                                     </SelectItem>
                                   );
                                 })}
@@ -5391,9 +5433,11 @@ export default function Results() {
                       type="button"
                       onClick={() => {
                         setConfigureModalSignSource('launchbox');
-                        const keep = userContracts.find(c => buildContractSignUrl(c.shareable_link) === configureModalLink);
+                        const keep = (configureModalLink || '').startsWith('template::')
+                          ? userContractTemplates.some((t) => `template::${t.id}` === configureModalLink)
+                          : (userContracts || []).some((c) => buildContractSignUrl(c.shareable_link) === configureModalLink);
                         const firstTemplateValue = userContractTemplates[0] ? `template::${userContractTemplates[0].id}` : '';
-                        const fallback = userContracts[0] ? buildContractSignUrl(userContracts[0].shareable_link) : firstTemplateValue;
+                        const fallback = selectableLaunchBoxContracts[0] ? buildContractSignUrl(selectableLaunchBoxContracts[0].shareable_link) : firstTemplateValue;
                         setConfigureModalLink(keep ? configureModalLink : fallback);
                       }}
                       className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'launchbox' ? 'bg-white' : 'bg-white/80'}`}
@@ -5415,7 +5459,14 @@ export default function Results() {
                     </button>
                   </div>
                   {configureModalSignSource === 'launchbox' ? (
-                    (userContractTemplates.length > 0 || userContracts.length > 0) ? (
+                    isLoadingUserContracts ? (
+                      <div className="mb-4 p-4 rounded-2xl bg-white text-center shadow-sm">
+                        <div className="inline-flex items-center gap-2 text-sm text-gray-600">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading contracts...
+                        </div>
+                      </div>
+                    ) : (userContractTemplates.length > 0 || launchboxContractsForDropdown.length > 0) ? (
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">Select contract</label>
                         <Select value={configureModalLink || ''} onValueChange={handleLaunchboxContractSelect}>
@@ -5436,18 +5487,19 @@ export default function Results() {
                                 ))}
                               </>
                             )}
-                            {userContractTemplates.length > 0 && userContracts.length > 0 && (
+                            {userContractTemplates.length > 0 && launchboxContractsForDropdown.length > 0 && (
                               <div className="my-1 h-px bg-gray-100" />
                             )}
-                            {userContracts.length > 0 && (
+                            {launchboxContractsForDropdown.length > 0 && (
                               <>
                                 <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Use From Your Contracts:</div>
-                                {userContracts.map((c) => {
+                                {launchboxContractsForDropdown.map((c) => {
                                   const url = buildContractSignUrl(c.shareable_link);
                                   if (!url) return null;
+                                  const isConnectedSharedContract = linkedLaunchBoxContract?.id === c.id && c.status !== 'draft';
                                   return (
-                                    <SelectItem key={c.id} value={url}>
-                                      {c.name}
+                                    <SelectItem key={c.id} value={url} disabled={isConnectedSharedContract}>
+                                      {c.name}{isConnectedSharedContract ? ' (Connected - shared)' : ''}
                                     </SelectItem>
                                   );
                                 })}

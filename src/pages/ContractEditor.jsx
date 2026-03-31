@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import TipTapEditor from '@/components/contracts/TipTapEditor';
 import {
   ArrowLeft, Save, Share2, AlertTriangle, Upload,
-  LayoutTemplate, Info, X, CheckCircle2, Loader2
+  LayoutTemplate, Info, X, CheckCircle2, Loader2, CalendarDays
 } from 'lucide-react';
 
 export default function ContractEditor() {
@@ -42,6 +44,7 @@ export default function ContractEditor() {
   const [shareableLink, setShareableLink] = useState('');
   const [status, setStatus] = useState('draft');
   const [expiresAt, setExpiresAt] = useState('');
+  const [isExpiryCalendarOpen, setIsExpiryCalendarOpen] = useState(false);
 
   const autoSaveTimer = useRef(null);
   const isNewRef = useRef(!contractId && !templateEditId);
@@ -93,6 +96,7 @@ export default function ContractEditor() {
     setConfirmationMessage(t.custom_confirmation_message || '');
     setButtonLabel(t.custom_button_label || '');
     setButtonLink(t.custom_button_link || '');
+    setMergeFieldDefs(t.merge_field_definitions || []);
     if (!createNew) {
       savedIdRef.current = t.id;
       isNewRef.current = false;
@@ -247,6 +251,27 @@ export default function ContractEditor() {
 
   const isSigned = status === 'signed';
   const isSharedOrSigned = status === 'shared' || status === 'signed';
+  const selectedExpiryDate = expiresAt ? new Date(expiresAt) : undefined;
+
+  const formatDateTimeLocal = (date) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const updateExpiryDate = (date) => {
+    if (!date) return;
+    const base = expiresAt ? new Date(expiresAt) : new Date();
+    base.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+    base.setHours(23, 59, 0, 0);
+    setExpiresAt(formatDateTimeLocal(base));
+    triggerAutoSave();
+    setIsExpiryCalendarOpen(false);
+  };
+
+  const clearExpiry = () => {
+    setExpiresAt('');
+    triggerAutoSave();
+  };
 
   if (isSigned && !isTemplate) {
     return (
@@ -358,15 +383,38 @@ export default function ContractEditor() {
           {!isTemplate && (
             <div>
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Expiration</h3>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">Expires on (optional)</label>
-                <Input
-                  type="datetime-local"
-                  value={expiresAt}
-                  onChange={(e) => { setExpiresAt(e.target.value); triggerAutoSave(); }}
-                  className="text-sm"
-                />
-                <p className="text-xs text-gray-400 mt-1">After this date, clients cannot sign. You can still view in console.</p>
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-3 space-y-3">
+                <label className="text-xs font-medium text-gray-600 block">Expires on (optional)</label>
+                <Popover open={isExpiryCalendarOpen} onOpenChange={setIsExpiryCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start rounded-xl border-gray-200 bg-white text-sm font-normal"
+                    >
+                      <CalendarDays className="w-4 h-4 text-gray-500" />
+                      {selectedExpiryDate
+                        ? selectedExpiryDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                        : 'Pick expiration date'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-0 rounded-xl border border-gray-200 shadow-xl">
+                    <Calendar
+                      mode="single"
+                      selected={selectedExpiryDate}
+                      onSelect={updateExpiryDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-400">After this date, clients cannot sign.</p>
+                  {expiresAt && (
+                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-500" onClick={clearExpiry}>
+                      Clear
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}

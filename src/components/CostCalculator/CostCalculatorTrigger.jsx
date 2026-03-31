@@ -8,6 +8,10 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
+// TooltipContent is a JS forwardRef export; some TS setups infer it too narrowly in .jsx consumers.
+// Casting here keeps this component type-safe enough while avoiding false-positive TS errors.
+const TooltipContentAny = /** @type {any} */ (TooltipContent);
+
 const NUDGE_DISMISS_KEY = 'launchbox_cost_nudge_dismissed';
 const OPENED_ONCE_KEY = 'launchbox_cost_calculator_opened_once';
 
@@ -23,30 +27,68 @@ export function CostCalculatorTrigger({
   onNudgeDismiss,
   darkMode = false,
 }) {
-  const bgColor =
-    darkMode
-      ? state === 'first_visit'
-        ? 'bg-purple-500/15'
-        : state === 'opened_incomplete'
-        ? 'bg-yellow-400/15'
-        : state === 'profitable'
-        ? 'bg-emerald-400/20'
-        : state === 'low_margin'
-        ? 'bg-amber-400/20'
-        : state === 'losing'
-        ? 'bg-rose-400/20'
-        : 'bg-white/10'
+  const darkStateStyles =
+    state === 'profitable'
+      ? {
+          bg: 'bg-emerald-500/20',
+          hoverBg: 'hover:bg-emerald-500/28',
+          border: 'border-emerald-400/40',
+          hoverBorder: 'hover:border-emerald-300/55',
+          ring: 'focus-visible:ring-2 focus-visible:ring-emerald-400/40',
+        }
+      : state === 'low_margin'
+      ? {
+          bg: 'bg-amber-500/20',
+          hoverBg: 'hover:bg-amber-500/28',
+          border: 'border-amber-400/45',
+          hoverBorder: 'hover:border-amber-300/60',
+          ring: 'focus-visible:ring-2 focus-visible:ring-amber-400/40',
+        }
+      : state === 'losing'
+      ? {
+          bg: 'bg-rose-500/20',
+          hoverBg: 'hover:bg-rose-500/28',
+          border: 'border-rose-400/40',
+          hoverBorder: 'hover:border-rose-300/55',
+          ring: 'focus-visible:ring-2 focus-visible:ring-rose-400/40',
+        }
+      : state === 'opened_incomplete'
+      ? {
+          bg: 'bg-yellow-500/15',
+          hoverBg: 'hover:bg-yellow-500/22',
+          border: 'border-yellow-300/40',
+          hoverBorder: 'hover:border-yellow-200/55',
+          ring: 'focus-visible:ring-2 focus-visible:ring-yellow-300/35',
+        }
       : state === 'first_visit'
+      ? {
+          bg: 'bg-purple-500/18',
+          hoverBg: 'hover:bg-purple-500/26',
+          border: 'border-purple-300/40',
+          hoverBorder: 'hover:border-purple-200/55',
+          ring: 'focus-visible:ring-2 focus-visible:ring-purple-300/35',
+        }
+      : {
+          bg: 'bg-white/10',
+          hoverBg: 'hover:bg-white/14',
+          border: 'border-white/25',
+          hoverBorder: 'hover:border-white/35',
+          ring: 'focus-visible:ring-2 focus-visible:ring-white/20',
+        };
+
+  const bgColor = darkMode
+    ? cn(darkStateStyles.bg, darkStateStyles.hoverBg)
+    : state === 'first_visit'
       ? 'bg-purple-100/35'
       : state === 'opened_incomplete'
-      ? 'bg-yellow-100/35'
-      : state === 'profitable'
-      ? 'bg-green-100/35'
-      : state === 'low_margin'
-      ? 'bg-amber-100/35'
-      : state === 'losing'
-      ? 'bg-red-100/35'
-      : 'bg-gray-100/35';
+        ? 'bg-yellow-100/35'
+        : state === 'profitable'
+          ? 'bg-green-100/35'
+          : state === 'low_margin'
+            ? 'bg-amber-100/35'
+            : state === 'losing'
+              ? 'bg-red-100/35'
+              : 'bg-gray-100/35';
 
   const label =
     state === 'profitable'
@@ -66,9 +108,10 @@ export function CostCalculatorTrigger({
       onClick={onClick}
       className={cn(
         'w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-dashed transition-all min-h-[44px]',
-        darkMode ? 'border-white/30' : 'border-gray-300/80',
-        darkMode ? 'hover:opacity-95' : 'hover:opacity-90',
+        darkMode ? cn(darkStateStyles.border, darkStateStyles.hoverBorder) : 'border-gray-300/80',
+        darkMode ? 'hover:opacity-100' : 'hover:opacity-90',
         'focus:outline-none focus-visible:outline-none focus-visible:ring-0',
+        darkMode && darkStateStyles.ring,
         bgColor,
         isBlinking && 'animate-cost-aura'
       )}
@@ -76,26 +119,26 @@ export function CostCalculatorTrigger({
       <span
         className={cn(
           'text-sm font-medium',
-          state === 'profitable' && (darkMode ? 'text-emerald-200' : 'text-green-700'),
-          state === 'low_margin' && (darkMode ? 'text-amber-200' : 'text-amber-800'),
-          state === 'losing' && (darkMode ? 'text-rose-200' : 'text-red-700'),
+          state === 'profitable' && (darkMode ? 'text-emerald-100' : 'text-green-700'),
+          state === 'low_margin' && (darkMode ? 'text-amber-100' : 'text-amber-800'),
+          state === 'losing' && (darkMode ? 'text-rose-100' : 'text-red-700'),
           (state === 'first_visit' || state === 'opened_incomplete') && (darkMode ? 'text-white/85' : 'text-gray-700')
         )}
       >
         {label}
       </span>
       {state === 'profitable' && marginPercent != null && !isNaN(marginPercent) && (
-        <span className={cn('text-xs', darkMode ? 'text-emerald-300' : 'text-green-600')}>
+        <span className={cn('text-xs', darkMode ? 'text-emerald-200/90' : 'text-green-600')}>
           ({marginPercent.toFixed(0)}%)
         </span>
       )}
       {state === 'low_margin' && marginPercent != null && !isNaN(marginPercent) && (
-        <span className={cn('text-xs', darkMode ? 'text-amber-300' : 'text-amber-600')}>
+        <span className={cn('text-xs', darkMode ? 'text-amber-200/90' : 'text-amber-600')}>
           ({marginPercent.toFixed(0)}%)
         </span>
       )}
       {state === 'losing' && marginPercent != null && !isNaN(marginPercent) && (
-        <span className={cn('text-xs', darkMode ? 'text-rose-300' : 'text-red-600')}>
+        <span className={cn('text-xs', darkMode ? 'text-rose-200/90' : 'text-red-600')}>
           ({marginPercent.toFixed(0)}%)
         </span>
       )}
@@ -117,7 +160,7 @@ export function CostCalculatorTrigger({
             <CircleHelp className="w-3.5 h-3.5" />
           </span>
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-[240px]">
+        <TooltipContentAny side="top" className="max-w-[240px]">
           {isCalculateYourCostState ? (
             <p>Clients won't see this. Please click to calculate your costs and profit margins.</p>
           ) : showNudgeTooltip ? (
@@ -138,7 +181,7 @@ export function CostCalculatorTrigger({
           ) : (
             <p>Clients won&apos;t see this. Please click to see your costs and profit margins.</p>
           )}
-        </TooltipContent>
+        </TooltipContentAny>
       </Tooltip>
       {isMobile && (state === 'first_visit' || state === 'opened_incomplete') && (
         <span className={cn('flex items-center gap-1 text-xs', darkMode ? 'text-white/60' : 'text-gray-500')}>

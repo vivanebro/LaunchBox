@@ -5,12 +5,13 @@ import supabaseClient from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import {
   FileSignature, Plus, LayoutTemplate, Copy, Pencil, Trash2,
-  CheckCircle2, Clock, Share2, FileText, Eye
+  CheckCircle2, Clock, Share2, FileText, Eye, Filter
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -34,6 +35,7 @@ export default function Contracts() {
   const navigate = useNavigate();
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteWarning, setDeleteWarning] = useState('');
   const [userPackages, setUserPackages] = useState([]);
@@ -119,6 +121,10 @@ export default function Contracts() {
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
+  const filteredContracts = statusFilter === 'all'
+    ? contracts
+    : contracts.filter((contract) => contract.status === statusFilter);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
@@ -136,6 +142,34 @@ export default function Contracts() {
             <p className="text-gray-500 text-sm mt-1">Create, send, and manage e-signature contracts</p>
           </div>
           <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Filter className="w-4 h-4" />
+                  {statusFilter === 'all' ? 'All' : (STATUS_CONFIG[statusFilter]?.label || 'All')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 p-1.5 rounded-xl border-0 shadow-xl">
+                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">Filter by status</div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setStatusFilter('all')} className="flex items-center justify-between rounded-lg">
+                  <span>All</span>
+                  {statusFilter === 'all' && <CheckCircle2 className="w-4 h-4 text-[#ff0044]" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('draft')} className="flex items-center justify-between rounded-lg">
+                  <span>Draft</span>
+                  {statusFilter === 'draft' && <CheckCircle2 className="w-4 h-4 text-[#ff0044]" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('shared')} className="flex items-center justify-between rounded-lg">
+                  <span>Shared</span>
+                  {statusFilter === 'shared' && <CheckCircle2 className="w-4 h-4 text-[#ff0044]" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('signed')} className="flex items-center justify-between rounded-lg">
+                  <span>Signed</span>
+                  {statusFilter === 'signed' && <CheckCircle2 className="w-4 h-4 text-[#ff0044]" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link to={createPageUrl('ContractTemplates')}>
               <Button variant="outline" className="gap-2">
                 <LayoutTemplate className="w-4 h-4" />
@@ -147,43 +181,65 @@ export default function Contracts() {
                 <Button className="gap-2 bg-[#ff0044] hover:bg-[#cc0033] text-white">
                   <Plus className="w-4 h-4" />
                   New Contract
-                  <span className="ml-1 text-xs opacity-90">▼</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuItem onClick={() => navigate(createPageUrl('ContractEditor'))} className="gap-2">
-                  <FileText className="w-4 h-4" />
-                  Write my own
+              <DropdownMenuContent align="end" className="w-72 p-1.5">
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('ContractEditor'))} className="items-start gap-3 py-3">
+                  <FileText className="w-4 h-4 mt-0.5 text-[#ff0044]" />
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-900">Write my own</div>
+                    <div className="text-xs text-gray-500">Start from scratch in the editor</div>
+                  </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled className="gap-2 opacity-50">
-                  <span className="text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">Coming soon</span>
-                  Create with Launchy
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled className="items-start gap-3 py-3 opacity-60">
+                  <div className="w-4 h-4 mt-0.5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-500">
+                    ✨
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-700">Create with Launchy</span>
+                      <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Coming soon</span>
+                    </div>
+                    <div className="text-xs text-gray-500">AI-assisted contract drafting</div>
+                  </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
 
-        {contracts.length === 0 ? (
+        {filteredContracts.length === 0 ? (
           <div className="bg-white rounded-3xl p-16 text-center shadow-sm">
             <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <FileSignature className="w-8 h-8 text-[#ff0044]" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">You don&apos;t have any contracts yet</h2>
-            <p className="text-gray-500 mb-6 max-w-sm mx-auto">
-              Create your first contract, add your branding, and send it for signature in minutes.
-            </p>
-            <Button
-              onClick={() => navigate(createPageUrl('ContractEditor'))}
-              className="bg-[#ff0044] hover:bg-[#cc0033] text-white gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Create your first contract
-            </Button>
+            {contracts.length === 0 ? (
+              <>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">You don&apos;t have any contracts yet</h2>
+                <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+                  Create your first contract, add your branding, and send it for signature in minutes.
+                </p>
+                <Button
+                  onClick={() => navigate(createPageUrl('ContractEditor'))}
+                  className="bg-[#ff0044] hover:bg-[#cc0033] text-white gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create your first contract
+                </Button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">No matching contracts</h2>
+                <p className="text-gray-500 max-w-sm mx-auto">
+                  There are no contracts in the selected status. Try another filter.
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
-            {contracts.map((contract) => {
+            {filteredContracts.map((contract) => {
               const status = STATUS_CONFIG[contract.status] || STATUS_CONFIG.draft;
               return (
                 <div
