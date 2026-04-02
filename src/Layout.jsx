@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare, BarChart2, FileSignature } from 'lucide-react';
+import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare, FileSignature } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient, { supabase } from '@/lib/supabaseClient';
 import HelpButton from '@/components/HelpButton';
@@ -277,15 +277,6 @@ export default function Layout({ children, currentPageName }) {
             >
               <Home className="w-5 h-5" />
               Dashboard
-            </Link>
-
-            <Link
-              to={createPageUrl('Analytics')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${currentPageName === 'Analytics' ? 'text-white shadow-lg' : 'text-gray-600 hover:bg-gray-50'}`}
-              style={currentPageName === 'Analytics' ? { background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)' } : {}}
-            >
-              <BarChart2 className="w-5 h-5" />
-              Analytics
             </Link>
 
             <div>

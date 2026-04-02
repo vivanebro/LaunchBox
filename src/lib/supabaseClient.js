@@ -49,6 +49,8 @@ const TABLE_COLUMNS = {
     'original_price_starter', 'original_price_growth', 'original_price_premium', 'original_price_elite',
     'original_price_starter_retainer', 'original_price_growth_retainer', 'original_price_premium_retainer', 'original_price_elite_retainer',
     'cost_data',
+    'manual_status',
+    'manual_status_updated_at',
   ]),
   users: new Set([
     'id', 'email', 'full_name', 'role', 'creator_slug', 'created_date', 'updated_date',

@@ -12,6 +12,7 @@ import jsPDF from 'jspdf';
 export default function ContractSign() {
   const [searchParams] = useSearchParams();
   const shareId = searchParams.get('shareId');
+  const isPreviewMode = searchParams.get('preview') === 'true';
 
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -157,6 +158,7 @@ export default function ContractSign() {
   };
 
   const handleSign = async () => {
+    if (isPreviewMode) return;
     if (!clientName.trim()) { setError('Please enter your name.'); return; }
     if (!sigRef.current || sigRef.current.isEmpty()) { setError('Please draw your signature.'); return; }
     setError('');
@@ -431,6 +433,7 @@ export default function ContractSign() {
                 onChange={(e) => setClientName(e.target.value)}
                 placeholder="Your full name"
                 className="max-w-sm"
+                disabled={isPreviewMode}
               />
             </div>
             <div>
@@ -441,6 +444,7 @@ export default function ContractSign() {
                 onChange={(e) => setClientEmail(e.target.value)}
                 placeholder="your@email.com"
                 className="max-w-sm"
+                disabled={isPreviewMode}
               />
             </div>
           </div>
@@ -451,12 +455,14 @@ export default function ContractSign() {
               <SignaturePad
                 ref={sigRef}
                 accentColor={accentColor}
+                disabled={isPreviewMode}
                 onChange={() => setSignatureEmpty(sigRef.current?.isEmpty() ?? true)}
               />
             </div>
             <button
               type="button"
               onClick={() => { sigRef.current?.clear(); setSignatureEmpty(true); }}
+              disabled={isPreviewMode}
               className="mt-2 flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -473,14 +479,14 @@ export default function ContractSign() {
 
           <Button
             onClick={handleSign}
-            disabled={submitting}
+            disabled={submitting || isPreviewMode}
             className="w-full sm:w-auto mt-4 py-3 px-8 rounded-xl font-semibold text-white text-base"
             style={{ backgroundColor: accentColor, minWidth: 200 }}
           >
             {submitting ? (
               <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Signing…</>
             ) : (
-              'Sign Document'
+              (isPreviewMode ? 'Preview Mode' : 'Sign Document')
             )}
           </Button>
         </div>

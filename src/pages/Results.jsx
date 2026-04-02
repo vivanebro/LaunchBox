@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature, AlertCircle } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { toPng } from 'html-to-image';
@@ -97,6 +97,18 @@ const buildContractSignUrl = (shareableLink) => {
   return `${typeof window !== 'undefined' ? window.location.origin : ''}${createPageUrl('ContractSign')}?shareId=${shareableLink}`;
 };
 
+const buildContractPreviewUrl = (contractUrl) => {
+  if (!contractUrl) return '';
+  try {
+    const u = new URL(contractUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    u.searchParams.set('preview', 'true');
+    return u.toString();
+  } catch {
+    const hasQuery = String(contractUrl).includes('?');
+    return `${contractUrl}${hasQuery ? '&' : '?'}preview=true`;
+  }
+};
+
 const PRICE_MERGE_KEYS = new Set(['price', 'total_price', 'amount', 'total']);
 const DATE_MERGE_KEYS = new Set(['date', 'contract_date', 'today']);
 
@@ -123,11 +135,41 @@ const buildMergeFieldDefinitionsFromTemplateBody = (bodyJson, cfg, tier, modeKey
 };
 
 const TIER_SCOPED_MERGE_KEYS = new Set([
-  'package_name', 'project_name', 'package', 'price', 'total_price', 'amount', 'total', 'date', 'contract_date', 'today',
+  'package_name', 'project_name', 'package', 'price', 'total_price', 'amount', 'total',
 ]);
 
 const getTodayMergeDate = () =>
   new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+const getMergeFieldValue = (defs, keys = []) => {
+  const byKey = new Map((defs || []).map((d) => [String(d?.key || '').toLowerCase(), String(d?.value || '').trim()]));
+  for (const key of keys) {
+    const v = byKey.get(String(key || '').toLowerCase());
+    if (v) return v;
+  }
+  return '';
+};
+
+const formatBundleNameFromTier = (tier) => {
+  const raw = String(tier || '').trim();
+  if (!raw) return '';
+  return raw
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
+
+const buildDefaultContractName = (mergeDefs, tier, fallbackName = 'Contract') => {
+  const clientName = getMergeFieldValue(mergeDefs, ['client_name', 'client']);
+  const packageName = getMergeFieldValue(mergeDefs, ['package_name', 'project_name', 'package']);
+  const bundleName = getMergeFieldValue(mergeDefs, ['bundle_name', 'bundle']) || formatBundleNameFromTier(tier);
+  const today = getTodayMergeDate();
+  const isSameLabel = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  const finalBundleName = isSameLabel(packageName, bundleName) ? '' : bundleName;
+  const name = [clientName, packageName, finalBundleName, today].filter(Boolean).join(' - ');
+  return name || fallbackName;
+};
 
 const contractBodyHasTierScopedMergeFields = (bodyJson) => {
   if (bodyJson == null || bodyJson === '') return false;
@@ -196,6 +238,7 @@ export default function Results() {
   const [isLoadingUserContracts, setIsLoadingUserContracts] = useState(false);
   /** After picking a contract template: unfilled merge fields can be filled in-modal before save. */
   const [templateMergeFieldsModal, setTemplateMergeFieldsModal] = useState(null);
+  const [templateContractPreviewModal, setTemplateContractPreviewModal] = useState(null);
   const [savingTemplateMerge, setSavingTemplateMerge] = useState(false);
   const [editingToggleLabels, setEditingToggleLabels] = useState(false);
   const [tempLabelOnetime, setTempLabelOnetime] = useState('');
@@ -976,9 +1019,10 @@ export default function Results() {
             currentModeLinks[tier] = linkValue;
           } else {
             const mergeDefs = buildMergeDefsForTierClone(baseContract, cfg, tier, modeKey);
+            const contractName = buildDefaultContractName(mergeDefs, tier, baseContract.name || 'Contract');
             try {
               const created = await supabaseClient.entities.Contract.create({
-                name: baseContract.name,
+                name: contractName,
                 body: baseContract.body,
                 shareable_link: crypto.randomUUID(),
                 accent_color: baseContract.accent_color || '#ff0044',
@@ -1159,10 +1203,11 @@ export default function Results() {
       tier,
       modeKey
     );
+    const contractName = buildDefaultContractName(mergeDefs, tier, selectedTemplate.name || 'Contract');
 
     try {
       const newContract = await supabaseClient.entities.Contract.create({
-        name: selectedTemplate.name,
+        name: contractName,
         body: selectedTemplate.body,
         shareable_link: crypto.randomUUID(),
         accent_color: selectedTemplate.accent_color || cfg?.brand_color || '#ff0044',
@@ -1188,6 +1233,7 @@ export default function Results() {
       if (fieldsToPrompt.length > 0) {
         setTemplateMergeFieldsModal({
           contractId: newContract.id,
+          contractUrl: newContractUrl || '',
           templateName: selectedTemplate.name,
           fullMergeDefs: mergeDefs,
           unfilledFields: fieldsToPrompt.map(({ key, label }) => ({ key, label: label || key })),
@@ -1195,6 +1241,7 @@ export default function Results() {
           optionalFieldKeys: optionalFields.map((f) => f.key),
           draftValues: Object.fromEntries(fieldsToPrompt.map((f) => [f.key, ''])),
           contractNameDraft: '',
+          tier,
         });
       } else {
         setTemplateMergeFieldsModal(null);
@@ -1237,7 +1284,8 @@ export default function Results() {
         }
         return f;
       });
-      const name = (m.contractNameDraft || '').trim() || m.templateName;
+      const explicitName = (m.contractNameDraft || '').trim();
+      const name = explicitName || buildDefaultContractName(newMergeDefs, m.tier, m.templateName || 'Contract');
       await supabaseClient.entities.Contract.update(m.contractId, {
         name,
         merge_field_definitions: newMergeDefs,
@@ -1249,6 +1297,11 @@ export default function Results() {
         )
       );
       setTemplateMergeFieldsModal(null);
+      setTemplateContractPreviewModal({
+        name,
+        contractUrl: buildContractPreviewUrl(m.contractUrl || ''),
+        showDisclaimer: true,
+      });
     } catch (e) {
       console.error('Failed to save contract merge fields:', e);
     } finally {
@@ -5044,12 +5097,12 @@ export default function Results() {
                   <Input
                     value={templateMergeFieldsModal.contractNameDraft}
                     onChange={(e) => updateTemplateMergeContractName(e.target.value)}
-                    placeholder={templateMergeFieldsModal.templateName}
+                    placeholder="e.g. Agreemental Contract - Growth for Lucia"
                     className="h-11 rounded-xl border-gray-200"
                     disabled={savingTemplateMerge}
                   />
                   <p className="text-xs text-gray-400 mt-1">
-                    Leave blank to use the template name: <span className="font-medium text-gray-500">{templateMergeFieldsModal.templateName}</span>
+                    Leave blank to auto-name as client, package, bundle, and today&apos;s date.
                   </p>
                 </div>
                 <div>
@@ -5110,10 +5163,100 @@ export default function Results() {
                         Saving…
                       </>
                     ) : (
-                      'Save Contract'
+                      'Save and Preview'
                     )}
                   </Button>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Template contract preview modal (shown right after save) */}
+      <AnimatePresence>
+        {templateContractPreviewModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4"
+            onClick={() => setTemplateContractPreviewModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ type: 'spring', duration: 0.35 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl h-[82vh] border border-gray-100 flex flex-col overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-gray-900 truncate">Contract Preview</h3>
+                  <p className="text-xs text-gray-500 truncate">{templateContractPreviewModal.name}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!!templateContractPreviewModal.contractUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded-xl border-gray-200"
+                      onClick={() => {
+                        window.open(templateContractPreviewModal.contractUrl, '_blank');
+                      }}
+                    >
+                      Open Full Preview
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    className="h-9 rounded-xl text-white"
+                    style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                    onClick={() => setTemplateContractPreviewModal(null)}
+                  >
+                    Looks Good
+                  </Button>
+                </div>
+              </div>
+              {templateContractPreviewModal.showDisclaimer !== false && (
+                <div className="px-6 py-4 border-b border-amber-100 bg-gradient-to-r from-amber-50 via-amber-50/70 to-orange-50/60">
+                  <div className="rounded-2xl border border-amber-200/80 bg-white/70 backdrop-blur-sm p-3.5 flex items-start gap-3 shadow-sm">
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertCircle className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-amber-900">Before you share</p>
+                      <p className="text-xs text-amber-900/90 leading-relaxed mt-1">
+                        Template fields are auto-filled, and this is the exact contract your client will receive.
+                        You can still edit it in Contracts while it is shared, until the client signs.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTemplateContractPreviewModal((prev) => (prev ? { ...prev, showDisclaimer: false } : null))
+                      }
+                      className="h-7 w-7 inline-flex items-center justify-center rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-100/70 transition-colors shrink-0"
+                      aria-label="Dismiss disclaimer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="flex-1 bg-gray-50">
+                {templateContractPreviewModal.contractUrl ? (
+                  <iframe
+                    title="Contract Preview"
+                    src={templateContractPreviewModal.contractUrl}
+                    className="w-full h-full border-0"
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-sm text-gray-500">
+                    Preview link is unavailable for this contract.
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

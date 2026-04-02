@@ -36,7 +36,7 @@ const COMMON_BONUSES = [
   'Caption writing',
   'Hashtag strategy',
   'Video hosting setup',
-  'Analytics dashboard',
+  'Dashboard insights',
   'Performance report',
   'Competitor analysis',
   'Brand style guide',
