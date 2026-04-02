@@ -9,6 +9,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import ClientsProjects from './pages/ClientsProjects';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -49,7 +50,17 @@ const AuthenticatedApp = () => {
           <MainPage />
         </LayoutWrapper>
       } />
-      {Object.entries(Pages).map(([path, Page]) => (
+      <Route
+        path="/ClientsProjects/*"
+        element={
+          <LayoutWrapper currentPageName="ClientsProjects">
+            <ClientsProjects />
+          </LayoutWrapper>
+        }
+      />
+      {Object.entries(Pages)
+        .filter(([path]) => path !== 'ClientsProjects')
+        .map(([path, Page]) => (
         <Route
           key={path}
           path={`/${path}`}

@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import AssignContractFolderMenu from '@/components/folders/AssignContractFolderMenu';
 
 const STATUS_CONFIG = {
   draft: { label: 'Draft', className: 'bg-gray-100 text-gray-600' },
@@ -40,11 +41,13 @@ export default function Contracts() {
   const [deleteWarning, setDeleteWarning] = useState('');
   const [userPackages, setUserPackages] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     const load = async () => {
       try {
         const user = await supabaseClient.auth.me();
+        setCurrentUser(user);
         const [contractList, packageList] = await Promise.all([
           supabaseClient.entities.Contract.filter({ created_by: user.id }, '-created_at'),
           supabaseClient.entities.PackageConfig.filter({ created_by: user.id }, '-created_date'),
@@ -270,6 +273,22 @@ export default function Contracts() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <AssignContractFolderMenu
+                      contractId={contract.id}
+                      userId={currentUser?.id}
+                      initialFolderId={contract.folder_id}
+                      onFolderChange={(folderId) => {
+                        setContracts((prev) =>
+                          prev.map((c) => (c.id === contract.id ? { ...c, folder_id: folderId } : c))
+                        );
+                      }}
+                      variant="outline"
+                      className={
+                        contract.folder_id
+                          ? 'border-transparent bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100'
+                          : 'border-transparent bg-white text-gray-500 hover:bg-gray-50'
+                      }
+                    />
                     {contract.shareable_link && (
                       <Button
                         variant="ghost"

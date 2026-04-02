@@ -51,9 +51,14 @@ const TABLE_COLUMNS = {
     'cost_data',
     'manual_status',
     'manual_status_updated_at',
+    'folder_id',
+  ]),
+  folders: new Set([
+    'id', 'name', 'parent_id', 'created_by', 'is_example', 'created_date', 'updated_date',
   ]),
   users: new Set([
     'id', 'email', 'full_name', 'role', 'creator_slug', 'created_date', 'updated_date',
+    'hide_copy_link_folder_prompt',
   ]),
   help_requests: new Set([
     'id', 'message', 'status', 'created_by', 'created_date', 'updated_date',
@@ -70,7 +75,7 @@ const TABLE_COLUMNS = {
     'id', 'created_by', 'name', 'body', 'merge_field_definitions',
     'logo_url', 'accent_color', 'custom_confirmation_message',
     'custom_button_label', 'custom_button_link', 'status',
-    'shareable_link', 'linked_package_id', 'expires_at',
+    'shareable_link', 'linked_package_id', 'folder_id', 'expires_at',
     'created_at', 'updated_at',
   ]),
   contract_templates: new Set([
@@ -195,6 +200,7 @@ const createEntityHelper = (tableName, isServiceRole = false) => {
 
 export const entities = {
   User: createEntityHelper('users'),
+  Folder: createEntityHelper('folders'),
   PackageConfig: createEntityHelper('package_configs'),
   AccessCode: createEntityHelper('access_codes'),
   HealthReport: createEntityHelper('health_reports'),
@@ -207,6 +213,7 @@ export const entities = {
 
 export const entitiesAsServiceRole = {
   User: createEntityHelper('users', true),
+  Folder: createEntityHelper('folders', true),
   PackageConfig: createEntityHelper('package_configs', true),
   AccessCode: createEntityHelper('access_codes', true),
   HealthReport: createEntityHelper('health_reports', true),

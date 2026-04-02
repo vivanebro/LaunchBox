@@ -25,6 +25,10 @@ import {
   setNudgeDismissed,
 } from '@/components/CostCalculator/CostCalculatorTrigger';
 import { extractMergeFieldKeys } from '@/components/contracts/MergeFieldExtension';
+import { toast } from '@/components/ui/use-toast';
+import AssignFolderMenu from '@/components/folders/AssignFolderMenu';
+import CopyLinkFolderPrompt from '@/components/folders/CopyLinkFolderPrompt';
+import { takePendingFolderId } from '@/lib/folderUtils';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
 
@@ -226,6 +230,8 @@ export default function Results() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showLinksModal, setShowLinksModal] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
+  const [showCopyLinkFolderPrompt, setShowCopyLinkFolderPrompt] = useState(false);
   const [configureModalTier, setConfigureModalTier] = useState(null);
   const [configureModalStep, setConfigureModalStep] = useState(1);
   const [configureModalOption, setConfigureModalOption] = useState('lock_your_spot');
@@ -289,6 +295,18 @@ export default function Results() {
     };
   }, [costCalculatorTier]);
 
+  useEffect(() => {
+    let cancelled = false;
+    supabaseClient.auth
+      .me()
+      .then((u) => {
+        if (!cancelled) setProfileUser(u);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     // Load Sour Gummy font
@@ -1569,6 +1587,11 @@ export default function Results() {
       if (typeof configToSave.popularPackageIndex === 'number' || !configToSave.popularPackageIndex) {
       const val = typeof configToSave.popularPackageIndex === 'number' ? configToSave.popularPackageIndex : 2;
       configToSave.popularPackageIndex = { onetime: val, retainer: val };
+      }
+
+      const pendingFolder = takePendingFolderId();
+      if (pendingFolder) {
+        configToSave.folder_id = pendingFolder;
       }
 
       // Use the packageId from state (which is kept in sync and validated)
@@ -4359,6 +4382,16 @@ export default function Results() {
             <Undo2 className="w-4 h-4 mr-2" />
             Undo
           </Button>
+          {!isPreviewMode && packageId && profileUser?.id && (
+            <AssignFolderMenu
+              packageId={packageId}
+              userId={profileUser.id}
+              initialFolderId={config?.folder_id}
+              onFolderChange={(fid) => {
+                setConfig((c) => (c ? { ...c, folder_id: fid } : c));
+              }}
+            />
+          )}
         </div>
 
         <div className="text-center">
@@ -4873,6 +4906,31 @@ export default function Results() {
               </>
             )}
           </Button>
+          {packageId && (
+            <Button
+              onClick={async () => {
+                const baseUrl = window.location.origin;
+                const currentUser = await supabaseClient.auth.me();
+                const previewPath = await getPublicPreviewPath(
+                  { ...(configRef.current || config || {}), id: packageId },
+                  currentUser
+                );
+                await navigator.clipboard.writeText(baseUrl + previewPath);
+                toast({ title: 'Link copied!' });
+                const u = await supabaseClient.auth.me();
+                setProfileUser(u);
+                if (!isPreviewMode && !u?.hide_copy_link_folder_prompt) {
+                  setShowCopyLinkFolderPrompt(true);
+                }
+              }}
+              variant="outline"
+              className="h-12 px-8 font-semibold rounded-full bg-white border-2 text-blue-600 hover:bg-blue-50"
+              style={{ borderColor: `${brandColor}40` }}
+            >
+              <LinkIcon className="w-4 h-4 mr-2" />
+              Copy Link
+            </Button>
+          )}
           {packageId && (
             <Button
               onClick={async () => {
@@ -5849,6 +5907,11 @@ export default function Results() {
                           price_elite_retainer: latestConfig.price_elite_retainer
                         };
 
+                        const pendingFolder = takePendingFolderId();
+                        if (pendingFolder) {
+                          configToSave.folder_id = pendingFolder;
+                        }
+
                         let savedPackageId = packageId;
 
                         if (packageId) {
@@ -5904,6 +5967,29 @@ export default function Results() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {!isPreviewMode && (
+        <CopyLinkFolderPrompt
+          open={showCopyLinkFolderPrompt}
+          onOpenChange={(o) => {
+            setShowCopyLinkFolderPrompt(o);
+            if (!o) {
+              supabaseClient.auth.me().then(setProfileUser).catch(() => {});
+            }
+          }}
+          packageId={packageId}
+          userId={profileUser?.id}
+          onAssigned={async () => {
+            if (!packageId) return;
+            try {
+              const p = await supabaseClient.entities.PackageConfig.get(packageId);
+              setConfig((c) => (c ? { ...c, folder_id: p.folder_id } : c));
+            } catch (e) {
+              console.error(e);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

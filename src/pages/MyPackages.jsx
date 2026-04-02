@@ -17,6 +17,8 @@ import {
   Code,
   BarChart3,
 } from 'lucide-react';
+import AssignFolderMenu from '@/components/folders/AssignFolderMenu';
+import CopyLinkFolderPrompt from '@/components/folders/CopyLinkFolderPrompt';
 import { createPageUrl } from '@/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { fetchAnalyticsForPackages } from '@/lib/packageAnalytics';
@@ -74,6 +76,7 @@ export default function MyPackages() {
   const [panelOpenId, setPanelOpenId] = useState(null);
   const [confirmWonLost, setConfirmWonLost] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [copyPromptPkg, setCopyPromptPkg] = useState(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -171,6 +174,9 @@ export default function MyPackages() {
       await navigator.clipboard.writeText(baseUrl + previewPath);
       const t = toast({ title: pick(COPY_TOASTS) });
       setTimeout(() => t.dismiss(), 2000);
+      if (!currentUser?.hide_copy_link_folder_prompt) {
+        setCopyPromptPkg(pkg);
+      }
     } catch (error) {
       console.error('Error copying link:', error);
       alert('Failed to copy link');
@@ -562,6 +568,17 @@ export default function MyPackages() {
                             </Button>
                           </div>
 
+                          <div className="w-full flex justify-center py-1">
+                            <AssignFolderMenu
+                              packageId={pkg.id}
+                              userId={currentUser?.id}
+                              initialFolderId={pkg.folder_id}
+                              onFolderChange={() => loadPackages()}
+                              variant="outline"
+                              className="w-full justify-between max-w-full"
+                            />
+                          </div>
+
                           <div className="grid grid-cols-4 gap-2">
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -652,6 +669,19 @@ export default function MyPackages() {
           pkg={panelPkg}
           analytics={panelAnalytics}
           isMobile={isMobile}
+        />
+
+        <CopyLinkFolderPrompt
+          open={!!copyPromptPkg}
+          onOpenChange={(o) => {
+            if (!o) {
+              setCopyPromptPkg(null);
+              supabaseClient.auth.me().then(setCurrentUser).catch(() => {});
+            }
+          }}
+          packageId={copyPromptPkg?.id}
+          userId={currentUser?.id}
+          onAssigned={() => loadPackages()}
         />
 
         <AlertDialog open={!!confirmWonLost} onOpenChange={(o) => !o && setConfirmWonLost(null)}>

@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import TipTapEditor from '@/components/contracts/TipTapEditor';
+import { takePendingContractFolderId } from '@/lib/folderUtils';
 import {
   ArrowLeft, Save, Share2, AlertTriangle, Upload,
   LayoutTemplate, Info, X, CheckCircle2, Loader2, CalendarDays
@@ -144,10 +145,12 @@ export default function ContractEditor() {
         if (isNewRef.current) {
           const link = crypto.randomUUID();
           setShareableLink(link);
+          const pendingFolderId = takePendingContractFolderId();
           const created = await supabaseClient.entities.Contract.create({
             ...buildPayload(),
             shareable_link: link,
             status: 'draft',
+            folder_id: pendingFolderId || null,
           });
           savedIdRef.current = created.id;
           isNewRef.current = false;

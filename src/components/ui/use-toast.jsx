@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 
 const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+/** Delay after dismiss before removing from DOM (cleanup after close animation). */
+const TOAST_REMOVE_DELAY = 500;
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -112,15 +113,21 @@ function dispatch(action) {
 
 function toast({ ...props }) {
   const id = genId();
+  let autoDismissTimeout;
+
+  const dismiss = () => {
+    if (autoDismissTimeout) {
+      clearTimeout(autoDismissTimeout);
+      autoDismissTimeout = null;
+    }
+    dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id });
+  };
 
   const update = (props) =>
     dispatch({
       type: actionTypes.UPDATE_TOAST,
       toast: { ...props, id },
     });
-
-  const dismiss = () =>
-    dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id });
 
   dispatch({
     type: actionTypes.ADD_TOAST,
@@ -133,6 +140,10 @@ function toast({ ...props }) {
       },
     },
   });
+
+  autoDismissTimeout = setTimeout(() => {
+    dismiss();
+  }, 5000);
 
   return {
     id,
