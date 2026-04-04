@@ -6,16 +6,15 @@ import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 
 import StepIndicator from '../components/builder/StepIndicator';
-import Step1PackageName from '../components/builder/Step1PackageName';
-import Step5Deliverables from '../components/builder/Step5Deliverables';
-import Step6Extras from '../components/builder/Step6Extras';
-import Step7Duration from '../components/builder/Step7Duration';
-import Step8Pricing from '../components/builder/Step8Pricing';
-import Step9Guarantee from '../components/builder/Step9Guarantee';
-import Step10Urgency from '../components/builder/Step10Urgency';
-import Step11Branding from '../components/builder/Step11Branding';
+import Step1Name from '../components/builder/Step1Name';
+import Step2Deliverables from '../components/builder/Step2Deliverables';
+import Step3Bonuses from '../components/builder/Step3Bonuses';
+import Step4Duration from '../components/builder/Step4Duration';
+import Step5Pricing from '../components/builder/Step5Pricing';
+import Step6Urgency from '../components/builder/Step6Urgency';
+import Step7Guarantee from '../components/builder/Step7Guarantee';
 
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 7;
 
 export default function PackageBuilder() {
   const [step, setStep] = useState(1);
@@ -142,7 +141,7 @@ export default function PackageBuilder() {
       case 1: return config.package_set_name?.trim().length > 0;
       case 2: return config.core_deliverables?.length > 0;
       case 4: return config.project_duration;
-      case 5: return config.price_range;
+      case 5: return config.typical_price > 0;
       default: return true;
     }
   };
@@ -219,14 +218,13 @@ export default function PackageBuilder() {
             transition={{ duration: 0.3 }}
             className="bg-white rounded-3xl p-8 shadow-lg border border-gray-200"
           >
-            {step === 1 && <Step1PackageName data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 2 && <Step5Deliverables data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 3 && <Step6Extras data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 4 && <Step7Duration data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 5 && <Step8Pricing data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 6 && <Step9Guarantee data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 7 && <Step10Urgency data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 8 && <Step11Branding data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 1 && <Step1Name data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 2 && <Step2Deliverables data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 3 && <Step3Bonuses data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 4 && <Step4Duration data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 5 && <Step5Pricing data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 6 && <Step6Urgency data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 7 && <Step7Guarantee data={config} onChange={updateConfig} onNext={handleNext} />}
           </motion.div>
         </AnimatePresence>
 
