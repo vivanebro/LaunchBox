@@ -18,7 +18,7 @@ export default function Step1Name({ data, onChange, onNext }) {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-4xl font-bold mb-3 text-gray-900">Name your package set</h2>
+        <h2 className="text-3xl font-bold mb-3 text-gray-900">Name your package set</h2>
         <p className="text-gray-500 text-base">This will show in the link you send clients.</p>
         <div className="flex items-center gap-1 mt-2 pl-0">
           <Link className="w-4 h-4 text-gray-400 flex-shrink-0 mr-1" />
@@ -28,12 +28,12 @@ export default function Step1Name({ data, onChange, onNext }) {
       </div>
 
       <div>
-        <div className="flex items-center gap-3 h-16 px-6 bg-gray-100 rounded-full focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-          <Package className="w-5 h-5 text-gray-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 h-12 px-5 bg-gray-100 rounded-full focus-within:bg-white focus-within:shadow-sm focus-within:ring-1 focus-within:ring-gray-300 transition-all">
+          <Package className="w-4 h-4 text-gray-400 flex-shrink-0" />
           <input
             value={name}
             onChange={(e) => onChange({ package_set_name: e.target.value })}
-            className="flex-1 text-lg bg-transparent outline-none text-gray-900 placeholder:text-gray-400"
+            className="flex-1 text-base bg-transparent outline-none text-gray-900 placeholder:text-gray-400"
             placeholder="e.g., Luxury Home Staging, HVAC Service Plan, Brand Video Package"
             autoFocus
           />
