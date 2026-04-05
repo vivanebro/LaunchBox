@@ -20,6 +20,11 @@ export default function Step1Name({ data, onChange, onNext }) {
       <div>
         <h2 className="text-4xl font-bold mb-3 text-gray-900">Name your package set</h2>
         <p className="text-gray-500 text-base">This will show in the link you send clients.</p>
+        <div className="flex items-center gap-1 mt-2 pl-0">
+          <Link className="w-4 h-4 text-gray-400 flex-shrink-0 mr-1" />
+          <span className="text-sm text-gray-400">launch-box.io/yourbrand/</span>
+          {slug && <span className="text-sm font-medium text-gray-700">{slug}</span>}
+        </div>
       </div>
 
       <div>
@@ -33,14 +38,6 @@ export default function Step1Name({ data, onChange, onNext }) {
             autoFocus
           />
         </div>
-
-        {slug && (
-          <div className="flex items-center gap-2 mt-3 pl-6">
-            <Link className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span className="text-sm text-gray-400">launch-box.io/yourbrand/</span>
-            <span className="text-sm font-medium text-gray-700">{slug}</span>
-          </div>
-        )}
       </div>
     </div>
   );
