@@ -1,60 +1,65 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, GripVertical, Plus, ArrowRight, Check } from 'lucide-react';
+import { X, GripVertical, Plus, ArrowRight, Check, Minus } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
-const COMMON_DELIVERABLES = [
-  // Marketing & Ads
-  'High-converting ad creatives',
-  'Strategic content plan',
-  'Full content management',
-  'Monthly performance report',
-  'On-trend social media shorts',
-  'Brand story video',
-  'Email campaign setup',
-  'SEO audit and recommendations',
-  // Design & Web
-  'Conversion-optimized website',
-  'Mobile-responsive design',
-  'SEO foundation setup',
-  'Brand identity package',
-  'Logo and visual identity',
-  'UI/UX design',
-  '3D visualization',
-  // Photography & Video
-  'Professional photo gallery',
-  'Edited highlights collection',
-  'Print-ready files',
-  'High-quality video production',
-  'Testimonial video',
-  'Event highlight video',
-  // Consulting & Coaching
-  'Weekly 1-on-1 strategy sessions',
-  'Custom growth roadmap',
-  'Implementation support',
-  'Business audit and action plan',
-  'Quarterly business review',
-  // Operations & Finance
-  'Monthly financial statements',
-  'Tax-ready reporting',
-  'Cash flow tracking',
-  'Process documentation',
-  'System setup and configuration',
-  // General high-value
-  'Full project management',
-  'Dedicated account manager',
-  'Custom solution design',
-  'End-to-end delivery',
-  'Results tracking dashboard',
-];
+const CATEGORIZED_DELIVERABLES = {
+  'Home Services': [
+    'Complete system installation with warranty',
+    'Full property inspection and assessment',
+    'Custom design tailored to your property',
+    'Professional photo documentation (before/after)',
+    '30-day post-project quality check',
+  ],
+  'Marketing & Creative': [
+    'High-converting ad creatives',
+    '3x Hook variations',
+    'Strategic content plan with posting calendar',
+    'Full content management across platforms',
+    'Monthly performance report',
+    'On-trend social media shorts (ready to post)',
+  ],
+  'Tech & IT': [
+    'Zero-downtime guarantee',
+    'Bulletproof security setup',
+    'Same-day issue resolution',
+    'Monthly peace-of-mind health report',
+    'Dedicated tech team on standby',
+  ],
+  'Finance & Operations': [
+    'Stress-free monthly bookkeeping',
+    'Tax-ready financial statements',
+    'Clear cash flow visibility',
+    'Monthly strategy call',
+    '24/7 account manager',
+  ],
+  'Automotive': [
+    'Showroom-level finish inside and out',
+    'Paint correction and scratch removal',
+    'Long-lasting ceramic protection',
+    'Interior deep clean and sanitization',
+    'Detailed before/after photo report',
+  ],
+  'Pest Control': [
+    'Full property pest-free guarantee',
+    'Comprehensive interior and exterior treatment',
+    'Seasonal prevention program',
+    'Same-day emergency response',
+    'Detailed inspection report with photos',
+  ],
+};
 
 export default function Step2Deliverables({ data, onChange, onNext }) {
   const [deliverables, setDeliverables] = React.useState(() => {
     const existing = data.core_deliverables || [];
-    return existing.map(d => ({ ...d, id: d.id || `${Date.now()}-${Math.random()}` }));
+    return existing.map(d => ({
+      ...d,
+      id: d.id || `${Date.now()}-${Math.random()}`,
+      quantity: d.quantity || 1
+    }));
   });
   const [inputValue, setInputValue] = React.useState('');
   const [open, setOpen] = React.useState(false);
@@ -94,9 +99,19 @@ export default function Step2Deliverables({ data, onChange, onNext }) {
   const addDeliverable = (type) => {
     if (!type.trim()) return;
 
+    // Parse quantity if the text starts with a number like "3x "
+    let quantity = 1;
+    let cleanType = type.trim();
+    const qtyMatch = cleanType.match(/^(\d+)\s*x\s+(.+)$/i);
+    if (qtyMatch) {
+      quantity = parseInt(qtyMatch[1]);
+      cleanType = qtyMatch[2];
+    }
+
     const newDeliverables = [...deliverables, {
       id: `${Date.now()}-${Math.random()}`,
-      type: type.trim()
+      type: cleanType,
+      quantity
     }];
     setDeliverables(newDeliverables);
     updateParentConfig(newDeliverables);
@@ -110,6 +125,18 @@ export default function Step2Deliverables({ data, onChange, onNext }) {
     const newDeliverables = deliverables.filter(d => d.id !== id);
     setDeliverables(newDeliverables);
     updateParentConfig(newDeliverables);
+  };
+
+  const updateQuantity = (id, delta) => {
+    const updated = deliverables.map(d => {
+      if (d.id === id) {
+        const newQty = Math.max(1, (d.quantity || 1) + delta);
+        return { ...d, quantity: newQty };
+      }
+      return d;
+    });
+    setDeliverables(updated);
+    updateParentConfig(updated);
   };
 
   const startEdit = (deliverable) => {
@@ -166,16 +193,76 @@ export default function Step2Deliverables({ data, onChange, onNext }) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-4xl font-bold mb-4 text-gray-900">What will your client walk away with?</h2>
-        <p className="text-gray-600">List everything they get. Think outcomes, not process. Add as many as you can.</p>
+        <h2 className="text-3xl font-bold mb-3 text-gray-900">Deliverables</h2>
+        <p className="text-gray-500 text-base">Think outcomes, not process. What will your client walk away with?</p>
+        <p className="text-sm text-gray-400 mt-2">"Complete kitchen renovation" not "80 hours of labor + materials"</p>
       </div>
 
+      {/* Input area - ABOVE the list */}
+      <div>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 h-12 bg-gray-100 border-0 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:ring-1 focus:ring-gray-300 rounded-full px-5"
+              placeholder={deliverables.length === 0
+                ? "Your core service (e.g., full home renovation, brand video, monthly bookkeeping)"
+                : "Add another deliverable..."
+              }
+              autoFocus
+            />
+            <Button
+              onClick={() => addDeliverable(inputValue)}
+              disabled={!inputValue.trim()}
+              className="h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full disabled:opacity-50 flex-shrink-0"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+          </div>
+
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium pl-1">
+                <Plus className="w-4 h-4" />
+                Browse ideas for inspiration
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[420px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search deliverables..." />
+                <CommandList>
+                  <CommandEmpty>No match found. Type your own above.</CommandEmpty>
+                  {Object.entries(CATEGORIZED_DELIVERABLES).map(([category, items]) => (
+                    <CommandGroup key={category} heading={category}>
+                      {items.map((item) => (
+                        <CommandItem
+                          key={item}
+                          value={item}
+                          onSelect={() => addDeliverable(item)}
+                          className="cursor-pointer"
+                        >
+                          {item}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {/* Deliverables list - BELOW the input */}
       {deliverables.length > 0 && (
         <DragDropContext onDragEnd={onDragEnd}>
           <Droppable droppableId="deliverables">
             {(provided) => (
               <div
-                className="space-y-3 mb-6"
+                className="space-y-2"
                 {...provided.droppableProps}
                 ref={provided.innerRef}
               >
@@ -185,18 +272,18 @@ export default function Step2Deliverables({ data, onChange, onNext }) {
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        className={`flex gap-3 items-center rounded-xl p-4 border-2 transition-all ${
+                        className={`flex gap-3 items-center rounded-xl p-3 transition-all ${
                           snapshot.isDragging
-                            ? 'bg-blue-50 border-blue-300 shadow-lg scale-105'
-                            : 'bg-white border-gray-200 hover:border-gray-300'
+                            ? 'bg-blue-50 shadow-lg scale-105'
+                            : 'bg-gray-50 hover:bg-gray-100'
                         }`}
                       >
                         <div
                           {...provided.dragHandleProps}
-                          className="cursor-grab active:cursor-grabbing p-2 -ml-1 -my-1 rounded-lg hover:bg-gray-100 transition-colors"
+                          className="cursor-grab active:cursor-grabbing p-1 rounded-lg hover:bg-gray-200 transition-colors"
                           title="Drag to reorder"
                         >
-                          <GripVertical className="w-5 h-5 text-gray-400" />
+                          <GripVertical className="w-4 h-4 text-gray-400" />
                         </div>
 
                         {editingId === deliverable.id ? (
@@ -205,32 +292,53 @@ export default function Step2Deliverables({ data, onChange, onNext }) {
                               value={editValue}
                               onChange={(e) => setEditValue(e.target.value)}
                               onKeyDown={(e) => handleEditKeyDown(e, deliverable.id)}
-                              className="flex-1 h-10 bg-white border-gray-300 text-gray-900"
+                              className="flex-1 h-9 bg-white border-gray-300 text-gray-900 text-sm"
                               autoFocus
                             />
                             <Button
                               onClick={() => saveEdit(deliverable.id)}
                               variant="ghost"
                               size="icon"
-                              className="h-10 w-10 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full flex-shrink-0"
-                              title="Save"
+                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full flex-shrink-0"
                             >
-                              <Check className="w-5 h-5" />
+                              <Check className="w-4 h-4" />
                             </Button>
                             <Button
                               onClick={cancelEdit}
                               variant="ghost"
                               size="icon"
-                              className="h-10 w-10 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full flex-shrink-0"
-                              title="Cancel"
+                              className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full flex-shrink-0"
                             >
-                              <X className="w-5 h-5" />
+                              <X className="w-4 h-4" />
                             </Button>
                           </>
                         ) : (
                           <>
+                            {/* Quantity controls */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {(deliverable.quantity || 1) > 1 && (
+                                <button
+                                  onClick={() => updateQuantity(deliverable.id, -1)}
+                                  className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                              )}
+                              {(deliverable.quantity || 1) > 1 && (
+                                <span className="text-sm font-semibold text-indigo-600 w-6 text-center">
+                                  {deliverable.quantity}x
+                                </span>
+                              )}
+                              <button
+                                onClick={() => updateQuantity(deliverable.id, 1)}
+                                className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+
                             <div
-                              className="flex-1 font-medium text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors"
+                              className="flex-1 text-sm font-medium text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors"
                               onClick={() => startEdit(deliverable)}
                               title="Click to edit"
                             >
@@ -241,10 +349,9 @@ export default function Step2Deliverables({ data, onChange, onNext }) {
                               onClick={() => removeDeliverable(deliverable.id)}
                               variant="ghost"
                               size="icon"
-                              className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full flex-shrink-0"
-                              title="Remove"
+                              className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full flex-shrink-0"
                             >
-                              <X className="w-5 h-5" />
+                              <X className="w-4 h-4" />
                             </Button>
                           </>
                         )}
@@ -257,66 +364,6 @@ export default function Step2Deliverables({ data, onChange, onNext }) {
             )}
           </Droppable>
         </DragDropContext>
-      )}
-
-      <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-indigo-200">
-        <div className="space-y-3">
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full h-12 border-2 border-indigo-300 hover:border-indigo-400 bg-white justify-start text-left font-normal"
-              >
-                <Plus className="w-4 h-4 mr-2 text-indigo-600" />
-                <span className="text-gray-600">Browse ideas...</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[400px] p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Search deliverables..." />
-                <CommandList>
-                  <CommandEmpty>No match found. Type your own below.</CommandEmpty>
-                  <CommandGroup>
-                    {COMMON_DELIVERABLES.map((item) => (
-                      <CommandItem
-                        key={item}
-                        value={item}
-                        onSelect={() => addDeliverable(item)}
-                        className="cursor-pointer"
-                      >
-                        {item}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-
-          <div className="flex gap-2">
-            <Input
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1 h-12 bg-white border-2 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-indigo-400"
-              placeholder="Or type your own..."
-            />
-            <Button
-              onClick={() => addDeliverable(inputValue)}
-              disabled={!inputValue.trim()}
-              className="h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl disabled:opacity-50 flex-shrink-0"
-            >
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {deliverables.length > 0 && (
-        <p className="text-sm text-gray-500">
-          Tip: Focus on what your client gets, not how you do it. "Conversion-optimized website" beats "40 hours of development."
-        </p>
       )}
     </div>
   );
