@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, GripVertical, Plus, ArrowRight, Check } from 'lucide-react';
+import { X, GripVertical, Plus, ArrowRight, Check, Copy } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -91,6 +91,22 @@ export default function Step6Extras({ data, onChange, onNext }) {
   
   const removeBonus = (id) => {
     const updated = bonuses.filter(b => b.id !== id);
+    setBonuses(updated);
+    updateConfig(updated);
+  };
+
+  const duplicateBonus = (id) => {
+    const sourceIndex = bonuses.findIndex(b => b.id === id);
+    if (sourceIndex === -1) return;
+
+    const source = bonuses[sourceIndex];
+    const duplicate = {
+      ...source,
+      id: `${Date.now()}-${Math.random()}`
+    };
+
+    const updated = [...bonuses];
+    updated.splice(sourceIndex + 1, 0, duplicate);
     setBonuses(updated);
     updateConfig(updated);
   };
@@ -221,6 +237,15 @@ export default function Step6Extras({ data, onChange, onNext }) {
                               >
                                 {bonus.type}
                               </div>
+                              <Button
+                                onClick={() => duplicateBonus(bonus.id)}
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 rounded-full flex-shrink-0"
+                                title="Duplicate"
+                              >
+                                <Copy className="w-5 h-5" />
+                              </Button>
                               
                               <Button
                                 onClick={() => removeBonus(bonus.id)}

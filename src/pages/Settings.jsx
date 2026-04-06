@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { User, Mail, Calendar, Save, Loader2, Link as LinkIcon } from 'lucide-react';
 import supabaseClient from '@/lib/supabaseClient';
+import { createPageUrl } from '@/utils';
+import { useAuth } from '@/lib/AuthContext';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 
 export default function Settings() {
+  const { logout } = useAuth();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,7 +47,7 @@ export default function Settings() {
     }
     const available = await isCreatorSlugAvailable(normalized, user.id);
     if (!available) {
-      setSlugError('This URL slug is already taken by another user');
+      setSlugError('This company name is already taken by another user');
     }
     setSlugChecking(false);
   };
@@ -65,7 +68,7 @@ export default function Settings() {
           }
           const available = await isCreatorSlugAvailable(normalized, user.id);
           if (!available) {
-            setSlugError('This URL slug is already taken by another user');
+            setSlugError('This company name is already taken by another user');
             setSaving(false);
             return;
           }
@@ -90,8 +93,16 @@ export default function Settings() {
     setSaving(false);
   };
 
-  const handleLogout = () => {
-    supabaseClient.auth.signOut();
+  const handleLogout = async () => {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (error) {
+      console.error('Error signing out from Supabase:', error);
+    }
+
+    // Clear Base44 auth state as well, then return to app welcome.
+    logout(false);
+    window.location.href = createPageUrl('Welcome');
   };
 
   if (loading) {
@@ -148,7 +159,15 @@ export default function Settings() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <LinkIcon className="w-4 h-4 inline mr-2" />
-                URL Slug
+                Company name
+                <span className="relative ml-2 inline-flex items-center group align-middle" aria-label="Company name help">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-700">
+                    i
+                  </span>
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-72 -translate-x-1/2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-normal text-gray-600 shadow-lg opacity-0 invisible transition-opacity duration-150 group-hover:opacity-100 group-hover:visible">
+                    This is used for all preview Links. You can change it anytime, but it can only be assigned if available.
+                  </span>
+                </span>
               </label>
               <Input
                 value={user?.creator_slug || ''}
@@ -157,7 +176,7 @@ export default function Settings() {
                   setSlugError(null);
                 }}
                 onBlur={handleSlugBlur}
-                placeholder="Your preferred URL slug"
+                placeholder="Your company name"
                 className={`h-12 bg-gray-50 border-gray-200 ${slugError ? 'border-red-400' : ''}`}
               />
               {slugChecking && (
@@ -167,7 +186,7 @@ export default function Settings() {
                 <p className="text-xs text-red-600 mt-1">{slugError}</p>
               )}
               <p className="text-xs text-gray-500 mt-1">
-                Your package previews will use: yourdomain.com/<strong>{user?.creator_slug ? slugify(user.creator_slug, '') || 'your-slug' : 'your-slug'}</strong>/package-name
+                Your package previews will use: https://launch-box.io/<strong>{user?.creator_slug ? slugify(user.creator_slug, '') || 'your-company-name' : 'your-company-name'}</strong>/package-name
               </p>
             </div>
 
