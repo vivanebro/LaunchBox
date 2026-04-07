@@ -4,15 +4,24 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ArrowRight } from 'lucide-react';
 
-const GUARANTEES = [
-  'Unlimited revisions until you\'re happy',
-  'On-time delivery or it\'s on us',
-  'We handle everything, you just show up',
-  '100% satisfaction or we redo it free',
-  'If you don\'t see results, we keep working until you do',
-  'Money-back guarantee if not delivered as promised',
-  'We\'re not done until you\'re done',
-];
+const CATEGORIZED_GUARANTEES = {
+  'Unconditional': [
+    'Not happy? Full refund. No questions, no drama.',
+    '30 days risk-free. Don\'t love it, don\'t pay.',
+  ],
+  'Conditional': [
+    'If you don\'t get [result] in [X days], full refund.',
+    'We miss your deadline, we cover the cost.',
+  ],
+  'Performance': [
+    'You get [result] first. We get paid second.',
+    'Pay per [result] only. No [result], no charge.',
+  ],
+  'Anti-guarantee': [
+    'All sales final. We\'re selective about who we work with.',
+    'No refunds. Our reputation is our guarantee.',
+  ],
+};
 
 export default function Step7Guarantee({ data, onChange, onNext }) {
   const [customGuarantee, setCustomGuarantee] = React.useState('');
@@ -33,24 +42,31 @@ export default function Step7Guarantee({ data, onChange, onNext }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold mb-3 text-gray-900">Guarantee</h2>
-        <p className="text-gray-500 text-base">A strong guarantee removes risk and makes it easier to say yes. This shows under all packages.</p>
-        <p className="text-sm text-gray-400 mt-2">Pick the one you can actually stand behind</p>
+        <p className="text-gray-500 text-base">What promise can you stand behind?</p>
+        <p className="text-sm text-gray-400 mt-2">A strong guarantee removes risk and makes it easier for clients to say yes. This shows under all your packages. Optional -- you can always add or change this later.</p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        {GUARANTEES.map((guarantee) => (
-          <Badge
-            key={guarantee}
-            onClick={() => selectGuarantee(guarantee)}
-            className={cn(
-              "cursor-pointer px-6 py-3 text-sm font-medium transition-all hover:scale-105 border-2",
-              selectedGuarantee === guarantee
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
-            )}
-          >
-            {guarantee}
-          </Badge>
+      <div className="space-y-5">
+        {Object.entries(CATEGORIZED_GUARANTEES).map(([category, options]) => (
+          <div key={category}>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{category}</p>
+            <div className="flex flex-wrap gap-3">
+              {options.map((guarantee) => (
+                <Badge
+                  key={guarantee}
+                  onClick={() => selectGuarantee(guarantee)}
+                  className={cn(
+                    "cursor-pointer px-6 py-3 text-sm font-medium transition-all hover:scale-105 border-2",
+                    selectedGuarantee === guarantee
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                      : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
+                  )}
+                >
+                  {guarantee}
+                </Badge>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 
