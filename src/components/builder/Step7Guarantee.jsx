@@ -43,7 +43,7 @@ export default function Step7Guarantee({ data, onChange, onNext }) {
       <div>
         <h2 className="text-3xl font-bold mb-3 text-gray-900">Guarantee</h2>
         <p className="text-gray-500 text-base">What promise can you stand behind?</p>
-        <p className="text-sm text-gray-400 mt-2">A strong guarantee removes risk and makes it easier for clients to say yes. This shows under all your packages. Optional -- you can always add or change this later.</p>
+        <p className="text-sm text-gray-400 mt-2">A guarantee removes risk. When there's no risk, the only question left is "which package?" Optional, but powerful. You can always change this later.</p>
       </div>
 
       <div className="space-y-5">

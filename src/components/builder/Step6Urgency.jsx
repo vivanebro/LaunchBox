@@ -31,7 +31,7 @@ export default function Step6Urgency({ data, onChange, onNext }) {
       <div>
         <h2 className="text-3xl font-bold mb-3 text-gray-900">Urgency</h2>
         <p className="text-gray-500 text-base">Any reason for the client to act now instead of "thinking about it"?</p>
-        <p className="text-sm text-gray-400 mt-2">This shows as a note on your package page. Scarcity and deadlines help clients decide faster. Optional -- skip if it doesn't apply. You can always add or change this later.</p>
+        <p className="text-sm text-gray-400 mt-2">Clients who see urgency decide now instead of going cold. Optional, but it works. You can always change this later.</p>
       </div>
 
       <div className="flex flex-wrap gap-3">

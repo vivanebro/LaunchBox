@@ -224,6 +224,7 @@ export default function Results() {
   const [popularPackageIndex, setPopularPackageIndex] = useState({ onetime: 2, retainer: 2 });
   const [popularBadgeText, setPopularBadgeText] = useState('Most Popular');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isFreshReveal, setIsFreshReveal] = useState(false);
   const [isEmbedMode, setIsEmbedMode] = useState(false);
   const [previewNotFound, setPreviewNotFound] = useState(false);
   const [packageId, setPackageId] = useState(null);
@@ -320,7 +321,15 @@ export default function Results() {
     const isPreview = urlParams.get('preview') === 'true' || isPrettyPreviewPath;
     const isEmbed = urlParams.get('embed') === 'true';
     let idFromUrl = urlParams.get('packageId');
-    setIsPreviewMode(isPreview);
+    // Fresh from wizard: show packages in preview-first mode with a "Customize" button
+    const isFreshBuild = localStorage.getItem('freshFromWizard') === 'true';
+    if (isFreshBuild) {
+      localStorage.removeItem('freshFromWizard');
+      setIsPreviewMode(true);
+      setIsFreshReveal(true);
+    } else {
+      setIsPreviewMode(isPreview);
+    }
     setIsEmbedMode(isEmbed);
 
     const checkMobile = () => {
@@ -4144,6 +4153,17 @@ export default function Results() {
           </div>
         )}
         <div className="max-w-7xl mx-auto px-4 md:px-6">
+          {isFreshReveal && (
+            <motion.div
+              className="text-center mb-8"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Here's how your packages will look to clients</h2>
+              <p className="text-gray-500">Review, then customize anything you'd like to change.</p>
+            </motion.div>
+          )}
           <div ref={exportRef}>
           <div className="text-center">
             {config.logo_url && (
@@ -4205,6 +4225,25 @@ export default function Results() {
           </div>
           </div>
         </div>
+        {isFreshReveal && (
+          <motion.div
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
+          >
+            <button
+              onClick={() => {
+                setIsPreviewMode(false);
+                setIsFreshReveal(false);
+              }}
+              className="px-8 py-4 rounded-full text-white font-semibold text-lg shadow-2xl hover:scale-105 transition-transform"
+              style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+            >
+              Customize Your Packages
+            </button>
+          </motion.div>
+        )}
       </div>
     );
   }

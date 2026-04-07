@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 
@@ -89,19 +89,62 @@ export default function PackageBuilder() {
     if (step < TOTAL_STEPS) {
       setStep(step + 1);
     } else {
-      // Final step - save and go to results
+      // Final step - show generating animation, then save and go to results
       setIsProcessing(true);
-      
+
+      // Show the "building" animation for 2 seconds before navigating
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       try {
         const editingPackageId = localStorage.getItem('editingPackageId');
-        
+
         // Strip system fields
         const { id, created_date, updated_date, created_by, created_by_id, entity_name, app_id, is_sample, is_deleted, deleted_date, environment, ...cleanConfig } = config;
-        
+
         // Ensure popularPackageIndex is always an object
         if (typeof cleanConfig.popularPackageIndex === 'number' || !cleanConfig.popularPackageIndex) {
           const val = typeof cleanConfig.popularPackageIndex === 'number' ? cleanConfig.popularPackageIndex : 2;
           cleanConfig.popularPackageIndex = { onetime: val, retainer: val };
+        }
+
+        // Flag that this is a fresh build so Results lands in preview-first mode
+        if (!editingPackageId) {
+          localStorage.setItem('freshFromWizard', 'true');
+        }
+
+        // Generate tier descriptions from deliverables if not already set
+        const deliverables = cleanConfig.core_deliverables || [];
+        const durationText = cleanConfig.project_duration || '';
+        if (!cleanConfig.package_descriptions || !cleanConfig.package_descriptions?.onetime?.starter ||
+            cleanConfig.package_descriptions?.onetime?.starter === 'For individuals just starting out who need essential features') {
+          const starterItems = deliverables.slice(0, 1);
+          const growthItems = deliverables.slice(0, 2);
+          cleanConfig.package_descriptions = {
+            onetime: {
+              starter: starterItems.length > 0
+                ? `The essentials: ${starterItems.join(', ')}${durationText ? '.' : '.'}`
+                : 'A streamlined package to get started.',
+              growth: growthItems.length > 0
+                ? `Everything you need: ${growthItems.join(', ')}${deliverables.length > 2 ? ', and more.' : '.'}`
+                : 'The complete package for growing businesses.',
+              premium: deliverables.length > 0
+                ? `The full experience: ${deliverables.join(', ')}. Priority delivery.`
+                : 'Our most comprehensive package with priority service.',
+              elite: 'For enterprise clients that need the ultimate solution.'
+            },
+            retainer: {
+              starter: starterItems.length > 0
+                ? `The essentials: ${starterItems.join(', ')}. Monthly.`
+                : 'A streamlined monthly package to get started.',
+              growth: growthItems.length > 0
+                ? `Everything you need: ${growthItems.join(', ')}${deliverables.length > 2 ? ', and more. Monthly.' : '. Monthly.'}`
+                : 'The complete monthly package for growing businesses.',
+              premium: deliverables.length > 0
+                ? `The full experience: ${deliverables.join(', ')}. Priority delivery. Monthly.`
+                : 'Our most comprehensive monthly package.',
+              elite: 'For enterprise clients that need the ultimate solution.'
+            }
+          };
         }
 
         if (editingPackageId) {
@@ -192,12 +235,41 @@ export default function PackageBuilder() {
 
   if (isProcessing) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 animate-spin mx-auto mb-6 text-[#ff0044]" />
-          <h2 className="text-3xl font-bold mb-2 text-gray-900">Preparing your packages...</h2>
-          <p className="text-gray-600">This will only take a moment</p>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-8" style={{ backgroundColor: '#F5F5F7' }}>
+        <motion.div
+          className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl"
+          style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` }}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+        >
+          <Sparkles className="text-white w-10 h-10 animate-pulse" />
+        </motion.div>
+        <motion.div
+          className="text-center"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Building your packages...</h2>
+          <p className="text-gray-400">This will just take a moment.</p>
+        </motion.div>
+        <motion.div
+          className="flex gap-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
+          {[0, 1, 2].map(i => (
+            <motion.span
+              key={i}
+              className="w-2.5 h-2.5 rounded-full"
+              style={{ background: brandColor }}
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 0.8, delay: i * 0.15, repeat: Infinity }}
+            />
+          ))}
+        </motion.div>
       </div>
     );
   }
