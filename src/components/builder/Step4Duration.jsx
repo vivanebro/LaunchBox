@@ -4,11 +4,32 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 const DURATIONS = [
-  { label: '1 week', min: 1, max: 1, unit: 'weeks' },
-  { label: '2-4 weeks', min: 2, max: 4, unit: 'weeks' },
-  { label: '1-2 months', min: 1, max: 2, unit: 'months' },
-  { label: '2-3 months', min: 2, max: 3, unit: 'months' },
+  { label: '3-5 days', unit: 'days' },
+  { label: '1-3 weeks', unit: 'weeks' },
+  { label: '1-3 months', unit: 'months' },
 ];
+
+// Simple rule: Growth = midpoint (or the value itself for single input).
+// Premium = Growth - 1. Starter = Growth + 1. Same unit always.
+// For ranges: Premium = min, Growth = middle, Starter = max.
+const calculateTierDurations = (min, max, unit) => {
+  if (min === max) {
+    // Single value: shift around it
+    const premium = Math.max(1, min - 1);
+    const growth = premium === min ? min + 1 : min;
+    const starter = growth + 1;
+    return { premium, growth, starter, unit };
+  }
+
+  // Range: use min/mid/max
+  const growth = Math.round((min + max) / 2);
+  return { premium: min, growth, starter: max, unit };
+};
+
+const formatDuration = (value, unit) => {
+  if (value === 1) return `${value} ${unit.replace(/s$/, '')}`;
+  return `${value} ${unit}`;
+};
 
 export default function Step4Duration({ data, onChange, onNext }) {
   const [customMin, setCustomMin] = React.useState('');
@@ -17,13 +38,25 @@ export default function Step4Duration({ data, onChange, onNext }) {
 
   const selectedDuration = data.project_duration;
 
-  const selectDuration = (duration) => {
+  const applyDuration = (label, min, max, unit) => {
+    const tiers = calculateTierDurations(min, max, unit);
     onChange({
-      project_duration: duration.label,
-      duration_min: duration.min,
-      duration_max: duration.max,
-      duration_unit: duration.unit
+      project_duration: label,
+      duration_min: min,
+      duration_max: max,
+      duration_unit: unit,
+      duration_starter: { value: tiers.starter, unit: tiers.unit },
+      duration_growth: { value: tiers.growth, unit: tiers.unit },
+      duration_premium: { value: tiers.premium, unit: tiers.unit },
     });
+  };
+
+  const selectDuration = (duration) => {
+    // Parse min/max from label like "3-5 days" or "1-3 weeks"
+    const match = duration.label.match(/^(\d+)-(\d+)/);
+    if (match) {
+      applyDuration(duration.label, parseInt(match[1]), parseInt(match[2]), duration.unit);
+    }
   };
 
   const selectOngoing = () => {
@@ -32,6 +65,9 @@ export default function Step4Duration({ data, onChange, onNext }) {
       duration_min: null,
       duration_max: null,
       duration_unit: 'ongoing',
+      duration_starter: null,
+      duration_growth: null,
+      duration_premium: null,
       pricing_availability: 'retainer'
     });
   };
@@ -46,12 +82,7 @@ export default function Step4Duration({ data, onChange, onNext }) {
         ? `${min} ${customUnit}`
         : `${min}-${maxValue} ${customUnit}`;
 
-      onChange({
-        project_duration: label,
-        duration_min: min,
-        duration_max: maxValue,
-        duration_unit: customUnit
-      });
+      applyDuration(label, min, maxValue, customUnit);
       setCustomMin('');
       setCustomMax('');
     }
@@ -142,29 +173,27 @@ export default function Step4Duration({ data, onChange, onNext }) {
       </div>
 
       {/* Tier preview */}
-      {data.duration_min && data.duration_max && selectedDuration !== 'Ongoing' && (
+      {data.duration_premium && data.duration_growth && data.duration_starter && selectedDuration !== 'Ongoing' && (
         <div className="p-5 bg-gray-50 rounded-xl">
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-xs text-gray-400 mb-1">Starter</div>
               <div className="text-lg font-bold text-gray-900">
-                {data.duration_max} {data.duration_unit}
+                {formatDuration(data.duration_starter.value, data.duration_starter.unit)}
               </div>
               <div className="text-xs text-gray-400 mt-1">Standard pace</div>
             </div>
             <div>
               <div className="text-xs text-gray-400 mb-1">Growth</div>
               <div className="text-lg font-bold text-indigo-600">
-                {data.duration_min === data.duration_max
-                  ? data.duration_max
-                  : Math.ceil((data.duration_min + data.duration_max) / 2)} {data.duration_unit}
+                {formatDuration(data.duration_growth.value, data.duration_growth.unit)}
               </div>
               <div className="text-xs text-gray-400 mt-1">Faster</div>
             </div>
             <div>
               <div className="text-xs text-gray-400 mb-1">Premium</div>
               <div className="text-lg font-bold text-gray-900">
-                {data.duration_min} {data.duration_unit}
+                {formatDuration(data.duration_premium.value, data.duration_premium.unit)}
               </div>
               <div className="text-xs text-gray-400 mt-1">Priority speed</div>
             </div>
