@@ -21,9 +21,16 @@ const calculateTierDurations = (min, max, unit) => {
     return { premium, growth, starter, unit };
   }
 
-  // Range: use min/mid/max
-  const growth = Math.round((min + max) / 2);
-  return { premium: min, growth, starter: max, unit };
+  // Range: Premium = min, Starter = max, Growth = midpoint
+  let premium = min;
+  let starter = max;
+  let growth = Math.round((min + max) / 2);
+
+  // Ensure all three are different
+  if (growth <= premium) growth = premium + 1;
+  if (growth >= starter) starter = growth + 1;
+
+  return { premium, growth, starter, unit };
 };
 
 const formatDuration = (value, unit) => {
@@ -100,7 +107,7 @@ export default function Step4Duration({ data, onChange, onNext }) {
       <div>
         <h2 className="text-3xl font-bold mb-3 text-gray-900">Duration</h2>
         <p className="text-gray-500 text-base">How long does this take to deliver?</p>
-        <p className="text-sm text-gray-400 mt-2">Higher-paying clients value speed. Your premium package will get the fastest turnaround, starter gets the longest.</p>
+        <p className="text-sm text-gray-400 mt-2">Higher-paying clients value speed. Your premium package will get the fastest turnaround, starter gets the longest. You can always adjust this later.</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
