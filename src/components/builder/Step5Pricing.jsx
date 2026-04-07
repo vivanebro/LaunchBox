@@ -5,11 +5,12 @@ import { cn } from '@/lib/utils';
 import { ArrowRight } from 'lucide-react';
 
 const QUICK_PRICES = [
-  { label: '$500', value: 500 },
   { label: '$1,000', value: 1000 },
   { label: '$2,500', value: 2500 },
   { label: '$5,000', value: 5000 },
   { label: '$10,000', value: 10000 },
+  { label: '$30,000', value: 30000 },
+  { label: '$50,000', value: 50000 },
 ];
 
 const roundToNearest50IfNeeded = (price) => {
