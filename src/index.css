@@ -156,3 +156,16 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes hotGlow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(255, 0, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(255, 0, 68, 0.6);
+  }
+}
+
+.hot-status-dot {
+  animation: hotGlow 2.5s ease-in-out infinite;
+}

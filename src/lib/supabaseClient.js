@@ -45,11 +45,20 @@ const TABLE_COLUMNS = {
     'package_descriptions', 'button_links', 'active_packages',
     'core_deliverables', 'extras_bonuses', 'niches',
     'currentDesign', 'pricingMode', 'popularPackageIndex', 'popularBadgeText',
+    'show_excluded_deliverables', 'show_package_buttons_in_edit_mode', 'retainer_discount_text',
     'original_price_starter', 'original_price_growth', 'original_price_premium', 'original_price_elite',
     'original_price_starter_retainer', 'original_price_growth_retainer', 'original_price_premium_retainer', 'original_price_elite_retainer',
+    'cost_data',
+    'manual_status',
+    'manual_status_updated_at',
+    'folder_id',
+  ]),
+  folders: new Set([
+    'id', 'name', 'parent_id', 'created_by', 'is_example', 'created_date', 'updated_date',
   ]),
   users: new Set([
     'id', 'email', 'full_name', 'role', 'creator_slug', 'created_date', 'updated_date',
+    'hide_copy_link_folder_prompt',
   ]),
   help_requests: new Set([
     'id', 'message', 'status', 'created_by', 'created_date', 'updated_date',
@@ -72,6 +81,28 @@ const TABLE_COLUMNS = {
   quiz_submissions: new Set([
     'id', 'quiz_id', 'answers', 'generated_packages',
     'calculated_base_price', 'started_at', 'completed_at', 'created_date',
+  ]),
+  contracts: new Set([
+    'id', 'created_by', 'name', 'body', 'merge_field_definitions',
+    'logo_url', 'accent_color', 'custom_confirmation_message',
+    'custom_button_label', 'custom_button_link', 'status',
+    'shareable_link', 'linked_package_id', 'folder_id', 'expires_at',
+    'created_at', 'updated_at',
+  ]),
+  contract_templates: new Set([
+    'id', 'created_by', 'name', 'body',
+    'logo_url', 'accent_color', 'custom_confirmation_message',
+    'custom_button_label', 'custom_button_link',
+    'created_at', 'updated_at',
+  ]),
+  signed_contracts: new Set([
+    'id', 'contract_id', 'client_name', 'client_email', 'signed_body',
+    'signature_image', 'signed_at', 'client_ip', 'pdf_url',
+    'client_folder_id', 'created_at',
+  ]),
+  notifications: new Set([
+    'id', 'created_by', 'type', 'title', 'message', 'metadata',
+    'is_read', 'is_viewed_celebration', 'created_at',
   ]),
 };
 
@@ -180,22 +211,32 @@ const createEntityHelper = (tableName, isServiceRole = false) => {
 
 export const entities = {
   User: createEntityHelper('users'),
+  Folder: createEntityHelper('folders'),
   PackageConfig: createEntityHelper('package_configs'),
   AccessCode: createEntityHelper('access_codes'),
   HealthReport: createEntityHelper('health_reports'),
   HelpRequest: createEntityHelper('help_requests'),
   QuizConfig: createEntityHelper('quiz_configs'),
   QuizSubmission: createEntityHelper('quiz_submissions'),
+  Contract: createEntityHelper('contracts'),
+  ContractTemplate: createEntityHelper('contract_templates'),
+  SignedContract: createEntityHelper('signed_contracts'),
+  Notification: createEntityHelper('notifications'),
 };
 
 export const entitiesAsServiceRole = {
   User: createEntityHelper('users', true),
+  Folder: createEntityHelper('folders', true),
   PackageConfig: createEntityHelper('package_configs', true),
   AccessCode: createEntityHelper('access_codes', true),
   HealthReport: createEntityHelper('health_reports', true),
   HelpRequest: createEntityHelper('help_requests', true),
   QuizConfig: createEntityHelper('quiz_configs', true),
   QuizSubmission: createEntityHelper('quiz_submissions', true),
+  Contract: createEntityHelper('contracts', true),
+  ContractTemplate: createEntityHelper('contract_templates', true),
+  SignedContract: createEntityHelper('signed_contracts', true),
+  Notification: createEntityHelper('notifications', true),
 };
 
 export const auth = {

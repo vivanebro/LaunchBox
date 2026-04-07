@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { User, Mail, Calendar, Save, Loader2, Link as LinkIcon } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import supabaseClient from '@/lib/supabaseClient';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -56,7 +57,10 @@ export default function Settings() {
     setSaving(true);
     setSlugError(null);
     try {
-      const updates = { full_name: user.full_name };
+      const updates = {
+        full_name: user.full_name,
+        hide_copy_link_folder_prompt: Boolean(user.hide_copy_link_folder_prompt),
+      };
       if (user.creator_slug !== undefined) {
         const normalized = slugify(user.creator_slug, '');
         if (normalized) {
@@ -212,6 +216,25 @@ export default function Settings() {
                 value={user?.role || 'user'}
                 disabled
                 className="h-12 bg-gray-100 border-gray-200 text-gray-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-4">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Folder prompt after copy link</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  When enabled, after you copy a package link we&apos;ll ask if you want to assign it to a client or project folder.
+                </p>
+              </div>
+              <Switch
+                checked={!user?.hide_copy_link_folder_prompt}
+                onCheckedChange={(checked) =>
+                  setUser({
+                    ...user,
+                    hide_copy_link_folder_prompt: !checked,
+                  })
+                }
+                aria-label="Toggle folder assignment prompt after copying link"
               />
             </div>
           </div>
