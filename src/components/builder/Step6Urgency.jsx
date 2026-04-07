@@ -9,7 +9,6 @@ const URGENCY_OPTIONS = [
   'Only 3 spots available this quarter',
   'Pricing valid until end of month',
   'Bonuses included only this month',
-  'Schedule fills up fast during peak season',
   'Currently booking 4-6 weeks out',
 ];
 
@@ -32,8 +31,8 @@ export default function Step6Urgency({ data, onChange, onNext }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold mb-3 text-gray-900">Urgency</h2>
-        <p className="text-gray-500 text-base">Give clients a reason to act now instead of "thinking about it." Optional but effective.</p>
-        <p className="text-sm text-gray-400 mt-2">This shows as a subtle note under your packages</p>
+        <p className="text-gray-500 text-base">Any reason for the client to act now instead of "thinking about it"?</p>
+        <p className="text-sm text-gray-400 mt-2">This shows as a note on your package page. Scarcity and deadlines help clients decide faster. Optional -- skip if it doesn't apply. You can always add or change this later.</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
