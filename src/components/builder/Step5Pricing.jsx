@@ -7,12 +7,9 @@ import { ArrowRight } from 'lucide-react';
 const QUICK_PRICES = [
   { label: '$500', value: 500 },
   { label: '$1,000', value: 1000 },
-  { label: '$2,000', value: 2000 },
-  { label: '$3,500', value: 3500 },
+  { label: '$2,500', value: 2500 },
   { label: '$5,000', value: 5000 },
-  { label: '$7,500', value: 7500 },
   { label: '$10,000', value: 10000 },
-  { label: '$15,000', value: 15000 },
 ];
 
 const roundToNearest50IfNeeded = (price) => {
@@ -73,8 +70,8 @@ export default function Step5Pricing({ data, onChange, onNext }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold mb-3 text-gray-900">Pricing</h2>
-        <p className="text-gray-500 text-base">What do you usually charge for something like this? We'll build the tiers around it.</p>
-        <p className="text-sm text-gray-400 mt-2">Just the number in your head. You can adjust everything on the results page.</p>
+        <p className="text-gray-500 text-base">What do you usually charge for something like this?</p>
+        <p className="text-sm text-gray-400 mt-2">Your price becomes the middle package. We'll create a lower entry option and a premium option above it. You can adjust everything later.</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -131,28 +128,24 @@ export default function Step5Pricing({ data, onChange, onNext }) {
             </div>
           </div>
 
-          <p className="text-sm text-gray-400">
-            Your price becomes Growth. Premium is just 20% more with everything included. Adjust on the results page.
-          </p>
-
-          {data.price_starter_retainer && (
-            <div className="grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-xl">
-              <div className="text-center">
-                <div className="text-xs text-gray-400 mb-2">Starter /mo</div>
-                <div className="text-2xl font-bold text-gray-900">${data.price_starter_retainer?.toLocaleString()}</div>
-                <div className="text-xs text-gray-400 mt-1">15% off</div>
+          {data.duration_unit === 'ongoing' && data.price_starter_retainer && (
+            <>
+              <p className="text-sm text-gray-400">Monthly retainer pricing (15% discount):</p>
+              <div className="grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-xl">
+                <div className="text-center">
+                  <div className="text-xs text-gray-400 mb-2">Starter /mo</div>
+                  <div className="text-2xl font-bold text-gray-900">${data.price_starter_retainer?.toLocaleString()}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs text-gray-400 mb-2">Growth /mo</div>
+                  <div className="text-2xl font-bold text-indigo-600">${data.price_growth_retainer?.toLocaleString()}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs text-gray-400 mb-2">Premium /mo</div>
+                  <div className="text-2xl font-bold text-gray-900">${data.price_premium_retainer?.toLocaleString()}</div>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-xs text-gray-400 mb-2">Growth /mo</div>
-                <div className="text-2xl font-bold text-indigo-600">${data.price_growth_retainer?.toLocaleString()}</div>
-                <div className="text-xs text-gray-400 mt-1">15% off</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xs text-gray-400 mb-2">Premium /mo</div>
-                <div className="text-2xl font-bold text-gray-900">${data.price_premium_retainer?.toLocaleString()}</div>
-                <div className="text-xs text-gray-400 mt-1">15% off</div>
-              </div>
-            </div>
+            </>
           )}
         </div>
       )}
