@@ -20,7 +20,7 @@ export default function Step4Duration({ data, onChange, onNext }) {
   const selectedDuration = data.project_duration;
 
   const selectDuration = (duration) => {
-    onChange({ 
+    onChange({
       project_duration: duration.label,
       duration_min: duration.min,
       duration_max: duration.max,
@@ -29,7 +29,7 @@ export default function Step4Duration({ data, onChange, onNext }) {
   };
 
   const selectOngoing = () => {
-    onChange({ 
+    onChange({
       project_duration: 'Ongoing',
       duration_min: null,
       duration_max: null,
@@ -41,14 +41,14 @@ export default function Step4Duration({ data, onChange, onNext }) {
   const setCustom = () => {
     const min = parseInt(customMin);
     const max = parseInt(customMax);
-    
+
     if (!isNaN(min) && min > 0) {
       const maxValue = !isNaN(max) && max > min ? max : min;
-      const label = min === maxValue 
+      const label = min === maxValue
         ? `${min} ${customUnit}`
         : `${min}-${maxValue} ${customUnit}`;
-      
-      onChange({ 
+
+      onChange({
         project_duration: label,
         duration_min: min,
         duration_max: maxValue,
@@ -59,24 +59,31 @@ export default function Step4Duration({ data, onChange, onNext }) {
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setCustom();
+    }
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-4xl font-bold mb-4 text-gray-900">How quickly do you deliver?</h2>
-        <p className="text-gray-600">Your Premium clients will get the fastest turnaround. Pick your typical timeline.</p>
+        <h2 className="text-3xl font-bold mb-3 text-gray-900">Duration</h2>
+        <p className="text-gray-500 text-base">How long does this typically take? Premium clients get the fastest turnaround.</p>
       </div>
 
-      <div className="mb-4">
+      <div>
         <Badge
           onClick={selectOngoing}
           className={cn(
-            "cursor-pointer px-8 py-4 text-base font-semibold transition-all hover:scale-105 border-2",
+            "cursor-pointer px-6 py-3 text-sm font-medium transition-all hover:scale-105 border-2",
             selectedDuration === 'Ongoing'
-              ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-500 shadow-lg"
-              : "bg-white text-gray-700 border-gray-300 hover:border-purple-300 hover:bg-purple-50"
+              ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+              : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
           )}
         >
-          ✨ Ongoing Monthly Service
+          Ongoing monthly service
         </Badge>
       </div>
 
@@ -88,8 +95,8 @@ export default function Step4Duration({ data, onChange, onNext }) {
             className={cn(
               "cursor-pointer px-6 py-3 text-sm font-medium transition-all hover:scale-105 border-2",
               selectedDuration === duration.label
-                ? "bg-blue-500 text-white border-blue-500 shadow-md"
-                : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
             )}
           >
             {duration.label}
@@ -97,30 +104,32 @@ export default function Step4Duration({ data, onChange, onNext }) {
         ))}
       </div>
 
-      <div className="space-y-3">
-        <p className="text-sm font-medium text-gray-700">Custom duration:</p>
+      <div className="space-y-2">
+        <p className="text-sm text-gray-400">Or set a custom duration:</p>
         <div className="flex gap-3 items-center">
           <Input
             type="number"
             min="1"
             value={customMin}
             onChange={(e) => setCustomMin(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Min"
-            className="h-12 bg-white border-gray-300 text-gray-900 w-24"
+            className="h-12 bg-gray-100 border-0 text-gray-900 rounded-full px-5 w-24 focus:bg-white focus:ring-1 focus:ring-gray-300"
           />
-          <span className="text-gray-500">to</span>
+          <span className="text-gray-400">to</span>
           <Input
             type="number"
             min="1"
             value={customMax}
             onChange={(e) => setCustomMax(e.target.value)}
-            placeholder="Max (optional)"
-            className="h-12 bg-white border-gray-300 text-gray-900 w-32"
+            onKeyDown={handleKeyDown}
+            placeholder="Max"
+            className="h-12 bg-gray-100 border-0 text-gray-900 rounded-full px-5 w-24 focus:bg-white focus:ring-1 focus:ring-gray-300"
           />
           <select
             value={customUnit}
             onChange={(e) => setCustomUnit(e.target.value)}
-            className="h-12 px-4 bg-white border border-gray-300 rounded-md text-gray-900"
+            className="h-12 px-4 bg-gray-100 border-0 rounded-full text-gray-900 focus:ring-1 focus:ring-gray-300"
           >
             <option value="days">days</option>
             <option value="weeks">weeks</option>
@@ -128,51 +137,47 @@ export default function Step4Duration({ data, onChange, onNext }) {
           </select>
           <button
             onClick={setCustom}
-            className="h-12 px-6 bg-blue-500 text-white rounded-md hover:bg-blue-600 font-medium"
+            disabled={!customMin}
+            className="h-12 px-6 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 font-medium disabled:opacity-50 transition-colors"
           >
             Set
           </button>
         </div>
       </div>
 
-      {/* Preview */}
-      {selectedDuration === 'Ongoing' && (
-        <div className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg">
-          <h3 className="text-sm font-semibold text-purple-900 mb-3">Service Model:</h3>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
-              Ongoing Monthly Retainer
-            </div>
-            <p className="text-sm text-gray-600 mt-2">Continuous service with monthly billing</p>
-          </div>
-        </div>
-      )}
-      
+      {/* Timeline preview */}
       {data.duration_min && data.duration_max && selectedDuration !== 'Ongoing' && (
-        <div className="p-6 bg-blue-50 border-2 border-blue-200 rounded-lg">
-          <h3 className="text-sm font-semibold text-blue-900 mb-3">Delivery Timeline Preview:</h3>
+        <div className="p-5 bg-gray-50 rounded-xl">
+          <p className="text-sm text-gray-400 mb-3">How this maps to your tiers:</p>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <div className="text-xs text-gray-600 mb-1">Starter</div>
+              <div className="text-xs text-gray-400 mb-1">Starter</div>
               <div className="text-lg font-bold text-gray-900">
                 {data.duration_max} {data.duration_unit}
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-600 mb-1">Growth</div>
-              <div className="text-lg font-bold text-blue-600">
-                {data.duration_min === data.duration_max 
-                  ? data.duration_max 
+              <div className="text-xs text-gray-400 mb-1">Growth</div>
+              <div className="text-lg font-bold text-indigo-600">
+                {data.duration_min === data.duration_max
+                  ? data.duration_max
                   : Math.ceil((data.duration_min + data.duration_max) / 2)} {data.duration_unit}
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-600 mb-1">Premium</div>
+              <div className="text-xs text-gray-400 mb-1">Premium</div>
               <div className="text-lg font-bold text-gray-900">
                 {data.duration_min} {data.duration_unit}
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {selectedDuration === 'Ongoing' && (
+        <div className="p-5 bg-gray-50 rounded-xl text-center">
+          <div className="text-lg font-bold text-indigo-600">Ongoing Monthly Retainer</div>
+          <p className="text-sm text-gray-400 mt-1">Continuous service with monthly billing</p>
         </div>
       )}
     </div>

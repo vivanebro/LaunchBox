@@ -2,6 +2,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { ArrowRight } from 'lucide-react';
 
 const URGENCY_OPTIONS = [
   'Only 2 new clients per month',
@@ -20,7 +21,7 @@ export default function Step6Urgency({ data, onChange, onNext }) {
     onChange({ urgency });
   };
 
-  const setCustom = () => {
+  const applyCustom = () => {
     if (customUrgency.trim()) {
       onChange({ urgency: customUrgency.trim() });
       setCustomUrgency('');
@@ -28,10 +29,11 @@ export default function Step6Urgency({ data, onChange, onNext }) {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-4xl font-bold mb-4 text-gray-900">Any reason to act now?</h2>
-        <p className="text-gray-600">Urgency and scarcity encourage clients to decide faster. Optional but effective.</p>
+        <h2 className="text-3xl font-bold mb-3 text-gray-900">Urgency</h2>
+        <p className="text-gray-500 text-base">Give clients a reason to act now instead of "thinking about it." Optional but effective.</p>
+        <p className="text-sm text-gray-400 mt-2">This shows as a subtle note under your packages</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -42,8 +44,8 @@ export default function Step6Urgency({ data, onChange, onNext }) {
             className={cn(
               "cursor-pointer px-6 py-3 text-sm font-medium transition-all hover:scale-105 border-2",
               selectedUrgency === urgency
-                ? "bg-blue-500 text-white border-blue-500 shadow-md"
-                : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
             )}
           >
             {urgency}
@@ -51,15 +53,29 @@ export default function Step6Urgency({ data, onChange, onNext }) {
         ))}
       </div>
 
-      <div>
+      <div className="flex gap-2">
         <Input
           value={customUrgency}
           onChange={(e) => setCustomUrgency(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && setCustom()}
-          placeholder="Or write your own (press Enter)"
-          className="h-12 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500"
+          onKeyDown={(e) => e.key === 'Enter' && applyCustom()}
+          placeholder="Or write your own..."
+          className="flex-1 h-12 bg-gray-100 border-0 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:ring-1 focus:ring-gray-300 rounded-full px-5"
         />
+        <button
+          onClick={applyCustom}
+          disabled={!customUrgency.trim()}
+          className="h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full disabled:opacity-50 flex-shrink-0 flex items-center justify-center transition-colors"
+        >
+          <ArrowRight className="w-5 h-5" />
+        </button>
       </div>
+
+      {selectedUrgency && (
+        <div className="p-5 bg-gray-50 rounded-xl text-center">
+          <p className="text-sm text-gray-400 mb-2">Preview</p>
+          <p className="text-base font-medium text-gray-900">{selectedUrgency}</p>
+        </div>
+      )}
     </div>
   );
 }

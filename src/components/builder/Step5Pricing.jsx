@@ -1,7 +1,6 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ArrowRight } from 'lucide-react';
 
@@ -71,10 +70,11 @@ export default function Step5Pricing({ data, onChange, onNext }) {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-4xl font-bold mb-4 text-gray-900">What do you usually charge for something like this?</h2>
-        <p className="text-gray-600">Just the number you already have in your head. We'll build the package pricing around it.</p>
+        <h2 className="text-3xl font-bold mb-3 text-gray-900">Pricing</h2>
+        <p className="text-gray-500 text-base">What do you usually charge for something like this? We'll build the tiers around it.</p>
+        <p className="text-sm text-gray-400 mt-2">Just the number in your head. You can adjust everything on the results page.</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -85,8 +85,8 @@ export default function Step5Pricing({ data, onChange, onNext }) {
             className={cn(
               "cursor-pointer px-6 py-3 text-sm font-medium transition-all hover:scale-105 border-2",
               typicalPrice === value
-                ? "bg-blue-500 text-white border-blue-500 shadow-md"
-                : "bg-white text-gray-700 border-gray-300 hover:border-blue-300 hover:bg-blue-50"
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
             )}
           >
             {label}
@@ -94,63 +94,63 @@ export default function Step5Pricing({ data, onChange, onNext }) {
         ))}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         <Input
           value={customPrice}
           onChange={(e) => setCustomPrice(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && applyCustom()}
           placeholder="Or type your price (e.g., 3500)"
-          className="h-12 bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500"
+          className="flex-1 h-12 bg-gray-100 border-0 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:ring-1 focus:ring-gray-300 rounded-full px-5"
         />
-        <Button
+        <button
           onClick={applyCustom}
           disabled={!customPrice.trim()}
-          className="h-12 px-6 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium"
+          className="h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full disabled:opacity-50 flex-shrink-0 flex items-center justify-center transition-colors"
         >
-          Apply <ArrowRight className="w-4 h-4 ml-1" />
-        </Button>
+          <ArrowRight className="w-5 h-5" />
+        </button>
       </div>
 
       {typicalPrice > 0 && (
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-4 p-6 bg-blue-50 border-2 border-blue-200 rounded-lg">
+          <div className="grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-xl">
             <div className="text-center">
-              <div className="text-sm text-gray-600 mb-2">Starter</div>
+              <div className="text-xs text-gray-400 mb-2">Starter</div>
               <div className="text-2xl font-bold text-gray-900">${data.price_starter?.toLocaleString()}</div>
-              <div className="text-xs text-gray-500 mt-1">Entry option</div>
+              <div className="text-xs text-gray-400 mt-1">Entry option</div>
             </div>
             <div className="text-center">
-              <div className="text-sm text-gray-600 mb-2">Growth</div>
-              <div className="text-2xl font-bold text-blue-600">${data.price_growth?.toLocaleString()}</div>
-              <div className="text-xs text-gray-500 mt-1">Your typical price</div>
+              <div className="text-xs text-gray-400 mb-2">Growth</div>
+              <div className="text-2xl font-bold text-indigo-600">${data.price_growth?.toLocaleString()}</div>
+              <div className="text-xs text-gray-400 mt-1">Your typical price</div>
             </div>
             <div className="text-center">
-              <div className="text-sm text-gray-600 mb-2">Premium</div>
+              <div className="text-xs text-gray-400 mb-2">Premium</div>
               <div className="text-2xl font-bold text-gray-900">${data.price_premium?.toLocaleString()}</div>
-              <div className="text-xs text-gray-500 mt-1">Best value</div>
+              <div className="text-xs text-gray-400 mt-1">Best value</div>
             </div>
           </div>
 
-          <p className="text-sm text-gray-500">
-            Your price becomes the Growth package. Premium is just 20% more with everything included. You can adjust all prices on the next page.
+          <p className="text-sm text-gray-400">
+            Your price becomes Growth. Premium is just 20% more with everything included. Adjust on the results page.
           </p>
 
           {data.price_starter_retainer && (
-            <div className="grid grid-cols-3 gap-4 p-6 bg-green-50 border-2 border-green-200 rounded-lg">
+            <div className="grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-xl">
               <div className="text-center">
-                <div className="text-sm text-gray-600 mb-2">Starter /mo</div>
+                <div className="text-xs text-gray-400 mb-2">Starter /mo</div>
                 <div className="text-2xl font-bold text-gray-900">${data.price_starter_retainer?.toLocaleString()}</div>
-                <div className="text-xs text-gray-500 mt-1">15% off</div>
+                <div className="text-xs text-gray-400 mt-1">15% off</div>
               </div>
               <div className="text-center">
-                <div className="text-sm text-gray-600 mb-2">Growth /mo</div>
-                <div className="text-2xl font-bold text-green-600">${data.price_growth_retainer?.toLocaleString()}</div>
-                <div className="text-xs text-gray-500 mt-1">15% off</div>
+                <div className="text-xs text-gray-400 mb-2">Growth /mo</div>
+                <div className="text-2xl font-bold text-indigo-600">${data.price_growth_retainer?.toLocaleString()}</div>
+                <div className="text-xs text-gray-400 mt-1">15% off</div>
               </div>
               <div className="text-center">
-                <div className="text-sm text-gray-600 mb-2">Premium /mo</div>
+                <div className="text-xs text-gray-400 mb-2">Premium /mo</div>
                 <div className="text-2xl font-bold text-gray-900">${data.price_premium_retainer?.toLocaleString()}</div>
-                <div className="text-xs text-gray-500 mt-1">15% off</div>
+                <div className="text-xs text-gray-400 mt-1">15% off</div>
               </div>
             </div>
           )}

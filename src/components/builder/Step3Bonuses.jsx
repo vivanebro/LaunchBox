@@ -1,56 +1,63 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, GripVertical, Plus, ArrowRight, Check } from 'lucide-react';
+import { X, GripVertical, Plus, ArrowRight, Check, Minus } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
-const COMMON_BONUSES = [
-  // Support & Access
-  'Priority support',
-  'Direct phone/video access',
-  'Dedicated account manager',
-  'Weekend availability',
-  '24-hour response time',
-  // Speed & Delivery
-  'Rush delivery option',
-  'Same-week turnaround',
-  'Expedited review process',
-  // Extras & Add-ons
-  'Unlimited revisions',
-  'Extra revision round',
-  'Raw files / source files access',
-  'Future project discount (10%)',
-  'Lifetime access to project files',
-  // Strategy & Consulting
-  'Free strategy session',
-  'Monthly strategy call',
-  'Quarterly business review',
-  'Competitor analysis',
-  'Performance report',
-  'Custom recommendations',
-  // Content & Assets
-  'Social media posting',
-  'Content calendar template',
-  'Brand style guide',
-  'Extra format versions',
-  'Print-ready versions',
-  'Stock assets included',
-  // Training & Education
-  'Training session included',
-  'How-to documentation',
-  'Video walkthrough',
-  'Team onboarding session',
-];
+const CATEGORIZED_BONUSES = {
+  'Support & Access': [
+    'Priority support (same-day response)',
+    'Direct phone/video access to your team',
+    'Dedicated account manager',
+    'Weekend and after-hours availability',
+  ],
+  'Speed & Delivery': [
+    'Rush delivery option included',
+    'Same-week turnaround guarantee',
+    'Expedited review and approval process',
+  ],
+  'Revisions & Files': [
+    'Unlimited revisions',
+    'Extra revision round',
+    'Raw files / source files access',
+    'Lifetime access to all project files',
+  ],
+  'Strategy & Consulting': [
+    'Free strategy session',
+    'Monthly strategy call',
+    'Quarterly business review',
+    'Competitor analysis report',
+    'Custom recommendations document',
+  ],
+  'Training & Education': [
+    'Team training session included',
+    'How-to documentation',
+    'Video walkthrough of deliverables',
+    'Team onboarding session',
+  ],
+  'Perks & Extras': [
+    'Future project discount (10-15%)',
+    'Content calendar template',
+    'Brand style guide included',
+    'Print-ready file versions',
+  ],
+};
 
 export default function Step3Bonuses({ data, onChange, onNext }) {
   const [bonuses, setBonuses] = React.useState(() => {
     const existing = data.extras_bonuses || [];
-    return existing.map(b => ({
-      id: `${Date.now()}-${Math.random()}`,
-      type: typeof b === 'string' ? b : b.type
-    }));
+    return existing.map(b => {
+      if (typeof b === 'string') {
+        return { id: `${Date.now()}-${Math.random()}`, type: b, quantity: 1 };
+      }
+      return {
+        id: b.id || `${Date.now()}-${Math.random()}`,
+        type: b.type,
+        quantity: b.quantity || 1
+      };
+    });
   });
   const [inputValue, setInputValue] = React.useState('');
   const [open, setOpen] = React.useState(false);
@@ -59,14 +66,14 @@ export default function Step3Bonuses({ data, onChange, onNext }) {
   const inputRef = React.useRef(null);
 
   const updateConfig = (updatedBonuses) => {
-    const filteredBonuses = updatedBonuses.filter(b => b.type.trim()).map(b => b.type);
+    const filtered = updatedBonuses.filter(b => b.type.trim());
 
-    const starter_bonuses = filteredBonuses.slice(0, 1);
-    const growth_bonuses = filteredBonuses.slice(0, 3);
-    const premium_bonuses = filteredBonuses;
+    const starter_bonuses = filtered.slice(0, 1).map(b => b.type);
+    const growth_bonuses = filtered.slice(0, 3).map(b => b.type);
+    const premium_bonuses = filtered.map(b => b.type);
 
     onChange({
-      extras_bonuses: filteredBonuses,
+      extras_bonuses: filtered,
       starter_bonuses,
       growth_bonuses,
       premium_bonuses
@@ -76,9 +83,18 @@ export default function Step3Bonuses({ data, onChange, onNext }) {
   const addBonus = (type) => {
     if (!type.trim()) return;
 
+    let quantity = 1;
+    let cleanType = type.trim();
+    const qtyMatch = cleanType.match(/^(\d+)\s*x\s+(.+)$/i);
+    if (qtyMatch) {
+      quantity = parseInt(qtyMatch[1]);
+      cleanType = qtyMatch[2];
+    }
+
     const updated = [...bonuses, {
       id: `${Date.now()}-${Math.random()}`,
-      type: type.trim()
+      type: cleanType,
+      quantity
     }];
     setBonuses(updated);
     updateConfig(updated);
@@ -90,6 +106,18 @@ export default function Step3Bonuses({ data, onChange, onNext }) {
 
   const removeBonus = (id) => {
     const updated = bonuses.filter(b => b.id !== id);
+    setBonuses(updated);
+    updateConfig(updated);
+  };
+
+  const updateQuantity = (id, delta) => {
+    const updated = bonuses.map(b => {
+      if (b.id === id) {
+        const newQty = Math.max(1, (b.quantity || 1) + delta);
+        return { ...b, quantity: newQty };
+      }
+      return b;
+    });
     setBonuses(updated);
     updateConfig(updated);
   };
@@ -146,121 +174,53 @@ export default function Step3Bonuses({ data, onChange, onNext }) {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-4xl font-bold mb-4 text-gray-900">What bonuses make your offer irresistible?</h2>
-        <p className="text-gray-600">Add extras that feel valuable to the client, even if they're easy for you to deliver.</p>
+        <h2 className="text-3xl font-bold mb-3 text-gray-900">Bonuses</h2>
+        <p className="text-gray-500 text-base">Add extras that feel valuable to the client, even if they cost you nothing extra to deliver.</p>
+        <p className="text-sm text-gray-400 mt-2">"Priority support" not "we answer emails" -- make it sound like a perk</p>
       </div>
 
-      <div className="space-y-6">
-        {bonuses.length > 0 && (
-          <DragDropContext onDragEnd={onDragEnd}>
-            <Droppable droppableId="bonuses">
-              {(provided) => (
-                <div
-                  className="space-y-3 mb-6"
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                >
-                  {bonuses.map((bonus, index) => (
-                    <Draggable key={bonus.id} draggableId={bonus.id} index={index}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className={`flex gap-3 items-center rounded-xl p-4 border-2 transition-all ${
-                            snapshot.isDragging
-                              ? 'bg-yellow-50 border-yellow-300 shadow-lg scale-105'
-                              : 'bg-white border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <div
-                            {...provided.dragHandleProps}
-                            className="cursor-grab active:cursor-grabbing p-2 -ml-1 -my-1 rounded-lg hover:bg-gray-100 transition-colors"
-                            title="Drag to reorder"
-                          >
-                            <GripVertical className="w-5 h-5 text-gray-400" />
-                          </div>
+      {/* Input area - ABOVE the list */}
+      <div>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 h-12 bg-gray-100 border-0 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:ring-1 focus:ring-gray-300 rounded-full px-5"
+              placeholder={bonuses.length === 0
+                ? "Your top bonus (e.g., unlimited revisions, dedicated account manager)"
+                : "Add another bonus..."
+              }
+              autoFocus
+            />
+            <Button
+              onClick={() => addBonus(inputValue)}
+              disabled={!inputValue.trim()}
+              className="h-12 w-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full disabled:opacity-50 flex-shrink-0"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+          </div>
 
-                          {editingId === bonus.id ? (
-                            <>
-                              <Input
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                onKeyDown={(e) => handleEditKeyDown(e, bonus.id)}
-                                className="flex-1 h-10 bg-white border-gray-300 text-gray-900"
-                                autoFocus
-                              />
-                              <Button
-                                onClick={() => saveEdit(bonus.id)}
-                                variant="ghost"
-                                size="icon"
-                                className="h-10 w-10 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full flex-shrink-0"
-                                title="Save"
-                              >
-                                <Check className="w-5 h-5" />
-                              </Button>
-                              <Button
-                                onClick={cancelEdit}
-                                variant="ghost"
-                                size="icon"
-                                className="h-10 w-10 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full flex-shrink-0"
-                                title="Cancel"
-                              >
-                                <X className="w-5 h-5" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <div
-                                className="flex-1 font-medium text-gray-900 cursor-pointer hover:text-yellow-600 transition-colors"
-                                onClick={() => startEdit(bonus)}
-                                title="Click to edit"
-                              >
-                                {bonus.type}
-                              </div>
-
-                              <Button
-                                onClick={() => removeBonus(bonus.id)}
-                                variant="ghost"
-                                size="icon"
-                                className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full flex-shrink-0"
-                                title="Remove"
-                              >
-                                <X className="w-5 h-5" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
-        )}
-
-        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-2xl p-6 border-2 border-yellow-200">
-          <div className="space-y-3">
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full h-12 border-2 border-yellow-300 hover:border-yellow-400 bg-white justify-start text-left font-normal"
-                >
-                  <Plus className="w-4 h-4 mr-2 text-yellow-600" />
-                  <span className="text-gray-600">Browse ideas...</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search bonuses..." />
-                  <CommandList>
-                    <CommandEmpty>No match found. Type your own below.</CommandEmpty>
-                    <CommandGroup>
-                      {COMMON_BONUSES.map((item) => (
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium pl-1">
+                <Plus className="w-4 h-4" />
+                Browse bonus ideas for inspiration
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[420px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search bonuses..." />
+                <CommandList>
+                  <CommandEmpty>No match found. Type your own above.</CommandEmpty>
+                  {Object.entries(CATEGORIZED_BONUSES).map(([category, items]) => (
+                    <CommandGroup key={category} heading={category}>
+                      {items.map((item) => (
                         <CommandItem
                           key={item}
                           value={item}
@@ -271,31 +231,123 @@ export default function Step3Bonuses({ data, onChange, onNext }) {
                         </CommandItem>
                       ))}
                     </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-
-            <div className="flex gap-2">
-              <Input
-                ref={inputRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="flex-1 h-12 bg-white border-2 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-yellow-400"
-                placeholder="Or type your own..."
-              />
-              <Button
-                onClick={() => addBonus(inputValue)}
-                disabled={!inputValue.trim()}
-                className="h-12 w-12 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl disabled:opacity-50 flex-shrink-0"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
+
+      {/* Bonuses list - BELOW the input */}
+      {bonuses.length > 0 && (
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="bonuses">
+            {(provided) => (
+              <div
+                className="space-y-2"
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+              >
+                {bonuses.map((bonus, index) => (
+                  <Draggable key={bonus.id} draggableId={bonus.id} index={index}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        className={`flex gap-3 items-center rounded-xl p-3 transition-all ${
+                          snapshot.isDragging
+                            ? 'bg-blue-50 shadow-lg scale-105'
+                            : 'bg-gray-50 hover:bg-gray-100'
+                        }`}
+                      >
+                        <div
+                          {...provided.dragHandleProps}
+                          className="cursor-grab active:cursor-grabbing p-1 rounded-lg hover:bg-gray-200 transition-colors"
+                          title="Drag to reorder"
+                        >
+                          <GripVertical className="w-4 h-4 text-gray-400" />
+                        </div>
+
+                        {editingId === bonus.id ? (
+                          <>
+                            <Input
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => handleEditKeyDown(e, bonus.id)}
+                              className="flex-1 h-9 bg-white border-gray-300 text-gray-900 text-sm"
+                              autoFocus
+                            />
+                            <Button
+                              onClick={() => saveEdit(bonus.id)}
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-full flex-shrink-0"
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              onClick={cancelEdit}
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full flex-shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            {/* Quantity controls */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {(bonus.quantity || 1) > 1 && (
+                                <button
+                                  onClick={() => updateQuantity(bonus.id, -1)}
+                                  className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                              )}
+                              {(bonus.quantity || 1) > 1 && (
+                                <span className="text-sm font-semibold text-indigo-600 w-6 text-center">
+                                  {bonus.quantity}x
+                                </span>
+                              )}
+                              <button
+                                onClick={() => updateQuantity(bonus.id, 1)}
+                                className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            <div
+                              className="flex-1 text-sm font-medium text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors"
+                              onClick={() => startEdit(bonus)}
+                              title="Click to edit"
+                            >
+                              {bonus.type}
+                            </div>
+
+                            <Button
+                              onClick={() => removeBonus(bonus.id)}
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full flex-shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      )}
     </div>
   );
 }
