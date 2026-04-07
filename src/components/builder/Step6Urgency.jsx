@@ -5,11 +5,10 @@ import { cn } from '@/lib/utils';
 import { ArrowRight } from 'lucide-react';
 
 const URGENCY_OPTIONS = [
-  'Only 2 new clients per month',
-  'Only 3 spots available this quarter',
-  'Pricing valid until end of month',
-  'Bonuses included only this month',
-  'Currently booking 4-6 weeks out',
+  'Limited to X spots per month',
+  'Currently booked X weeks in advance',
+  'Prices increase next month',
+  'Bonus offer ends this month',
 ];
 
 export default function Step6Urgency({ data, onChange, onNext }) {
