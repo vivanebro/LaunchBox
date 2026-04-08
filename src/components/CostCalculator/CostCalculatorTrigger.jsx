@@ -1,201 +1,93 @@
 import React from 'react';
-import { Lock, CircleHelp } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-
-// TooltipContent is a JS forwardRef export; some TS setups infer it too narrowly in .jsx consumers.
-// Casting here keeps this component type-safe enough while avoiding false-positive TS errors.
-const TooltipContentAny = /** @type {any} */ (TooltipContent);
 
 const NUDGE_DISMISS_KEY = 'launchbox_cost_nudge_dismissed';
 const OPENED_ONCE_KEY = 'launchbox_cost_calculator_opened_once';
 
 export function CostCalculatorTrigger({
-  state, // 'first_visit' | 'opened_incomplete' | 'profitable' | 'losing'
+  state, // 'first_visit' | 'opened_incomplete' | 'profitable' | 'low_margin' | 'losing'
   profit,
   marginPercent,
   currencySymbol = '$',
   onClick,
-  isMobile,
-  showNewBadge,
-  showNudgeTooltip,
-  onNudgeDismiss,
   darkMode = false,
+  packagePrice,
 }) {
-  const darkStateStyles =
-    state === 'profitable'
-      ? {
-          bg: 'bg-emerald-500/20',
-          hoverBg: 'hover:bg-emerald-500/28',
-          border: 'border-emerald-400/40',
-          hoverBorder: 'hover:border-emerald-300/55',
-          ring: 'focus-visible:ring-2 focus-visible:ring-emerald-400/40',
-        }
-      : state === 'low_margin'
-      ? {
-          bg: 'bg-amber-500/20',
-          hoverBg: 'hover:bg-amber-500/28',
-          border: 'border-amber-400/45',
-          hoverBorder: 'hover:border-amber-300/60',
-          ring: 'focus-visible:ring-2 focus-visible:ring-amber-400/40',
-        }
-      : state === 'losing'
-      ? {
-          bg: 'bg-rose-500/20',
-          hoverBg: 'hover:bg-rose-500/28',
-          border: 'border-rose-400/40',
-          hoverBorder: 'hover:border-rose-300/55',
-          ring: 'focus-visible:ring-2 focus-visible:ring-rose-400/40',
-        }
-      : state === 'opened_incomplete'
-      ? {
-          bg: 'bg-yellow-500/15',
-          hoverBg: 'hover:bg-yellow-500/22',
-          border: 'border-yellow-300/40',
-          hoverBorder: 'hover:border-yellow-200/55',
-          ring: 'focus-visible:ring-2 focus-visible:ring-yellow-300/35',
-        }
-      : state === 'first_visit'
-      ? {
-          bg: 'bg-purple-500/18',
-          hoverBg: 'hover:bg-purple-500/26',
-          border: 'border-purple-300/40',
-          hoverBorder: 'hover:border-purple-200/55',
-          ring: 'focus-visible:ring-2 focus-visible:ring-purple-300/35',
-        }
-      : {
-          bg: 'bg-white/10',
-          hoverBg: 'hover:bg-white/14',
-          border: 'border-white/25',
-          hoverBorder: 'hover:border-white/35',
-          ring: 'focus-visible:ring-2 focus-visible:ring-white/20',
-        };
+  const hasData = state === 'profitable' || state === 'low_margin' || state === 'losing';
 
-  const bgColor = darkMode
-    ? cn(darkStateStyles.bg, darkStateStyles.hoverBg)
-    : state === 'first_visit'
-      ? 'bg-purple-100/35'
-      : state === 'opened_incomplete'
-        ? 'bg-yellow-100/35'
-        : state === 'profitable'
-          ? 'bg-green-100/35'
-          : state === 'low_margin'
-            ? 'bg-amber-100/35'
-            : state === 'losing'
-              ? 'bg-red-100/35'
-              : 'bg-gray-100/35';
+  // Calculate bar proportions
+  // profitPct = what portion of the price is profit (green)
+  // costPct = what portion is cost (gray, or red if losing)
+  const price = parseFloat(packagePrice) || 0;
+  const profitVal = profit || 0;
+  const isLosing = state === 'losing';
 
-  const label =
-    state === 'profitable'
-      ? `${currencySymbol}${Math.abs(profit || 0).toLocaleString()} profit`
-      : state === 'low_margin'
-      ? `${currencySymbol}${Math.abs(profit || 0).toLocaleString()} profit`
-      : state === 'losing'
-      ? `-${currencySymbol}${Math.abs(profit || 0).toLocaleString()} loss`
-      : 'Calculate Your Cost';
+  let costPct = 100;
+  let profitPct = 0;
 
-  const isBlinking = state === 'first_visit';
-  const isCalculateYourCostState = label === 'Calculate Your Cost';
+  if (hasData && price > 0) {
+    if (isLosing) {
+      costPct = 100;
+      profitPct = 0;
+    } else {
+      profitPct = Math.max(0, Math.min(100, (profitVal / price) * 100));
+      costPct = 100 - profitPct;
+    }
+  }
 
-  const content = (
+  if (!hasData) {
+    // Empty state: subtle prompt
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'w-full flex flex-col items-center gap-1 py-0.5 transition-all hover:brightness-125',
+        )}
+      >
+        <div className="w-3/4 h-1.5 rounded-full bg-gray-200 overflow-hidden" />
+        <span className={cn(
+          'text-[10px]',
+          darkMode ? 'text-white/40' : 'text-gray-400'
+        )}>
+          Calculate costs
+        </span>
+      </button>
+    );
+  }
+
+  return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        'w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-dashed transition-all min-h-[44px]',
-        darkMode ? cn(darkStateStyles.border, darkStateStyles.hoverBorder) : 'border-gray-300/80',
-        darkMode ? 'hover:opacity-100' : 'hover:opacity-90',
-        'focus:outline-none focus-visible:outline-none focus-visible:ring-0',
-        darkMode && darkStateStyles.ring,
-        bgColor,
-        isBlinking && 'animate-cost-aura'
-      )}
+      className="w-full flex flex-col items-center gap-1 py-0.5 transition-all hover:brightness-125"
     >
-      <span
-        className={cn(
-          'text-sm font-medium',
-          state === 'profitable' && (darkMode ? 'text-emerald-100' : 'text-green-700'),
-          state === 'low_margin' && (darkMode ? 'text-amber-100' : 'text-amber-800'),
-          state === 'losing' && (darkMode ? 'text-rose-100' : 'text-red-700'),
-          (state === 'first_visit' || state === 'opened_incomplete') && (darkMode ? 'text-white/85' : 'text-gray-700')
-        )}
-      >
-        {label}
-      </span>
-      {state === 'profitable' && marginPercent != null && !isNaN(marginPercent) && (
-        <span className={cn('text-xs', darkMode ? 'text-emerald-200/90' : 'text-green-600')}>
-          ({marginPercent.toFixed(0)}%)
-        </span>
-      )}
-      {state === 'low_margin' && marginPercent != null && !isNaN(marginPercent) && (
-        <span className={cn('text-xs', darkMode ? 'text-amber-200/90' : 'text-amber-600')}>
-          ({marginPercent.toFixed(0)}%)
-        </span>
-      )}
-      {state === 'losing' && marginPercent != null && !isNaN(marginPercent) && (
-        <span className={cn('text-xs', darkMode ? 'text-rose-200/90' : 'text-red-600')}>
-          ({marginPercent.toFixed(0)}%)
-        </span>
-      )}
-      {showNewBadge && state === 'first_visit' && (
-        <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase bg-purple-500 text-white rounded">
-          New
-        </span>
-      )}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            className={cn(
-              'inline-flex items-center justify-center rounded-full',
-              'w-4 h-4',
-              darkMode ? 'text-white/65 hover:text-white/85' : 'text-gray-500 hover:text-gray-700'
-            )}
-            aria-label="Cost calculator help"
-          >
-            <CircleHelp className="w-3.5 h-3.5" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContentAny side="top" className="max-w-[240px]">
-          {isCalculateYourCostState ? (
-            <p>Clients won't see this. Please click to calculate your costs and profit margins.</p>
-          ) : showNudgeTooltip ? (
-            <p>
-              Check if your price covers your costs. Only visible to you.
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onNudgeDismiss?.();
-                }}
-                className="block mt-1 text-xs underline"
-              >
-                Got it
-              </button>
-            </p>
-          ) : (
-            <p>Clients won&apos;t see this. Please click to see your costs and profit margins.</p>
+      <div className="w-3/4 h-1.5 rounded-full overflow-hidden flex">
+        <div
+          className={cn(
+            'h-full transition-all',
+            isLosing ? 'bg-red-400' : 'bg-gray-300'
           )}
-        </TooltipContentAny>
-      </Tooltip>
-      {isMobile && (state === 'first_visit' || state === 'opened_incomplete') && (
-        <span className={cn('flex items-center gap-1 text-xs', darkMode ? 'text-white/60' : 'text-gray-500')}>
-          <Lock className="w-3 h-3" />
-          Only you
-        </span>
-      )}
+          style={{ width: `${costPct}%` }}
+        />
+        {profitPct > 0 && (
+          <div
+            className="h-full bg-emerald-500 transition-all"
+            style={{ width: `${profitPct}%` }}
+          />
+        )}
+      </div>
+      <span className={cn(
+        'text-[10px]',
+        isLosing
+          ? (darkMode ? 'text-red-300' : 'text-red-400')
+          : state === 'profitable'
+            ? (darkMode ? 'text-green-300' : 'text-green-500')
+            : (darkMode ? 'text-amber-300' : 'text-amber-500')
+      )}>
+        {isLosing ? 'Over budget' : `${Math.round(profitPct)}% margin`}
+      </span>
     </button>
-  );
-
-  return (
-    <TooltipProvider delayDuration={200}>
-      <div className="my-3">{content}</div>
-    </TooltipProvider>
   );
 }
 
@@ -228,7 +120,7 @@ export function getCostCalculatorState(costData, packagePrice) {
 export function getCostCalculatorDisplay(costData, packagePrice, currencySymbol = '$') {
   const state = getCostCalculatorState(costData, packagePrice);
   if (state !== 'profitable' && state !== 'low_margin' && state !== 'losing') {
-    return { state, profit: null, marginPercent: null };
+    return { state, profit: null, marginPercent: null, packagePrice };
   }
 
   const { categories = [] } = costData || {};
@@ -244,7 +136,7 @@ export function getCostCalculatorDisplay(costData, packagePrice, currencySymbol 
   const profit = price - totalCost;
   const margin = price > 0 ? (profit / price) * 100 : 0;
 
-  return { state, profit, marginPercent: margin };
+  return { state, profit, marginPercent: margin, packagePrice };
 }
 
 export function hasOpenedCalculatorOnce() {

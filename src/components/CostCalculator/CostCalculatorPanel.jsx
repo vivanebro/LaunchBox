@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, CircleHelp } from 'lucide-react';
+import { X, Lock, Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, CircleHelp, Pencil, Save, Settings2, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -19,15 +19,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { EXAMPLE_TEMPLATE, EXAMPLE_TEMPLATE_ID } from './exampleTemplate';
 
 const DEFAULT_CATEGORIES = [
-  { id: 'time', name: 'Your Time', type: 'time', placeholder: 'e.g., filming, editing, meetings', qty: '', unit: 'days', rate: '', amount: 0 },
-  { id: 'team', name: 'Team / Subcontractors', type: 'amount', placeholder: 'e.g., second shooter, editor', amount: '' },
-  { id: 'equipment', name: 'Equipment / Rentals', type: 'amount', placeholder: 'e.g., camera, lights, gimbal', amount: '' },
-  { id: 'travel', name: 'Travel / Location', type: 'amount', placeholder: 'e.g., flights, accommodation', amount: '' },
-  { id: 'materials', name: 'Materials & Licenses', type: 'amount', placeholder: 'e.g., stock footage, music, fonts, prints', amount: '' },
-  { id: 'software', name: 'Software', type: 'amount', placeholder: 'e.g., editing tools, subscriptions', amount: '' },
-  { id: 'other', name: 'Other', type: 'amount', placeholder: 'e.g., insurance, permits', amount: '' },
+  { id: 'time', name: 'Your Time', type: 'time', placeholder: '0', qty: '', unit: 'days', rate: '', amount: 0 },
+  { id: 'team', name: 'Team / Subcontractors', type: 'amount', placeholder: '0', amount: '' },
+  { id: 'equipment', name: 'Equipment / Rentals', type: 'amount', placeholder: '0', amount: '' },
+  { id: 'travel', name: 'Travel / Location', type: 'amount', placeholder: '0', amount: '' },
+  { id: 'materials', name: 'Materials & Licenses', type: 'amount', placeholder: '0', amount: '' },
+  { id: 'software', name: 'Software', type: 'amount', placeholder: '0', amount: '' },
+  { id: 'other', name: 'Other', type: 'amount', placeholder: '0', amount: '' },
 ];
 
 const PRIVACY_DISMISS_KEY = 'launchbox_cost_privacy_dismissed';
@@ -77,7 +78,7 @@ export function CostCalculatorPanel({
   variant = 'sheet',
   /** Template editor: hide tier switching; relabel price line */
   templateMode = false,
-  showCloseButton = true,
+  showCloseButton = false,
   /** Optional: apply a saved template from library (Results page) */
   templateLibrary = [],
   onApplyTemplate,
@@ -87,6 +88,11 @@ export function CostCalculatorPanel({
   templateReferenceEditable = false,
   referencePriceInputValue = '',
   onReferencePriceChange,
+  /** Save current costs as a new template */
+  onSaveAsTemplate,
+  /** Template management callbacks */
+  onDeleteTemplate,
+  onRenameTemplate,
 }) {
   const initCategories = useCallback((data) => {
     const raw = data?.categories?.length ? data.categories : DEFAULT_CATEGORIES.map((c) => ({ ...c }));
@@ -109,12 +115,12 @@ export function CostCalculatorPanel({
   });
 
   useEffect(() => {
-    if (!currentTier) return;
+    if (!currentTier && !templateMode) return;
     setCategories(initCategories(costData));
     const val = costData?.marginPercent ?? 30;
     setMarginPercent(val);
     setMarginInputValue(String(val));
-  }, [currentTier, costData, initCategories]);
+  }, [currentTier, costData, initCategories, templateMode]);
 
   useEffect(() => {
     if (isOpen) setIsVisible(true);
@@ -128,6 +134,13 @@ export function CostCalculatorPanel({
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [templateSelectValue, setTemplateSelectValue] = useState('none');
+  const [savingTemplateName, setSavingTemplateName] = useState(null); // null = hidden, string = showing input
+  const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
+  const [renamingTemplateId, setRenamingTemplateId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [savingOverExisting, setSavingOverExisting] = useState(false); // show overwrite options
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const templateDropdownRef = React.useRef(null);
 
   const saveDebounceRef = React.useRef(null);
   const panelRef = React.useRef(null);
@@ -259,18 +272,31 @@ export function CostCalculatorPanel({
     setIsVisible(false);
   }, []);
 
+  // Close template dropdown when clicking outside it
+  useEffect(() => {
+    if (!templateDropdownOpen) return;
+    const handler = (e) => {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target)) {
+        setTemplateDropdownOpen(false);
+        setRenamingTemplateId(null);
+      }
+    };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, [templateDropdownOpen]);
+
   useEffect(() => {
     if (!isOpen || variant === 'embedded') return;
 
     const handlePointerDownOutside = (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
+      if (!panelRef.current) return;
 
-      // Keep panel open when clicking inside panel or Radix dropdown content.
-      if (panelRef.current?.contains(target)) return;
-      if (target.closest('[data-radix-popper-content-wrapper], [role="menu"]')) return;
+      // Use the panel's bounding box to decide -- if the click is within
+      // the panel's horizontal area, keep it open regardless of DOM containment.
+      // This handles Radix portals, tooltips, dropdowns, etc. that render outside the panel DOM.
+      const rect = panelRef.current.getBoundingClientRect();
+      if (event.clientX >= rect.left) return;
 
-      // Defer so click reaches editable fields first, then animate out
       setTimeout(() => requestClose(), 0);
     };
 
@@ -283,7 +309,7 @@ export function CostCalculatorPanel({
       ? 'relative z-0 w-full flex flex-col bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden min-h-[520px]'
       : isMobile
         ? 'fixed inset-0 z-50 bg-white flex flex-col md:hidden'
-        : 'fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col border-l border-gray-200';
+        : 'fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-white/60 backdrop-blur-xl shadow-2xl flex flex-col border-l border-gray-200/40';
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -306,57 +332,7 @@ export function CostCalculatorPanel({
           onWheelCapture={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex-shrink-0 p-4 md:p-6 border-b border-gray-200 space-y-3">
-            {templateLibrary.length > 0 && typeof onApplyTemplate === 'function' && !templateMode && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="cost-template-select" className="text-sm font-medium text-gray-800">
-                    Apply template
-                  </Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                        aria-label="About templates"
-                      >
-                        <CircleHelp className="w-4 h-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[280px] text-xs leading-relaxed">
-                      Replaces this tier&apos;s cost categories and margin with a saved template. Your package price
-                      stays the same; only your internal cost breakdown updates.
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <Select
-                  value={templateSelectValue}
-                  onValueChange={(v) => {
-                    if (v === 'none') return;
-                    Promise.resolve(onApplyTemplate(v))
-                      .then(() => setTemplateSelectValue('none'))
-                      .catch(() => {});
-                  }}
-                >
-                  <SelectTrigger
-                    id="cost-template-select"
-                    className="h-11 w-full rounded-xl border-gray-200 bg-gray-50/80 text-left font-normal shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-[#ff0044]/20"
-                  >
-                    <SelectValue placeholder="Choose a saved template…" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-gray-200 shadow-lg max-h-[min(280px,50vh)]">
-                    <SelectItem value="none" className="rounded-lg text-gray-500">
-                      None — keep current costs
-                    </SelectItem>
-                    {templateLibrary.map((t) => (
-                      <SelectItem key={t.id} value={t.id} className="rounded-lg cursor-pointer">
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+          <div className="flex-shrink-0 p-4 md:p-6 space-y-3">
             <div className="flex items-center justify-between gap-2">
               {!templateMode && tiers.length > 1 && (
                 <>
@@ -375,15 +351,13 @@ export function CostCalculatorPanel({
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg hover:bg-gray-100 transition-colors text-left"
+                        className="flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                       >
-                        <span className="text-lg font-bold text-gray-900 truncate w-full text-center">
-                          {packageName}
+                        <span className="text-lg font-bold text-gray-900">Cost Calculator</span>
+                        <span className="text-sm text-gray-500 truncate w-full text-center">
+                          {packageName} &middot; {formatCurrency(price, currencySymbol)}
                         </span>
-                        <span className="text-xl font-bold text-gray-700">
-                          {formatCurrency(price, currencySymbol)}
-                        </span>
-                        <ChevronDown className="w-4 h-4 text-gray-500 mt-0.5" />
+                        <ChevronDown className="w-4 h-4 text-gray-400 mt-0.5" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="center" className="min-w-[180px]">
@@ -419,10 +393,8 @@ export function CostCalculatorPanel({
               )}
               {!templateMode && tiers.length <= 1 && (
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-lg font-bold text-gray-900 truncate">{packageName}</h2>
-                  <p className="text-2xl font-bold mt-1 text-gray-900">
-                    {formatCurrency(price, currencySymbol)}
-                  </p>
+                  <h2 className="text-lg font-bold text-gray-900">Cost Calculator</h2>
+                  <p className="text-sm text-gray-500 truncate">{packageName} &middot; {formatCurrency(price, currencySymbol)}</p>
                 </div>
               )}
               {templateMode && (
@@ -482,19 +454,15 @@ export function CostCalculatorPanel({
             </div>
 
             {showPrivacyNotice && (
-              <div className="mt-4 flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
-                <Lock className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-blue-800">
-                    Only you can see this. Your client will never see your costs.
-                  </p>
-                  <button
-                    onClick={dismissPrivacy}
-                    className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Dismiss
-                  </button>
-                </div>
+              <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50">
+                <Lock className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                <p className="text-xs text-blue-700 flex-1">This won't be visible to your clients!</p>
+                <button
+                  onClick={dismissPrivacy}
+                  className="text-xs text-blue-400 hover:text-blue-600 flex-shrink-0"
+                >
+                  Dismiss
+                </button>
               </div>
             )}
           </div>
@@ -502,6 +470,233 @@ export function CostCalculatorPanel({
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 overscroll-contain">
             <div className="space-y-4">
+              {/* Template selector + save as template */}
+              {!templateMode && (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="relative flex-1" ref={templateDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => { setTemplateDropdownOpen(!templateDropdownOpen); setRenamingTemplateId(null); setConfirmingClear(false); }}
+                      className="w-full h-9 flex items-center justify-between px-3 rounded-lg border-0 bg-gray-50 text-sm shadow-sm hover:bg-white hover:shadow-md transition-all"
+                    >
+                      <span className={templateSelectValue ? 'text-gray-900' : 'text-gray-400'}>
+                        {templateSelectValue === EXAMPLE_TEMPLATE_ID
+                          ? EXAMPLE_TEMPLATE.name
+                          : templateLibrary.find((t) => t.id === templateSelectValue)?.name
+                          || 'Use a template'}
+                      </span>
+                      <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', templateDropdownOpen && 'rotate-180')} />
+                    </button>
+
+                    {templateDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden max-h-[280px] overflow-y-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const hasData = categories.some((c) => {
+                              if (c.type === 'time') return parseNum(c.qty) > 0 || parseNum(c.rate) > 0;
+                              return parseNum(c.amount) > 0;
+                            });
+                            if (hasData && !confirmingClear) {
+                              setConfirmingClear(true);
+                              return;
+                            }
+                            setCategories(DEFAULT_CATEGORIES.map((c, i) => ({ ...c, _id: `reset-${i}-${Date.now()}` })));
+                            setMarginInputValue('30');
+                            setTemplateSelectValue('');
+                            setConfirmingClear(false);
+                            setTemplateDropdownOpen(false);
+                          }}
+                          className={cn(
+                            'w-full text-left px-3 py-2 text-sm hover:bg-gray-50',
+                            confirmingClear ? 'text-red-500 font-medium' : 'text-gray-400'
+                          )}
+                        >
+                          {confirmingClear ? 'Clear all data?' : 'None'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const initCats = EXAMPLE_TEMPLATE.body.categories.map((c, i) => ({
+                              ...c, _id: `example-${i}-${Date.now()}`,
+                            }));
+                            setCategories(initCats);
+                            setMarginInputValue(String(EXAMPLE_TEMPLATE.body.marginPercent));
+                            setTemplateSelectValue(EXAMPLE_TEMPLATE_ID);
+                            setTemplateDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-400 italic hover:bg-gray-50"
+                        >
+                          {EXAMPLE_TEMPLATE.name}
+                        </button>
+                        {templateLibrary.map((t) => (
+                          <div key={t.id} className="flex items-center hover:bg-gray-50 group/tpl">
+                            {renamingTemplateId === t.id ? (
+                              <div className="flex items-center gap-1.5 flex-1 px-2 py-1">
+                                <Input
+                                  autoFocus
+                                  value={renameValue}
+                                  onChange={(e) => setRenameValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === 'Enter' && renameValue.trim()) {
+                                      onRenameTemplate?.(t.id, renameValue.trim());
+                                      setRenamingTemplateId(null);
+                                    }
+                                    if (e.key === 'Escape') setRenamingTemplateId(null);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-7 text-xs flex-1 border-0 bg-gray-50 shadow-sm"
+                                />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (renameValue.trim()) onRenameTemplate?.(t.id, renameValue.trim());
+                                    setRenamingTemplateId(null);
+                                  }}
+                                  className="text-emerald-600 hover:text-emerald-700 p-0.5"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTemplateSelectValue(t.id);
+                                    Promise.resolve(onApplyTemplate?.(t.id)).catch(() => {});
+                                    setTemplateDropdownOpen(false);
+                                  }}
+                                  className="flex-1 text-left px-3 py-2 text-sm text-gray-700 truncate"
+                                >
+                                  {t.name}
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRenamingTemplateId(t.id);
+                                    setRenameValue(t.name);
+                                  }}
+                                  className="opacity-0 group-hover/tpl:opacity-100 text-gray-300 hover:text-gray-500 p-1.5"
+                                  title="Rename"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteTemplate?.(t.id);
+                                    if (templateSelectValue === t.id) setTemplateSelectValue('');
+                                  }}
+                                  className="opacity-0 group-hover/tpl:opacity-100 text-gray-300 hover:text-red-500 p-1.5 mr-1"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {onSaveAsTemplate && savingTemplateName === null && (
+                    <button
+                      onClick={() => {
+                        setSavingTemplateName('');
+                        setSavingOverExisting(templateLibrary.length > 0);
+                      }}
+                      className="text-xs text-gray-400 hover:text-gray-600 inline-flex items-center gap-1 min-h-[36px] px-2 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      Save template
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Save template: overwrite existing or create new */}
+              {savingTemplateName !== null && (
+                <div className="bg-gray-50 rounded-lg p-2 space-y-2">
+                  {/* Overwrite existing templates */}
+                  {templateLibrary.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wide px-1">Update existing</p>
+                      {templateLibrary.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            const data = {
+                              categories: categories.map(({ _id, ...c }) => c),
+                              marginPercent: parseNum(marginInputValue) || 0,
+                              hasOpened: true,
+                              _templateName: t.name,
+                              _overwriteId: t.id,
+                            };
+                            onSaveAsTemplate(data);
+                            setSavingTemplateName(null);
+                          }}
+                          className="w-full text-left px-2 py-1.5 text-xs text-gray-700 rounded hover:bg-white truncate"
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                      <div className="border-t border-gray-200 my-1" />
+                    </div>
+                  )}
+                  {/* Create new */}
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide px-1">Create new</p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      autoFocus
+                      value={savingTemplateName}
+                      onChange={(e) => setSavingTemplateName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && savingTemplateName.trim()) {
+                          const data = {
+                            categories: categories.map(({ _id, ...c }) => c),
+                            marginPercent: parseNum(marginInputValue) || 0,
+                            hasOpened: true,
+                            _templateName: savingTemplateName.trim(),
+                          };
+                          onSaveAsTemplate(data);
+                          setSavingTemplateName(null);
+                        }
+                        if (e.key === 'Escape') setSavingTemplateName(null);
+                      }}
+                      placeholder="Template name..."
+                      className="h-8 text-xs flex-1 border-0 bg-white shadow-sm"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!savingTemplateName.trim()}
+                      onClick={() => {
+                        const data = {
+                          categories: categories.map(({ _id, ...c }) => c),
+                          marginPercent: parseNum(marginInputValue) || 0,
+                          hasOpened: true,
+                          _templateName: savingTemplateName.trim(),
+                        };
+                        onSaveAsTemplate(data);
+                        setSavingTemplateName(null);
+                      }}
+                      className="h-8 px-3 text-xs"
+                    >
+                      Save
+                    </Button>
+                    <button
+                      onClick={() => setSavingTemplateName(null)}
+                      className="text-gray-400 hover:text-gray-600 p-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {categories.map((cat, idx) => (
                 <div key={cat._id} className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -515,68 +710,47 @@ export function CostCalculatorPanel({
                           className="h-11 min-h-[44px] w-[230px] max-w-full"
                           autoFocus
                         />
-                        <FieldHelp
-                          text={cat.type === 'time'
-                            ? 'Name this time-based cost item, then enter quantity, unit, and your rate.'
-                            : 'Enter the total amount for this cost category.'}
-                        />
                       </div>
                     ) : (
-                      <div className="flex-1 flex items-center justify-start gap-1.5">
+                      <div className="flex-1 flex items-center justify-start gap-1.5 group">
                         <button
                           onClick={() => startEditName(cat)}
-                          className="text-left text-sm font-medium text-gray-700 hover:text-gray-900 min-h-[44px] inline-flex items-center px-1 rounded"
+                          className="text-left text-sm font-medium text-gray-700 hover:text-gray-900 min-h-[44px] inline-flex items-center gap-1.5 px-1 rounded"
                         >
                           {cat.name}
+                          <Pencil className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
-                        <FieldHelp
-                          text={cat.type === 'time'
-                            ? 'Name this time-based cost item, then enter quantity, unit, and your rate.'
-                            : 'Enter the total amount for this cost category.'}
-                        />
                       </div>
-                    )}
-                    {categories.length > 1 && (
-                      <button
-                        onClick={() => deleteCategory(idx)}
-                        className="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                        aria-label="Delete category"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     )}
                   </div>
 
                   {cat.type === 'time' ? (
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 group/row">
                       <Input
                         type="number"
                         inputMode="decimal"
                         placeholder="0"
                         value={cat.qty}
                         onChange={(e) => updateCategory(idx, { qty: e.target.value })}
-                        className="w-20 h-11 min-h-[44px]"
+                        className="w-20 h-11 min-h-[44px] border-0 shadow-sm bg-gray-50 focus:bg-white focus:shadow-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <select
                         value={cat.unit}
                         onChange={(e) => updateCategory(idx, { unit: e.target.value })}
-                        className="h-11 min-h-[44px] px-3 rounded-md border border-gray-200 bg-white text-sm"
+                        className="h-11 min-h-[44px] px-3 rounded-md border-0 shadow-sm bg-gray-50 text-sm focus:bg-white focus:shadow-md"
                       >
                         <option value="days">days</option>
                         <option value="hours">hours</option>
                       </select>
-                      <span className="text-gray-500">×</span>
+                      <span className="text-gray-400 text-xs">x</span>
                       <div className="relative w-28">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
-                          {currencySymbol}
-                        </span>
                         <Input
                           type="number"
                           inputMode="decimal"
-                          placeholder="Rate"
+                          placeholder="0"
                           value={cat.rate}
                           onChange={(e) => updateCategory(idx, { rate: e.target.value })}
-                          className="w-full h-11 min-h-[44px] pl-7"
+                          className="w-full h-11 min-h-[44px] border-0 shadow-sm bg-gray-50 focus:bg-white focus:shadow-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
                       <span className="text-gray-500">=</span>
@@ -586,20 +760,38 @@ export function CostCalculatorPanel({
                           currencySymbol
                         )}
                       </span>
+                      {categories.length > 1 && (
+                        <button
+                          onClick={() => deleteCategory(idx)}
+                          className="opacity-0 group-hover/row:opacity-100 transition-opacity text-red-400 hover:text-red-600 ml-1"
+                          aria-label="Delete category"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ) : (
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
+                    <div className="relative group/row">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none z-10">
                         {currencySymbol}
                       </span>
                       <Input
                         type="number"
                         inputMode="decimal"
-                        placeholder={cat.placeholder}
+                        placeholder="0"
                         value={cat.amount}
                         onChange={(e) => updateCategory(idx, { amount: e.target.value })}
-                        className="h-11 min-h-[44px] pl-7"
+                        className="h-11 min-h-[44px] pl-7 pr-10 border-0 shadow-sm bg-gray-50 focus:bg-white focus:shadow-md [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
+                      {categories.length > 1 && (
+                        <button
+                          onClick={() => deleteCategory(idx)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 transition-opacity text-red-400 hover:text-red-600"
+                          aria-label="Delete category"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -616,20 +808,17 @@ export function CostCalculatorPanel({
               <div className="pt-2">
                 <button
                   onClick={() => setShowResetConfirm(true)}
-                  className="text-sm text-red-500 hover:text-red-700 font-medium"
+                  className="text-sm text-gray-400 hover:text-gray-600"
                 >
                   {templateMode ? 'Reset all costs in this template' : 'Reset all costs for this package'}
                 </button>
               </div>
 
-              <p className="text-xs text-gray-400">
-                {filledCount} of {categories.length} categories filled
-              </p>
             </div>
           </div>
 
           {/* Fixed summary footer */}
-          <div className="flex-shrink-0 p-4 md:p-6 border-t border-gray-200 bg-gray-50 space-y-3">
+          <div className="flex-shrink-0 p-4 md:p-6 space-y-3 bg-gray-50/80">
             {!hasAnyCosts ? (
               <div className="space-y-3">
                 <p className="text-sm text-gray-500 text-center py-2">
@@ -719,7 +908,7 @@ export function CostCalculatorPanel({
                         setMarginInputValue(String(n));
                       }
                     }}
-                    className="w-16 h-9 text-sm"
+                    className="w-16 h-9 text-sm border-0 shadow-sm bg-gray-50 focus:bg-white focus:shadow-md"
                   />
                   <span className="text-sm text-gray-500">%</span>
                 </div>
@@ -727,7 +916,7 @@ export function CostCalculatorPanel({
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="text-sm text-gray-600">
                       Suggested min. price{' '}
-                      <span className="font-semibold text-gray-900">{formatCurrency(suggestedMinPrice, currencySymbol)}</span>
+                      <span className="font-semibold text-gray-900">{formatCurrency(suggestedPriceRoundedUp, currencySymbol)}</span>
                     </span>
                     {templateMode && (
                       <Tooltip>

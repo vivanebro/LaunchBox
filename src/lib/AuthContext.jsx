@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import { supabase } from '@/lib/supabaseClient';
 
 const AuthContext = createContext();
 
@@ -14,6 +15,27 @@ export const AuthProvider = ({ children }) => {
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
 
   useEffect(() => {
+    // Dev-only: bypass Base44 auth, sign in directly to Supabase
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('devbypass')) {
+      localStorage.setItem('devbypass_active', '1');
+      (async () => {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: 'dana@launchbox.dev',
+            password: 'devpreview2026',
+          });
+          if (error) throw error;
+          setUser({ id: data.user.id, email: data.user.email, full_name: 'Dana (Dev Preview)' });
+          setIsAuthenticated(true);
+        } catch (e) {
+          console.error('Dev bypass auth failed:', e);
+          setAuthError({ type: 'unknown', message: 'Dev bypass failed: ' + e.message });
+        }
+        setIsLoadingAuth(false);
+        setIsLoadingPublicSettings(false);
+      })();
+      return;
+    }
     checkAppState();
   }, []);
 

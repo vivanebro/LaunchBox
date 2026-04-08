@@ -2815,7 +2815,7 @@ export default function Results() {
                   </div>
                 </div>
 
-                <div className="mb-2 group/origprice">
+                <div className="mb-0 group/origprice">
                   {/* Original/strikethrough price */}
                   <div className="h-8 flex items-center justify-center mb-1">
                     {originalPrice > 0 ? (
@@ -2913,6 +2913,12 @@ export default function Results() {
                     )}
                   </div>
                 </div>
+                {!isPreviewMode && (
+                  <CostCalculatorTrigger
+                    {...getCostCalculatorDisplay(config.cost_data?.[modeKey]?.[tierName], pkg.price, currencySymbol)}
+                    onClick={() => openCostCalculator(tierName)}
+                  />
+                )}
                 {pricingMode === 'one-time' && (
                   <p className={`text-gray-900 font-bold mb-6 text-center ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}>
                     <EditableText
@@ -2964,18 +2970,6 @@ export default function Results() {
                   >
                     + Add description
                   </button>
-                )}
-
-                {!isPreviewMode && (
-                  <CostCalculatorTrigger
-                    {...getCostCalculatorDisplay(config.cost_data?.[modeKey]?.[tierName], pkg.price, currencySymbol)}
-                    onClick={() => openCostCalculator(tierName)}
-                    isMobile={isMobileView}
-                    showNewBadge={!hasOpenedCalculatorOnce()}
-                    showNudgeTooltip={!hasNudgeBeenDismissed()}
-                    onNudgeDismiss={setNudgeDismissed}
-                    darkMode={false}
-                  />
                 )}
 
                 <div className={`space-y-2 mb-4`}>
@@ -3286,7 +3280,7 @@ export default function Results() {
                   </div>
                 </div>
 
-                <div className="mb-6 group/origprice">
+                <div className="mb-0 group/origprice">
                   {/* Original/strikethrough price */}
                   <div className="h-8 flex items-center justify-center mb-1">
                     {originalPrice > 0 ? (
@@ -3386,6 +3380,13 @@ export default function Results() {
                     )}
                   </div>
                 </div>
+                {!isPreviewMode && (
+                  <CostCalculatorTrigger
+                    {...getCostCalculatorDisplay(config.cost_data?.[modeKey]?.[tierName], pkg.price, currencySymbol)}
+                    onClick={() => openCostCalculator(tierName)}
+                    darkMode
+                  />
+                )}
                 {pricingMode === 'one-time' && (
                   <p className={`text-white font-bold mb-6 text-center ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}>
                     <EditableText
@@ -3438,18 +3439,6 @@ export default function Results() {
                   >
                     + Add description
                   </button>
-                )}
-
-                {!isPreviewMode && (
-                  <CostCalculatorTrigger
-                    {...getCostCalculatorDisplay(config.cost_data?.[modeKey]?.[tierName], pkg.price, currencySymbol)}
-                    onClick={() => openCostCalculator(tierName)}
-                    isMobile={isMobileView}
-                    showNewBadge={!hasOpenedCalculatorOnce()}
-                    showNudgeTooltip={!hasNudgeBeenDismissed()}
-                    onNudgeDismiss={setNudgeDismissed}
-                    darkMode={true}
-                  />
                 )}
 
                 <div className={`space-y-2 mb-4`}>
@@ -5035,7 +5024,7 @@ export default function Results() {
             setTimeout(() => silentSave(), 500);
           }}
           templateLibrary={costTemplates}
-          onApplyTemplate={costTemplates.length ? handleApplyCostTemplate : undefined}
+          onApplyTemplate={handleApplyCostTemplate}
           onApplySuggestedPrice={(newPrice, calculatorData) => {
             const tierName = costCalculatorTier;
             const modeKey = getCurrentModeKey();
@@ -5054,6 +5043,50 @@ export default function Results() {
             }
             updateConfigMultiple(updates);
             setTimeout(() => silentSave(), 500);
+          }}
+          onSaveAsTemplate={async (costBody) => {
+            const name = costBody?._templateName;
+            const overwriteId = costBody?._overwriteId;
+            if (!name?.trim() && !overwriteId) return;
+            const { _templateName, _overwriteId, ...body } = costBody;
+            try {
+              if (overwriteId) {
+                await supabaseClient.entities.CostCalculatorTemplate.update(overwriteId, {
+                  body,
+                  currency: config?.currency || 'USD',
+                  updated_at: new Date().toISOString(),
+                });
+              } else {
+                await supabaseClient.entities.CostCalculatorTemplate.create({
+                  name: name.trim(),
+                  body,
+                  linked_package_id: null,
+                  currency: config?.currency || 'USD',
+                });
+              }
+              const list = await supabaseClient.entities.CostCalculatorTemplate.filter({ created_by: profileUser?.id }, '-created_at');
+              setCostTemplates((list || []).map((t) => ({ id: t.id, name: t.name })));
+            } catch (e) {
+              console.error('Save as template:', e);
+            }
+          }}
+          onDeleteTemplate={async (templateId) => {
+            try {
+              await supabaseClient.entities.CostCalculatorTemplate.delete(templateId);
+              const list = await supabaseClient.entities.CostCalculatorTemplate.filter({ created_by: profileUser?.id }, '-created_at');
+              setCostTemplates((list || []).map((t) => ({ id: t.id, name: t.name })));
+            } catch (e) {
+              console.error('Delete template:', e);
+            }
+          }}
+          onRenameTemplate={async (templateId, newName) => {
+            try {
+              await supabaseClient.entities.CostCalculatorTemplate.update(templateId, { name: newName, updated_at: new Date().toISOString() });
+              const list = await supabaseClient.entities.CostCalculatorTemplate.filter({ created_by: profileUser?.id }, '-created_at');
+              setCostTemplates((list || []).map((t) => ({ id: t.id, name: t.name })));
+            } catch (e) {
+              console.error('Rename template:', e);
+            }
           }}
           isMobile={isMobileView}
           tiers={packages.filter((p) => !p.isCustomOffer).map((p) => ({ tier: p.tier, name: p.name, price: p.price }))}
