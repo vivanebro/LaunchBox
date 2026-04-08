@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 
@@ -112,41 +112,6 @@ export default function PackageBuilder() {
           localStorage.setItem('freshFromWizard', 'true');
         }
 
-        // Generate tier descriptions from deliverables if not already set
-        const deliverables = cleanConfig.core_deliverables || [];
-        const durationText = cleanConfig.project_duration || '';
-        if (!cleanConfig.package_descriptions || !cleanConfig.package_descriptions?.onetime?.starter ||
-            cleanConfig.package_descriptions?.onetime?.starter === 'For individuals just starting out who need essential features') {
-          const starterItems = deliverables.slice(0, 1);
-          const growthItems = deliverables.slice(0, 2);
-          cleanConfig.package_descriptions = {
-            onetime: {
-              starter: starterItems.length > 0
-                ? `The essentials: ${starterItems.join(', ')}${durationText ? '.' : '.'}`
-                : 'A streamlined package to get started.',
-              growth: growthItems.length > 0
-                ? `Everything you need: ${growthItems.join(', ')}${deliverables.length > 2 ? ', and more.' : '.'}`
-                : 'The complete package for growing businesses.',
-              premium: deliverables.length > 0
-                ? `The full experience: ${deliverables.join(', ')}. Priority delivery.`
-                : 'Our most comprehensive package with priority service.',
-              elite: 'For enterprise clients that need the ultimate solution.'
-            },
-            retainer: {
-              starter: starterItems.length > 0
-                ? `The essentials: ${starterItems.join(', ')}. Monthly.`
-                : 'A streamlined monthly package to get started.',
-              growth: growthItems.length > 0
-                ? `Everything you need: ${growthItems.join(', ')}${deliverables.length > 2 ? ', and more. Monthly.' : '. Monthly.'}`
-                : 'The complete monthly package for growing businesses.',
-              premium: deliverables.length > 0
-                ? `The full experience: ${deliverables.join(', ')}. Priority delivery. Monthly.`
-                : 'Our most comprehensive monthly package.',
-              elite: 'For enterprise clients that need the ultimate solution.'
-            }
-          };
-        }
-
         if (editingPackageId) {
           try {
             await supabaseClient.entities.PackageConfig.update(editingPackageId, cleanConfig);
@@ -235,41 +200,50 @@ export default function PackageBuilder() {
 
   if (isProcessing) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-8" style={{ backgroundColor: '#F5F5F7' }}>
-        <motion.div
-          className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl"
-          style={{ background: `linear-gradient(135deg, ${brandColor}, ${brandColor}cc)` }}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-        >
-          <Sparkles className="text-white w-10 h-10 animate-pulse" />
-        </motion.div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-10 px-6" style={{ backgroundColor: '#F5F5F7' }}>
         <motion.div
           className="text-center"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
         >
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Building your packages...</h2>
-          <p className="text-gray-400">This will just take a moment.</p>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Building your packages...</h2>
+          <p className="text-gray-400 text-sm">This will just take a moment.</p>
         </motion.div>
+
+        {/* Skeleton wireframe of 3 package cards */}
         <motion.div
-          className="flex gap-2"
+          className="flex gap-4 w-full max-w-3xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.15 }}
         >
           {[0, 1, 2].map(i => (
-            <motion.span
-              key={i}
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ background: brandColor }}
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 0.8, delay: i * 0.15, repeat: Infinity }}
-            />
+            <div key={i} className="flex-1 bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
+              <div className="h-6 w-20 bg-gray-200 rounded-full mx-auto animate-pulse" />
+              <div className="h-8 w-24 bg-gray-200 rounded mx-auto animate-pulse" />
+              <div className="h-4 w-28 bg-gray-100 rounded mx-auto animate-pulse" />
+              <div className="space-y-2 pt-2">
+                {[0, 1, 2].map(j => (
+                  <div key={j} className="h-3 bg-gray-100 rounded animate-pulse" style={{ width: `${85 - j * 15}%` }} />
+                ))}
+              </div>
+              <div className="h-9 bg-gray-200 rounded-lg animate-pulse mt-3" />
+            </div>
           ))}
         </motion.div>
+
+        {/* Progress bar */}
+        <div className="w-full max-w-md">
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full rounded-full"
+              style={{ background: brandColor }}
+              initial={{ width: '0%' }}
+              animate={{ width: '92%' }}
+              transition={{ duration: 2, ease: [0.4, 0.0, 0.2, 1] }}
+            />
+          </div>
+        </div>
       </div>
     );
   }
