@@ -78,6 +78,8 @@ function SectionSkeleton() {
 }
 
 const STATUS_CHART_COLORS = {
+  won: '#0F6E56',
+  lost: '#6B7280',
   converted: '#0F6E56',
   hot: '#ff0044',
   cooling: '#BA7517',
@@ -189,15 +191,19 @@ export default function Dashboard() {
   }, [analytics]);
 
   const statusMixData = useMemo(() => {
-    const counts = { converted: 0, hot: 0, cooling: 0, cold: 0 };
+    const counts = { won: 0, lost: 0, converted: 0, hot: 0, cooling: 0, cold: 0 };
     enriched.forEach(({ status }) => {
-      if (status.kind === 'converted') counts.converted += 1;
+      if (status.kind === 'won') counts.won += 1;
+      else if (status.kind === 'lost') counts.lost += 1;
+      else if (status.kind === 'converted') counts.converted += 1;
       else if (status.kind === 'hot') counts.hot += 1;
       else if (status.kind === 'cooling') counts.cooling += 1;
-      else if (status.kind !== 'won' && status.kind !== 'lost') counts.cold += 1;
+      else counts.cold += 1;
     });
     return [
-      { name: 'Converted', key: 'converted', value: counts.converted },
+      { name: 'Won', key: 'won', value: counts.won },
+      { name: 'Lost', key: 'lost', value: counts.lost },
+      { name: 'Clicked', key: 'converted', value: counts.converted },
       { name: 'Hot', key: 'hot', value: counts.hot },
       { name: 'Cooling', key: 'cooling', value: counts.cooling },
       { name: 'Cold', key: 'cold', value: counts.cold },

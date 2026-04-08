@@ -93,6 +93,10 @@ const TABLE_COLUMNS = {
     'id', 'created_by', 'type', 'title', 'message', 'metadata',
     'is_read', 'is_viewed_celebration', 'created_at',
   ]),
+  cost_calculator_templates: new Set([
+    'id', 'created_by', 'name', 'body', 'linked_package_id', 'currency',
+    'created_at', 'updated_at',
+  ]),
 };
 
 const stripUnknownFields = (tableName, data) => {
@@ -209,6 +213,7 @@ export const entities = {
   ContractTemplate: createEntityHelper('contract_templates'),
   SignedContract: createEntityHelper('signed_contracts'),
   Notification: createEntityHelper('notifications'),
+  CostCalculatorTemplate: createEntityHelper('cost_calculator_templates'),
 };
 
 export const entitiesAsServiceRole = {
@@ -222,6 +227,7 @@ export const entitiesAsServiceRole = {
   ContractTemplate: createEntityHelper('contract_templates', true),
   SignedContract: createEntityHelper('signed_contracts', true),
   Notification: createEntityHelper('notifications', true),
+  CostCalculatorTemplate: createEntityHelper('cost_calculator_templates', true),
 };
 
 export const auth = {

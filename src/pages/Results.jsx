@@ -265,6 +265,7 @@ export default function Results() {
   const exportDropdownRef = React.useRef(null);
   const [canUndo, setCanUndo] = useState(false);
   const [costCalculatorTier, setCostCalculatorTier] = useState(null);
+  const [costTemplates, setCostTemplates] = useState([]);
 
   const brandColor = config?.brand_color || '#ff0044';
   const darkerBrandColor = getDarkerBrandColor(brandColor);
@@ -307,6 +308,27 @@ export default function Results() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!profileUser?.id) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await supabaseClient.entities.CostCalculatorTemplate.filter(
+          { created_by: profileUser.id },
+          '-created_at'
+        );
+        if (!cancelled) {
+          setCostTemplates((list || []).map((t) => ({ id: t.id, name: t.name })));
+        }
+      } catch (e) {
+        console.warn('Cost calculator templates:', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profileUser?.id]);
 
   useEffect(() => {
     // Load Sour Gummy font
@@ -948,6 +970,8 @@ export default function Results() {
     const c = configRef.current || config;
     const costData = (c.cost_data && typeof c.cost_data === 'object') ? c.cost_data : {};
     const modeData = (costData[modeKey] && typeof costData[modeKey] === 'object') ? costData[modeKey] : {};
+    // Skip if data is identical to what's already stored (e.g. debounce re-firing after undo restores config)
+    if (modeData[tier] && JSON.stringify(modeData[tier]) === JSON.stringify(data)) return;
     updateConfig('cost_data', {
       ...costData,
       [modeKey]: { ...modeData, [tier]: data }
@@ -1660,6 +1684,19 @@ export default function Results() {
       console.log('Silent save success');
     } catch (e) {
       console.error('Silent save failed', e);
+    }
+  };
+
+  const handleApplyCostTemplate = async (templateId) => {
+    if (!costCalculatorTier || !templateId) return;
+    try {
+      const t = await supabaseClient.entities.CostCalculatorTemplate.get(templateId);
+      if (t?.body && typeof t.body === 'object') {
+        updateCostData(costCalculatorTier, t.body);
+        setTimeout(() => silentSave(), 500);
+      }
+    } catch (e) {
+      console.error('Apply cost template:', e);
     }
   };
 
@@ -4983,17 +5020,25 @@ export default function Results() {
             updateCostData(costCalculatorTier, data);
             setTimeout(() => silentSave(), 500);
           }}
-          onApplySuggestedPrice={(newPrice) => {
+          templateLibrary={costTemplates}
+          onApplyTemplate={costTemplates.length ? handleApplyCostTemplate : undefined}
+          onApplySuggestedPrice={(newPrice, calculatorData) => {
             const tierName = costCalculatorTier;
+            const modeKey = getCurrentModeKey();
+            const c = configRef.current || config;
+            const existingCostData = (c.cost_data && typeof c.cost_data === 'object') ? c.cost_data : {};
+            const modeData = (existingCostData[modeKey] && typeof existingCostData[modeKey] === 'object') ? existingCostData[modeKey] : {};
+            const updates = {
+              cost_data: { ...existingCostData, [modeKey]: { ...modeData, [tierName]: calculatorData } }
+            };
             if (pricingMode === 'one-time') {
               const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
-              updateConfigMultiple({
-                [`price_${tierName}`]: newPrice,
-                [`price_${tierName}_retainer`]: retainerPrice
-              });
+              updates[`price_${tierName}`] = newPrice;
+              updates[`price_${tierName}_retainer`] = retainerPrice;
             } else {
-              updateConfig(`price_${tierName}_retainer`, newPrice);
+              updates[`price_${tierName}_retainer`] = newPrice;
             }
+            updateConfigMultiple(updates);
             setTimeout(() => silentSave(), 500);
           }}
           isMobile={isMobileView}

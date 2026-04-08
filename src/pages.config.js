@@ -52,6 +52,7 @@ import ContractEditor from './pages/ContractEditor';
 import Contracts from './pages/Contracts';
 import ContractSign from './pages/ContractSign';
 import ContractTemplates from './pages/ContractTemplates';
+import CostCalculator from './pages/CostCalculator';
 import ClientsProjects from './pages/ClientsProjects';
 import Dashboard from './pages/Dashboard';
 import HelpRequests from './pages/HelpRequests';
@@ -71,6 +72,7 @@ export const PAGES = {
     "Contracts": Contracts,
     "ContractSign": ContractSign,
     "ContractTemplates": ContractTemplates,
+    "CostCalculator": CostCalculator,
     "ClientsProjects": ClientsProjects,
     "Dashboard": Dashboard,
     "HelpRequests": HelpRequests,

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { CheckCircle2, Download, Loader2, RotateCcw, AlertCircle } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { logContractView, updateContractTimeSpent } from '@/lib/contractAnalytics';
 
 export default function ContractSign() {
   const [searchParams] = useSearchParams();
@@ -30,6 +31,8 @@ export default function ContractSign() {
 
   const sigRef = useRef(null);
   const contractBodyRef = useRef(null);
+  const viewIdRef = useRef(null);
+  const viewStartedAtRef = useRef(null);
 
   useEffect(() => {
     if (!shareId) { setNotFound(true); setLoading(false); return; }
@@ -60,6 +63,38 @@ export default function ContractSign() {
     };
     load();
   }, [shareId]);
+
+  useEffect(() => {
+    if (!contract?.id || isPreviewMode) return undefined;
+
+    let active = true;
+    viewStartedAtRef.current = Date.now();
+    logContractView(contract.id).then((viewId) => {
+      if (!active) return;
+      viewIdRef.current = viewId;
+    });
+
+    const flush = () => {
+      const started = viewStartedAtRef.current;
+      if (!started || !viewIdRef.current) return;
+      const seconds = (Date.now() - started) / 1000;
+      updateContractTimeSpent(viewIdRef.current, seconds);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      active = false;
+      flush();
+      window.removeEventListener('beforeunload', flush);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [contract?.id, isPreviewMode]);
 
   const renderedHtml = contract
     ? replaceMergeFields(
