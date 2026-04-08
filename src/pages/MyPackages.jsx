@@ -372,6 +372,13 @@ export default function MyPackages() {
                   const growthPrice = getTierPrice(pkg, 'growth');
                   const premiumPrice = getTierPrice(pkg, 'premium');
                   const manual = pkg.manual_status;
+                  const hasAnalyticsOpen = !!panelOpenId;
+                  const isAnalyticsSelected = panelOpenId === pkg.id;
+                  const cardClassName = hasAnalyticsOpen
+                    ? isAnalyticsSelected
+                      ? 'bg-white rounded-3xl shadow-2xl transition-all duration-300 overflow-hidden border-2 border-[#ff0044]'
+                      : 'bg-white rounded-3xl shadow-md transition-all duration-300 overflow-hidden border-2 border-gray-200 opacity-60'
+                    : 'bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border-2 border-gray-100 hover:border-[#ff0044]';
 
                   return (
                     <motion.div
@@ -379,7 +386,7 @@ export default function MyPackages() {
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
-                      className="bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border-2 border-gray-100 hover:border-[#ff0044]"
+                      className={cardClassName}
                     >
                       <div
                         className="p-6 text-white relative overflow-hidden"

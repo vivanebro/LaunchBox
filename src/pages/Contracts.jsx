@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
+import { supabaseServiceRole } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import {
   FileSignature, Plus, LayoutTemplate, Copy, Pencil, Trash2,
@@ -25,6 +26,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import AssignContractFolderMenu from '@/components/folders/AssignContractFolderMenu';
+import { fetchContractAnalytics } from '@/lib/contractAnalytics';
 
 const STATUS_CONFIG = {
   draft: { label: 'Draft', className: 'bg-gray-100 text-gray-600' },
@@ -42,6 +44,7 @@ export default function Contracts() {
   const [userPackages, setUserPackages] = useState([]);
   const [copiedId, setCopiedId] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [contractAnalytics, setContractAnalytics] = useState({});
 
   useEffect(() => {
     const load = async () => {
@@ -52,8 +55,31 @@ export default function Contracts() {
           supabaseClient.entities.Contract.filter({ created_by: user.id }, '-created_at'),
           supabaseClient.entities.PackageConfig.filter({ created_by: user.id }, '-created_date'),
         ]);
-        setContracts(contractList);
+        const ids = (contractList || []).map((c) => c.id);
+
+        let signedIds = [];
+        if (ids.length > 0) {
+          const { data: signedRows, error: signedErr } = await supabaseServiceRole
+            .from('signed_contracts')
+            .select('contract_id')
+            .in('contract_id', ids);
+          if (!signedErr && signedRows) {
+            signedIds = signedRows.map((row) => row.contract_id);
+          }
+        }
+
+        const signedSet = new Set(signedIds);
+        const normalizedContracts = (contractList || []).map((contract) => {
+          if (signedSet.has(contract.id) && contract.status !== 'signed') {
+            supabaseClient.entities.Contract.update(contract.id, { status: 'signed' }).catch(() => {});
+            return { ...contract, status: 'signed' };
+          }
+          return contract;
+        });
+
+        setContracts(normalizedContracts);
         setUserPackages(packageList);
+        setContractAnalytics(await fetchContractAnalytics(ids));
       } catch (e) {
         console.error('Failed to load contracts:', e);
       }
@@ -122,6 +148,13 @@ export default function Contracts() {
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatAvgTime = (seconds) => {
+    const s = Math.max(0, Math.round(seconds || 0));
+    if (s < 60) return `${s}s avg`;
+    const mins = Math.round(s / 60);
+    return `${mins}m avg`;
   };
 
   const filteredContracts = statusFilter === 'all'
@@ -244,6 +277,7 @@ export default function Contracts() {
           <div className="space-y-3">
             {filteredContracts.map((contract) => {
               const status = STATUS_CONFIG[contract.status] || STATUS_CONFIG.draft;
+              const analytics = contractAnalytics[contract.id] || { views: 0, avgTimeSeconds: 0 };
               return (
                 <div
                   key={contract.id}
@@ -260,11 +294,25 @@ export default function Contracts() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2.5 flex-wrap">
                       <h3 className="font-semibold text-gray-900 truncate">{contract.name}</h3>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status.className}`}>
-                        {status.label}
-                      </span>
+                      {contract.status === 'shared' ? (
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-gradient-to-r from-sky-50 to-indigo-50 px-2.5 py-1">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700">
+                            <Eye className="w-3 h-3" />
+                            {analytics.views || 0} views
+                          </span>
+                          <span className="h-3.5 w-px bg-sky-200" />
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
+                            <Clock className="w-3 h-3" />
+                            {formatAvgTime(analytics.avgTimeSeconds)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status.className}`}>
+                          {status.label}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />

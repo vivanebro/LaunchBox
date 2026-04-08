@@ -274,7 +274,12 @@ function ClientsProjectsGrid() {
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Clients &amp; Projects</h1>
+            <div className="flex items-center gap-2 mb-2">
+              <h1 className="text-4xl font-bold text-gray-900">Clients &amp; Projects</h1>
+              <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
+                Beta
+              </span>
+            </div>
             <p className="text-gray-600">Organize packages (and more soon) into named folders.</p>
           </div>
           <Button

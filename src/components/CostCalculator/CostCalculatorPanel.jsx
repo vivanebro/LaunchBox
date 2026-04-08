@@ -11,6 +11,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 const DEFAULT_CATEGORIES = [
   { id: 'time', name: 'Your Time', type: 'time', placeholder: 'e.g., filming, editing, meetings', qty: '', unit: 'days', rate: '', amount: 0 },
@@ -65,6 +73,20 @@ export function CostCalculatorPanel({
   tiers = [],
   currentTier,
   onTierChange,
+  /** 'sheet' = right drawer (default); 'embedded' = inline page block */
+  variant = 'sheet',
+  /** Template editor: hide tier switching; relabel price line */
+  templateMode = false,
+  showCloseButton = true,
+  /** Optional: apply a saved template from library (Results page) */
+  templateLibrary = [],
+  onApplyTemplate,
+  /** Embedded: after Save, pass payload to parent (e.g. persist to server) */
+  onEmbeddedSave = undefined,
+  /** Template builder: allow typing reference price when no package is linked */
+  templateReferenceEditable = false,
+  referencePriceInputValue = '',
+  onReferencePriceChange,
 }) {
   const initCategories = useCallback((data) => {
     const raw = data?.categories?.length ? data.categories : DEFAULT_CATEGORIES.map((c) => ({ ...c }));
@@ -98,9 +120,14 @@ export function CostCalculatorPanel({
     if (isOpen) setIsVisible(true);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!templateMode) setTemplateSelectValue('none');
+  }, [currentTier, templateMode]);
+
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [templateSelectValue, setTemplateSelectValue] = useState('none');
 
   const saveDebounceRef = React.useRef(null);
   const panelRef = React.useRef(null);
@@ -151,6 +178,7 @@ export function CostCalculatorPanel({
       hasOpened: true,
     };
     onSave?.(data);
+    return data;
   }, [categories, marginInputValue, onSave]);
 
   const switchTier = useCallback((newTier) => {
@@ -232,7 +260,7 @@ export function CostCalculatorPanel({
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || variant === 'embedded') return;
 
     const handlePointerDownOutside = (event) => {
       const target = event.target;
@@ -248,11 +276,14 @@ export function CostCalculatorPanel({
 
     document.addEventListener('pointerdown', handlePointerDownOutside);
     return () => document.removeEventListener('pointerdown', handlePointerDownOutside);
-  }, [isOpen, requestClose]);
+  }, [isOpen, requestClose, variant]);
 
-  const panelClass = isMobile
-    ? 'fixed inset-0 z-50 bg-white flex flex-col md:hidden'
-    : 'fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col border-l border-gray-200';
+  const panelClass =
+    variant === 'embedded'
+      ? 'relative z-0 w-full flex flex-col bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden min-h-[520px]'
+      : isMobile
+        ? 'fixed inset-0 z-50 bg-white flex flex-col md:hidden'
+        : 'fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col border-l border-gray-200';
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -275,9 +306,59 @@ export function CostCalculatorPanel({
           onWheelCapture={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex-shrink-0 p-4 md:p-6 border-b border-gray-200">
+          <div className="flex-shrink-0 p-4 md:p-6 border-b border-gray-200 space-y-3">
+            {templateLibrary.length > 0 && typeof onApplyTemplate === 'function' && !templateMode && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="cost-template-select" className="text-sm font-medium text-gray-800">
+                    Apply template
+                  </Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                        aria-label="About templates"
+                      >
+                        <CircleHelp className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[280px] text-xs leading-relaxed">
+                      Replaces this tier&apos;s cost categories and margin with a saved template. Your package price
+                      stays the same; only your internal cost breakdown updates.
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select
+                  value={templateSelectValue}
+                  onValueChange={(v) => {
+                    if (v === 'none') return;
+                    Promise.resolve(onApplyTemplate(v))
+                      .then(() => setTemplateSelectValue('none'))
+                      .catch(() => {});
+                  }}
+                >
+                  <SelectTrigger
+                    id="cost-template-select"
+                    className="h-11 w-full rounded-xl border-gray-200 bg-gray-50/80 text-left font-normal shadow-sm hover:bg-gray-50 focus:ring-2 focus:ring-[#ff0044]/20"
+                  >
+                    <SelectValue placeholder="Choose a saved template…" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-gray-200 shadow-lg max-h-[min(280px,50vh)]">
+                    <SelectItem value="none" className="rounded-lg text-gray-500">
+                      None — keep current costs
+                    </SelectItem>
+                    {templateLibrary.map((t) => (
+                      <SelectItem key={t.id} value={t.id} className="rounded-lg cursor-pointer">
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
-              {tiers.length > 1 && (
+              {!templateMode && tiers.length > 1 && (
                 <>
                   <button
                     onClick={() => {
@@ -336,7 +417,7 @@ export function CostCalculatorPanel({
                   </button>
                 </>
               )}
-              {tiers.length <= 1 && (
+              {!templateMode && tiers.length <= 1 && (
                 <div className="flex-1 min-w-0">
                   <h2 className="text-lg font-bold text-gray-900 truncate">{packageName}</h2>
                   <p className="text-2xl font-bold mt-1 text-gray-900">
@@ -344,6 +425,52 @@ export function CostCalculatorPanel({
                   </p>
                 </div>
               )}
+              {templateMode && (
+                <div className="flex-1 min-w-0 pr-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Cost template</p>
+                  <h2 className="text-lg font-bold text-gray-900 truncate">{packageName}</h2>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-sm text-gray-500">Reference price (for margin math)</p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center w-5 h-5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                          aria-label="What is reference price?"
+                        >
+                          <CircleHelp className="w-3.5 h-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
+                        This is the selling price used to compute profit and margin against your costs. Link a package
+                        to pull its price, or enter a number manually.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  {templateReferenceEditable && typeof onReferencePriceChange === 'function' ? (
+                    <div className="relative mt-2 max-w-[200px]">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
+                        {currencySymbol}
+                      </span>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
+                        placeholder="0"
+                        className="h-11 pl-7 rounded-xl border-gray-200 bg-white"
+                        value={referencePriceInputValue}
+                        onChange={(e) => onReferencePriceChange(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-2xl font-bold mt-1 text-gray-900">
+                      {formatCurrency(price, currencySymbol)}
+                    </p>
+                  )}
+                </div>
+              )}
+              {showCloseButton && (
               <button
                 onClick={requestClose}
                 className="flex-shrink-0 w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
@@ -351,6 +478,7 @@ export function CostCalculatorPanel({
               >
                 <X className="w-5 h-5" />
               </button>
+              )}
             </div>
 
             {showPrivacyNotice && (
@@ -490,7 +618,7 @@ export function CostCalculatorPanel({
                   onClick={() => setShowResetConfirm(true)}
                   className="text-sm text-red-500 hover:text-red-700 font-medium"
                 >
-                  Reset all costs for this package
+                  {templateMode ? 'Reset all costs in this template' : 'Reset all costs for this package'}
                 </button>
               </div>
 
@@ -513,12 +641,16 @@ export function CostCalculatorPanel({
                       clearTimeout(saveDebounceRef.current);
                       saveDebounceRef.current = null;
                     }
-                    persist();
-                    requestClose();
+                    const data = persist();
+                    if (variant === 'embedded') {
+                      onEmbeddedSave?.(data);
+                    } else {
+                      requestClose();
+                    }
                   }}
                   className="w-full h-11 font-semibold"
                 >
-                  Save
+                  {templateMode ? 'Save template' : 'Save'}
                 </Button>
               </div>
             ) : (
@@ -528,7 +660,7 @@ export function CostCalculatorPanel({
                   <span className="font-medium text-red-600">{formatCurrency(totalCost, currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Package price</span>
+                  <span className="text-gray-600">{templateMode ? 'Reference price' : 'Package price'}</span>
                   <span className="font-medium">{formatCurrency(price, currencySymbol)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-semibold">
@@ -563,7 +695,13 @@ export function CostCalculatorPanel({
                 </div>
                 <div className="pt-2 flex items-center gap-2">
                   <span className="text-sm text-gray-600">Target margin</span>
-                  <FieldHelp text="Set your desired profit margin percentage to get a suggested minimum package price." />
+                  <FieldHelp
+                    text={
+                      templateMode
+                        ? 'Set your target margin to see what selling price would cover your costs for this template.'
+                        : 'Set your desired profit margin percentage to get a suggested minimum package price.'
+                    }
+                  />
                   <Input
                     type="number"
                     inputMode="decimal"
@@ -586,13 +724,44 @@ export function CostCalculatorPanel({
                   <span className="text-sm text-gray-500">%</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-gray-600">
-                    Suggested min. price <span className="font-semibold text-gray-900">{formatCurrency(suggestedMinPrice, currencySymbol)}</span>
-                  </span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-sm text-gray-600">
+                      Suggested min. price{' '}
+                      <span className="font-semibold text-gray-900">{formatCurrency(suggestedMinPrice, currencySymbol)}</span>
+                    </span>
+                    {templateMode && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex shrink-0 text-gray-400 hover:text-gray-600"
+                            aria-label="About suggested price"
+                          >
+                            <CircleHelp className="w-3.5 h-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
+                          For templates this is illustrative only. In the package editor you can apply a suggested
+                          price to the real package tier.
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                   {onApplySuggestedPrice && (
                     <Button
                       size="sm"
-                      onClick={() => onApplySuggestedPrice(suggestedPriceRoundedUp)}
+                      onClick={() => {
+                        if (saveDebounceRef.current) {
+                          clearTimeout(saveDebounceRef.current);
+                          saveDebounceRef.current = null;
+                        }
+                        const data = {
+                          categories: categories.map(({ _id, ...c }) => c),
+                          marginPercent: parseNum(marginInputValue) || 0,
+                          hasOpened: true,
+                        };
+                        onApplySuggestedPrice(suggestedPriceRoundedUp, data);
+                      }}
                       className="flex-shrink-0 h-9 px-4 rounded-lg font-medium bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                     >
                       Apply {formatCurrency(suggestedPriceRoundedUp, currencySymbol)}
@@ -611,12 +780,16 @@ export function CostCalculatorPanel({
                       clearTimeout(saveDebounceRef.current);
                       saveDebounceRef.current = null;
                     }
-                    persist();
-                    requestClose();
+                    const data = persist();
+                    if (variant === 'embedded') {
+                      onEmbeddedSave?.(data);
+                    } else {
+                      requestClose();
+                    }
                   }}
                   className="w-full h-11 font-semibold"
                 >
-                  Save
+                  {templateMode ? 'Save template' : 'Save'}
                 </Button>
               </>
             )}
@@ -640,7 +813,7 @@ export function CostCalculatorPanel({
                   className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
                 >
                   <p className="text-gray-700 mb-4">
-                    Reset all costs for this package?
+                    {templateMode ? 'Reset all costs in this template?' : 'Reset all costs for this package?'}
                   </p>
                   <div className="flex gap-3">
                     <Button
