@@ -6,16 +6,15 @@ import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 
 import StepIndicator from '../components/builder/StepIndicator';
-import Step1PackageName from '../components/builder/Step1PackageName';
-import Step5Deliverables from '../components/builder/Step5Deliverables';
-import Step6Extras from '../components/builder/Step6Extras';
-import Step7Duration from '../components/builder/Step7Duration';
-import Step8Pricing from '../components/builder/Step8Pricing';
-import Step9Guarantee from '../components/builder/Step9Guarantee';
-import Step10Urgency from '../components/builder/Step10Urgency';
-import Step11Branding from '../components/builder/Step11Branding';
+import Step1Name from '../components/builder/Step1Name';
+import Step2Deliverables from '../components/builder/Step2Deliverables';
+import Step3Bonuses from '../components/builder/Step3Bonuses';
+import Step4Duration from '../components/builder/Step4Duration';
+import Step5Pricing from '../components/builder/Step5Pricing';
+import Step6Urgency from '../components/builder/Step6Urgency';
+import Step7Guarantee from '../components/builder/Step7Guarantee';
 
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 7;
 
 export default function PackageBuilder() {
   const [step, setStep] = useState(1);
@@ -90,19 +89,27 @@ export default function PackageBuilder() {
     if (step < TOTAL_STEPS) {
       setStep(step + 1);
     } else {
-      // Final step - save and go to results
+      // Final step - show generating animation, then save and go to results
       setIsProcessing(true);
-      
+
+      // Show the "building" animation for 2 seconds before navigating
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       try {
         const editingPackageId = localStorage.getItem('editingPackageId');
-        
+
         // Strip system fields
         const { id, created_date, updated_date, created_by, created_by_id, entity_name, app_id, is_sample, is_deleted, deleted_date, environment, ...cleanConfig } = config;
-        
+
         // Ensure popularPackageIndex is always an object
         if (typeof cleanConfig.popularPackageIndex === 'number' || !cleanConfig.popularPackageIndex) {
           const val = typeof cleanConfig.popularPackageIndex === 'number' ? cleanConfig.popularPackageIndex : 2;
           cleanConfig.popularPackageIndex = { onetime: val, retainer: val };
+        }
+
+        // Flag that this is a fresh build so Results lands in preview-first mode
+        if (!editingPackageId) {
+          localStorage.setItem('freshFromWizard', 'true');
         }
 
         if (editingPackageId) {
@@ -142,7 +149,7 @@ export default function PackageBuilder() {
       case 1: return config.package_set_name?.trim().length > 0;
       case 2: return config.core_deliverables?.length > 0;
       case 4: return config.project_duration;
-      case 5: return config.price_range;
+      case 5: return config.typical_price > 0;
       default: return true;
     }
   };
@@ -193,11 +200,49 @@ export default function PackageBuilder() {
 
   if (isProcessing) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 animate-spin mx-auto mb-6 text-[#ff0044]" />
-          <h2 className="text-3xl font-bold mb-2 text-gray-900">Preparing your packages...</h2>
-          <p className="text-gray-600">This will only take a moment</p>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-10 px-6" style={{ backgroundColor: '#F5F5F7' }}>
+        <motion.div
+          className="text-center"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Building your packages...</h2>
+          <p className="text-gray-400 text-sm">This will just take a moment.</p>
+        </motion.div>
+
+        {/* Skeleton wireframe of 3 package cards */}
+        <motion.div
+          className="flex gap-4 w-full max-w-3xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
+        >
+          {[0, 1, 2].map(i => (
+            <div key={i} className="flex-1 bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
+              <div className="h-6 w-20 bg-gray-200 rounded-full mx-auto animate-pulse" />
+              <div className="h-8 w-24 bg-gray-200 rounded mx-auto animate-pulse" />
+              <div className="h-4 w-28 bg-gray-100 rounded mx-auto animate-pulse" />
+              <div className="space-y-2 pt-2">
+                {[0, 1, 2].map(j => (
+                  <div key={j} className="h-3 bg-gray-100 rounded animate-pulse" style={{ width: `${85 - j * 15}%` }} />
+                ))}
+              </div>
+              <div className="h-9 bg-gray-200 rounded-lg animate-pulse mt-3" />
+            </div>
+          ))}
+        </motion.div>
+
+        {/* Progress bar */}
+        <div className="w-full max-w-md">
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full rounded-full"
+              style={{ background: brandColor }}
+              initial={{ width: '0%' }}
+              animate={{ width: '92%' }}
+              transition={{ duration: 2, ease: [0.4, 0.0, 0.2, 1] }}
+            />
+          </div>
         </div>
       </div>
     );
@@ -219,14 +264,13 @@ export default function PackageBuilder() {
             transition={{ duration: 0.3 }}
             className="bg-white rounded-3xl p-8 shadow-lg border border-gray-200"
           >
-            {step === 1 && <Step1PackageName data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 2 && <Step5Deliverables data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 3 && <Step6Extras data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 4 && <Step7Duration data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 5 && <Step8Pricing data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 6 && <Step9Guarantee data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 7 && <Step10Urgency data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 8 && <Step11Branding data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 1 && <Step1Name data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 2 && <Step2Deliverables data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 3 && <Step3Bonuses data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 4 && <Step4Duration data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 5 && <Step5Pricing data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 6 && <Step6Urgency data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 7 && <Step7Guarantee data={config} onChange={updateConfig} onNext={handleNext} />}
           </motion.div>
         </AnimatePresence>
 

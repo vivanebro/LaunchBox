@@ -224,6 +224,7 @@ export default function Results() {
   const [popularPackageIndex, setPopularPackageIndex] = useState({ onetime: 2, retainer: 2 });
   const [popularBadgeText, setPopularBadgeText] = useState('Most Popular');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isFreshReveal, setIsFreshReveal] = useState(false);
   const [isEmbedMode, setIsEmbedMode] = useState(false);
   const [previewNotFound, setPreviewNotFound] = useState(false);
   const [packageId, setPackageId] = useState(null);
@@ -342,6 +343,12 @@ export default function Results() {
     const isPreview = urlParams.get('preview') === 'true' || isPrettyPreviewPath;
     const isEmbed = urlParams.get('embed') === 'true';
     let idFromUrl = urlParams.get('packageId');
+    // Fresh from wizard: show packages in preview-first mode with a "Customize" button
+    const isFreshBuild = localStorage.getItem('freshFromWizard') === 'true';
+    if (isFreshBuild) {
+      localStorage.removeItem('freshFromWizard');
+      setIsFreshReveal(true);
+    }
     setIsPreviewMode(isPreview);
     setIsEmbedMode(isEmbed);
 
@@ -2675,7 +2682,7 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-4 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
@@ -2791,9 +2798,9 @@ export default function Results() {
             )}
 
             <div className="flex-grow flex flex-col">
-              <div className={packages.length === 4 ? 'min-h-[520px] flex flex-col' : ''}>
+              <div className={packages.length === 4 ? 'min-h-[390px] flex flex-col' : ''}>
                 <div className="text-center mb-4">
-                  <div 
+                  <div
                     className={`inline-block px-6 py-2 rounded-full text-white font-bold shadow-md ${packages.length === 4 ? 'text-base' : 'text-lg'}`}
                     style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                   >
@@ -2807,15 +2814,18 @@ export default function Results() {
                     />
                   </div>
                 </div>
-                
+
                 <div className="mb-2 group/origprice">
                   {/* Original/strikethrough price */}
                   <div className="h-8 flex items-center justify-center mb-1">
                     {originalPrice > 0 ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-lg text-gray-400 line-through">
-                          ${originalPrice.toLocaleString()}
-                        </span>
+                        <EditablePrice
+                          value={originalPrice}
+                          onSave={(newPrice) => { updateConfig(originalPriceKey, newPrice); setTimeout(() => silentSave(), 300); }}
+                          className="text-lg text-gray-400 line-through cursor-pointer"
+                          brandColor={brandColor}
+                        />
                         <button
                           onClick={() => { updateConfig(originalPriceKey, null); setTimeout(() => silentSave(), 300); }}
                           className="opacity-0 group-hover/origprice:opacity-100 text-xs text-red-400 hover:text-red-600 transition-opacity"
@@ -2847,7 +2857,7 @@ export default function Results() {
                             updateConfig(`price_${tierName}_retainer`, newPrice);
                           }
                         }}
-                        className={`font-bold inline-block ${packages.length === 4 ? 'text-3xl' : 'text-4xl'}`}
+                        className={`font-bold inline-block ${packages.length === 4 ? 'text-2xl' : 'text-3xl'}`}
                         style={{ color: brandColor }}
                         brandColor={brandColor}
                       />
@@ -2904,11 +2914,11 @@ export default function Results() {
                   </div>
                 </div>
                 {pricingMode === 'one-time' && (
-                  <p className={`text-gray-900 font-bold mb-6 text-center ${packages.length === 4 ? 'text-xl' : 'text-2xl'}`}>
+                  <p className={`text-gray-900 font-bold mb-6 text-center ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}>
                     <EditableText
                       value={pkg.duration || '2-4 weeks to delivery'}
                       onSave={(newValue) => updatePackageDuration(tierName, newValue)}
-                      className={`inline font-bold ${packages.length === 4 ? 'text-xl' : 'text-2xl'}`}
+                      className={`inline font-bold ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}
                       placeholder="2-4 weeks to delivery"
                       brandColor={brandColor}
                     />
@@ -2968,12 +2978,12 @@ export default function Results() {
                   />
                 )}
 
-                <div className={`space-y-3 mb-6`}>
+                <div className={`space-y-2 mb-4`}>
                   <p className="text-sm font-semibold text-gray-500 uppercase">Deliverables</p>
 
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
-                      <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${deliverablesMinHeight}px` }}>
+                      <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2" style={{ minHeight: `${deliverablesMinHeight}px` }}>
                        {deliverableTemplate.map((templateDeliverable, idx) => {
                          const deliverable = pkg.deliverables[idx];
                          const isIncluded = idx < pkg.deliverables.length;
@@ -2983,7 +2993,7 @@ export default function Results() {
 
                          if (!isIncluded) {
                            if (!showExcludedDeliverables) {
-                             return <div key={`deliv-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                             return <div key={`deliv-missing-${tierName}-${idx}`} className="min-h-[24px]" aria-hidden />;
                            }
                            return (
                              <div
@@ -3040,19 +3050,19 @@ export default function Results() {
                 </div>
               </div>
 
-              <div className="space-y-3 mb-10 pt-6 border-t border-gray-200">
+              <div className="space-y-2 mb-8 pt-4 border-t border-gray-200">
                 <p className="text-sm font-semibold text-gray-500 uppercase">Bonuses</p>
 
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${bonusesMinHeight}px` }}>
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2" style={{ minHeight: `${bonusesMinHeight}px` }}>
                       {bonusTemplate.map((templateBonus, idx) => {
                         const bonus = pkg.bonuses[idx];
                         const hasBonus = idx < pkg.bonuses.length;
 
                         if (!hasBonus) {
                           if (!showExcludedDeliverables) {
-                            return <div key={`bonus-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                            return <div key={`bonus-missing-${tierName}-${idx}`} className="min-h-[24px]" aria-hidden />;
                           }
                           return (
                             <div
@@ -3146,7 +3156,7 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-6 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-4 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
@@ -3262,7 +3272,7 @@ export default function Results() {
             )}
 
             <div className="flex-grow flex flex-col">
-              <div className={packages.length === 4 ? 'min-h-[520px] flex flex-col' : ''}>
+              <div className={packages.length === 4 ? 'min-h-[390px] flex flex-col' : ''}>
                 <div className="text-center mb-4">
                   <div className={`inline-block px-6 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md ${packages.length === 4 ? 'text-base' : 'text-lg'}`}>
                     <EditableText
@@ -3275,15 +3285,19 @@ export default function Results() {
                     />
                   </div>
                 </div>
-                
+
                 <div className="mb-6 group/origprice">
                   {/* Original/strikethrough price */}
                   <div className="h-8 flex items-center justify-center mb-1">
                     {originalPrice > 0 ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-lg text-white/50 line-through">
-                          ${originalPrice.toLocaleString()}
-                        </span>
+                        <EditablePrice
+                          value={originalPrice}
+                          onSave={(newPrice) => { updateConfig(originalPriceKey, newPrice); setTimeout(() => silentSave(), 300); }}
+                          className="text-lg text-white/50 line-through cursor-pointer"
+                          darkMode={true}
+                          brandColor="#fff"
+                        />
                         <button
                           onClick={() => { updateConfig(originalPriceKey, null); setTimeout(() => silentSave(), 300); }}
                           className="opacity-0 group-hover/origprice:opacity-100 text-xs text-red-300 hover:text-red-100 transition-opacity"
@@ -3315,7 +3329,7 @@ export default function Results() {
                             updateConfig(`price_${tierName}_retainer`, newPrice);
                           }
                         }}
-                        className={`font-bold text-white inline-block ${packages.length === 4 ? 'text-4xl' : 'text-5xl'}`}
+                        className={`font-bold text-white inline-block ${packages.length === 4 ? 'text-2xl' : 'text-3xl'}`}
                         darkMode={true}
                         brandColor={brandColor}
                       />
@@ -3373,11 +3387,11 @@ export default function Results() {
                   </div>
                 </div>
                 {pricingMode === 'one-time' && (
-                  <p className={`text-white font-bold mb-6 text-center ${packages.length === 4 ? 'text-xl' : 'text-2xl'}`}>
+                  <p className={`text-white font-bold mb-6 text-center ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}>
                     <EditableText
                       value={pkg.duration || '2-4 weeks to delivery'}
                       onSave={(newValue) => updatePackageDuration(tierName, newValue)}
-                      className={`inline font-bold ${packages.length === 4 ? 'text-xl' : 'text-2xl'}`}
+                      className={`inline font-bold ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}
                       placeholder="2-4 weeks to delivery"
                       darkMode={true}
                       brandColor={brandColor}
@@ -3438,12 +3452,12 @@ export default function Results() {
                   />
                 )}
 
-                <div className={`space-y-3 mb-6`}>
+                <div className={`space-y-2 mb-4`}>
                   <p className="text-sm font-semibold text-white/70 uppercase">Deliverables</p>
 
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
-                      <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${deliverablesMinHeight}px` }}>
+                      <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2" style={{ minHeight: `${deliverablesMinHeight}px` }}>
                        {deliverableTemplate.map((templateDeliverable, idx) => {
                          const deliverable = pkg.deliverables[idx];
                          const isIncluded = idx < pkg.deliverables.length;
@@ -3453,7 +3467,7 @@ export default function Results() {
 
                          if (!isIncluded) {
                            if (!showExcludedDeliverables) {
-                             return <div key={`deliv-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                             return <div key={`deliv-missing-${tierName}-${idx}`} className="min-h-[24px]" aria-hidden />;
                            }
                            return (
                              <div
@@ -3507,19 +3521,19 @@ export default function Results() {
                 </div>
               </div>
 
-              <div className="space-y-3 mb-10 pt-6 border-t border-white/20">
+              <div className="space-y-2 mb-8 pt-4 border-t border-white/20">
                 <p className="text-xs font-bold uppercase tracking-wider">Bonuses</p>
 
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3" style={{ minHeight: `${bonusesMinHeight}px` }}>
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2" style={{ minHeight: `${bonusesMinHeight}px` }}>
                       {bonusTemplate.map((templateBonus, idx) => {
                         const bonus = pkg.bonuses[idx];
                         const hasBonus = idx < pkg.bonuses.length;
 
                         if (!hasBonus) {
                           if (!showExcludedDeliverables) {
-                            return <div key={`bonus-missing-${tierName}-${idx}`} className="min-h-[32px]" aria-hidden />;
+                            return <div key={`bonus-missing-${tierName}-${idx}`} className="min-h-[24px]" aria-hidden />;
                           }
                           return (
                             <div
@@ -3634,7 +3648,7 @@ export default function Results() {
             <motion.div
               key={index}
               {...getPreviewMotionProps(index)}
-              className={`relative bg-white rounded-3xl border-2 border-gray-200 shadow-lg flex flex-col ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
+              className={`relative bg-white rounded-3xl border-2 border-gray-200 shadow-lg flex flex-col ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
             >
               <div className={`flex-grow flex flex-col items-center justify-center ${previewPackages.length === 4 ? 'py-6' : 'py-12'}`}>
                 <div className="text-center mb-4">
@@ -3690,7 +3704,7 @@ export default function Results() {
           {...getPreviewMotionProps(index)}
           className={`relative bg-white rounded-3xl border-2 flex flex-col ${
             pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
-          } ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
+          } ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
           style={pkg.popular ? { borderColor: brandColor } : {}}
         >
           {pkg.popular && (
@@ -3724,7 +3738,7 @@ export default function Results() {
                 )}
                 <div>
                   <div className="flex items-baseline gap-1 justify-center">
-                    <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-2xl' : 'text-4xl'}`}>
+                    <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-xl' : 'text-3xl'}`}>
                       {currencySymbol}{(pkg.price || 0).toLocaleString()}
                     </div>
                     <span className={`text-gray-500 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
@@ -3763,9 +3777,9 @@ export default function Results() {
                 )}
               </div>
 
-              <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
+              <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
-                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
                   {deliverableTemplate.map((templateDeliverable, i) => {
                     const deliverable = pkg.deliverables[i];
                     const isIncluded = i < pkg.deliverables.length;
@@ -3799,9 +3813,9 @@ export default function Results() {
               </div>
 
             {(maxBonuses > 0 || pkg.bonuses.length > 0) && (
-              <div className={`pt-4 border-t border-gray-200 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
+              <div className={`pt-4 border-t border-gray-200 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
                 <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Bonuses</p>
-                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
                     const hasBonus = i < pkg.bonuses.length;
@@ -3895,7 +3909,7 @@ export default function Results() {
             <motion.div
               key={index}
               {...getPreviewMotionProps(index)}
-              className={`relative rounded-3xl text-white shadow-2xl flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
+              className={`relative rounded-3xl text-white shadow-2xl flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
             >
               <div className={`flex-grow flex flex-col items-center justify-center ${previewPackages.length === 4 ? 'py-6' : 'py-12'}`}>
                 <div className="text-center mb-4">
@@ -3949,7 +3963,7 @@ export default function Results() {
             pkg.popular
               ? ''
               : 'bg-gradient-to-br from-gray-800 to-gray-900'
-          } ${previewPackages.length === 4 ? 'p-4' : 'p-8'}`}
+          } ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
           style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})` } : {}}
         >
           {pkg.popular && (
@@ -3977,7 +3991,7 @@ export default function Results() {
                 )}
                 <div>
                   <div className="flex items-baseline gap-1 justify-center">
-                    <div className={`font-bold ${previewPackages.length === 4 ? 'text-3xl' : 'text-5xl'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</div>
+                    <div className={`font-bold ${previewPackages.length === 4 ? 'text-xl' : 'text-3xl'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</div>
                     <span className={`text-white/70 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
                       / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
                     </span>
@@ -4014,9 +4028,9 @@ export default function Results() {
                 )}
               </div>
 
-              <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
+              <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
                 <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
-                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
                   {deliverableTemplate.map((templateDeliverable, i) => {
                     const deliverable = pkg.deliverables[i];
                     const isIncluded = i < pkg.deliverables.length;
@@ -4047,9 +4061,9 @@ export default function Results() {
               </div>
 
             {(maxBonuses > 0 || pkg.bonuses.length > 0) && (
-              <div className={`pt-4 border-t border-white/20 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}`}>
+              <div className={`pt-4 border-t border-white/20 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
                 <p className={`font-bold uppercase tracking-wider ${previewPackages.length === 4 ? 'text-[10px]' : 'text-xs'}`}>Bonuses</p>
-                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-3'}>
+                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
                     const hasBonus = i < pkg.bonuses.length;
@@ -4191,10 +4205,10 @@ export default function Results() {
                 style={{ height: `${config.logo_height || 80}px` }}
               />
             )}
-            <h1 className="text-3xl md:text-6xl font-bold mb-3 md:mb-4 text-gray-900 px-2">
+            <h1 className="text-2xl md:text-4xl font-bold mb-3 md:mb-4 text-gray-900 px-2">
               {config.headline || 'Simple, transparent pricing'}
             </h1>
-            <p className="text-lg md:text-2xl text-gray-600 px-2">
+            <p className="text-base md:text-xl text-gray-600 px-2">
               {config.sub_headline || 'No surprise fees.'}
             </p>
           </div>
@@ -4204,7 +4218,7 @@ export default function Results() {
               <div className="inline-flex rounded-full bg-white p-1 md:p-1.5 shadow-lg border border-gray-200">
                 <button
                   onClick={() => setPricingMode('one-time')}
-                  className={`px-4 md:px-8 py-2 md:py-3 rounded-full font-semibold text-xs md:text-sm transition-all ${
+                  className={`px-3 md:px-6 py-1.5 md:py-2 rounded-full font-semibold text-xs md:text-sm transition-all ${
                     pricingMode === 'one-time' ? 'text-white shadow-lg' : 'text-gray-600 hover:text-gray-900'
                   }`}
                   style={pricingMode === 'one-time' ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` } : {}}
@@ -4213,7 +4227,7 @@ export default function Results() {
                 </button>
                 <button
                   onClick={() => setPricingMode('retainer')}
-                  className={`px-4 md:px-8 py-2 md:py-3 rounded-full font-semibold text-xs md:text-sm transition-all ${
+                  className={`px-3 md:px-6 py-1.5 md:py-2 rounded-full font-semibold text-xs md:text-sm transition-all ${
                     pricingMode === 'retainer' ? 'text-white shadow-lg' : 'text-gray-600 hover:text-gray-900'
                   }`}
                   style={pricingMode === 'retainer' ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` } : {}}
@@ -4230,8 +4244,8 @@ export default function Results() {
 
           <div className="text-center space-y-4 mt-8 md:mt-12">
             {config.guarantee && (
-              <div className="bg-white rounded-xl p-6 shadow-md max-w-3xl mx-auto border-2 border-gray-200">
-                <p className="text-lg text-gray-900">
+              <div className="bg-white rounded-xl p-4 shadow-md max-w-3xl mx-auto border-2 border-gray-200">
+                <p className="text-base text-gray-900">
                   <span className="font-semibold" style={{ color: brandColor }}>Guarantee:</span> {config.guarantee}
                 </p>
               </div>
@@ -4440,7 +4454,7 @@ export default function Results() {
               style={{ height: `${config.logo_height || 80}px` }}
             />
           )}
-          <h1 className="text-6xl font-bold mb-4 text-gray-900">
+          <h1 className="text-4xl font-bold mb-3 text-gray-900">
             <EditableText
               value={config.headline}
               onSave={(newValue) => updateConfig('headline', newValue)}
@@ -4449,7 +4463,7 @@ export default function Results() {
               brandColor={brandColor}
             />
           </h1>
-          <p className="text-2xl text-gray-600">
+          <p className="text-xl text-gray-600">
             <EditableText
               value={config.sub_headline}
               onSave={(newValue) => updateConfig('sub_headline', newValue)}
@@ -6035,6 +6049,50 @@ export default function Results() {
           }}
         />
       )}
+
+      {/* Fresh-from-wizard preview modal */}
+      <AnimatePresence>
+        {isFreshReveal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
+            onClick={() => setIsFreshReveal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 30 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-y-auto p-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Here's how your packages will look</h2>
+                <p className="text-gray-500 text-sm">This is the client view. Let's finalize it to your liking.</p>
+              </div>
+
+              {/* Compact preview of packages */}
+              <div className="pointer-events-none">
+                <div style={{ transform: 'scale(0.75)', transformOrigin: 'top center' }}>
+                  {renderCurrentPreviewDesign()}
+                </div>
+              </div>
+
+              <div className="text-center mt-6">
+                <button
+                  onClick={() => setIsFreshReveal(false)}
+                  className="px-6 py-3 rounded-full text-white font-semibold shadow-lg hover:scale-105 transition-transform"
+                  style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                >
+                  Customize Your Packages
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

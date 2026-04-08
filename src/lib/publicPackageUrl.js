@@ -6,7 +6,7 @@ const FALLBACK_PACKAGE = 'package';
 const RESERVED_SLUGS = new Set([
   'admin', 'api', 'app', 'dashboard', 'login', 'logout', 'signup', 'signin',
   'settings', 'results', 'welcome', 'templates', 'analytics', 'help',
-  'embed', 'p', 's', 'creator', 'package', 'user', 'users'
+  'embed', 'p', 's', 'creator', 'package', 'user', 'users', 'quiz'
 ]);
 
 export const slugify = (value, fallback) => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare, FileSignature, Folder, Calculator } from 'lucide-react';
+import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare, FileSignature, Folder, Calculator, ClipboardList } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient, { supabase } from '@/lib/supabaseClient';
 import HelpButton from '@/components/HelpButton';
@@ -151,7 +151,7 @@ export default function Layout({ children, currentPageName }) {
     window.addEventListener('resize', checkMobile);
 
     // Auto-expand menu items
-    if (['PackageBuilder', 'Templates', 'MyPackages'].includes(currentPageName)) {
+    if (['PackageBuilder', 'Templates', 'MyPackages', 'QuizManager'].includes(currentPageName)) {
       setPackageBuilderExpanded(true);
     }
     if (['Contracts', 'ContractTemplates'].includes(currentPageName)) {
@@ -283,7 +283,7 @@ export default function Layout({ children, currentPageName }) {
               <button
                 onClick={() => setPackageBuilderExpanded(!packageBuilderExpanded)}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm transition-all ${
-                  ['PackageBuilder', 'Templates', 'MyPackages'].includes(currentPageName)
+                  ['PackageBuilder', 'Templates', 'MyPackages', 'QuizManager'].includes(currentPageName)
                     ? 'text-[#ff0044] bg-red-50 font-medium'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
@@ -321,7 +321,7 @@ export default function Layout({ children, currentPageName }) {
                     My Packages
                   </Link>
 
-                  <Link 
+                  <Link
                     to={createPageUrl('Templates')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
                       currentPageName === 'Templates'
@@ -331,6 +331,18 @@ export default function Layout({ children, currentPageName }) {
                   >
                     <LayoutTemplate className="w-4 h-4" />
                     Templates
+                  </Link>
+
+                  <Link
+                    to={createPageUrl('QuizManager')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                      currentPageName === 'QuizManager'
+                        ? 'text-[#ff0044] bg-red-50 font-medium'
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <ClipboardList className="w-4 h-4" />
+                    Client Quiz
                   </Link>
                 </div>
               )}
