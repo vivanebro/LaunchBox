@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
-import { supabaseServiceRole } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import {
   FileSignature, Plus, LayoutTemplate, Copy, Pencil, Trash2,
@@ -59,7 +59,7 @@ export default function Contracts() {
 
         let signedIds = [];
         if (ids.length > 0) {
-          const { data: signedRows, error: signedErr } = await supabaseServiceRole
+          const { data: signedRows, error: signedErr } = await supabase
             .from('signed_contracts')
             .select('contract_id')
             .in('contract_id', ids);
@@ -212,36 +212,13 @@ export default function Contracts() {
                 New from Template
               </Button>
             </Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button className="gap-2 bg-[#ff0044] hover:bg-[#cc0033] text-white">
-                  <Plus className="w-4 h-4" />
-                  New Contract
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72 p-1.5">
-                <DropdownMenuItem onClick={() => navigate(createPageUrl('ContractEditor'))} className="items-start gap-3 py-3">
-                  <FileText className="w-4 h-4 mt-0.5 text-[#ff0044]" />
-                  <div className="min-w-0">
-                    <div className="font-medium text-gray-900">Write my own</div>
-                    <div className="text-xs text-gray-500">Start from scratch in the editor</div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled className="items-start gap-3 py-3 opacity-60">
-                  <div className="w-4 h-4 mt-0.5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-500">
-                    ✨
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-700">Create with Launchy</span>
-                      <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Coming soon</span>
-                    </div>
-                    <div className="text-xs text-gray-500">AI-assisted contract drafting</div>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button
+              onClick={() => navigate(createPageUrl('ContractEditor'))}
+              className="gap-2 bg-[#ff0044] hover:bg-[#cc0033] text-white"
+            >
+              <Plus className="w-4 h-4" />
+              New Contract
+            </Button>
           </div>
         </div>
 
@@ -296,11 +273,14 @@ export default function Contracts() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <h3 className="font-semibold text-gray-900 truncate">{contract.name}</h3>
-                      {contract.status === 'shared' ? (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status.className}`}>
+                        {status.label}
+                      </span>
+                      {(contract.status === 'shared' || contract.status === 'signed') && analytics.views > 0 && (
                         <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-gradient-to-r from-sky-50 to-indigo-50 px-2.5 py-1">
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700">
                             <Eye className="w-3 h-3" />
-                            {analytics.views || 0} views
+                            {analytics.views} views
                           </span>
                           <span className="h-3.5 w-px bg-sky-200" />
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
@@ -308,10 +288,6 @@ export default function Contracts() {
                             {formatAvgTime(analytics.avgTimeSeconds)}
                           </span>
                         </div>
-                      ) : (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status.className}`}>
-                          {status.label}
-                        </span>
                       )}
                     </div>
                     <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-1.5">
@@ -321,22 +297,20 @@ export default function Contracts() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <AssignContractFolderMenu
-                      contractId={contract.id}
-                      userId={currentUser?.id}
-                      initialFolderId={contract.folder_id}
-                      onFolderChange={(folderId) => {
-                        setContracts((prev) =>
-                          prev.map((c) => (c.id === contract.id ? { ...c, folder_id: folderId } : c))
-                        );
-                      }}
-                      variant="outline"
-                      className={
-                        contract.folder_id
-                          ? 'border-transparent bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100'
-                          : 'border-transparent bg-white text-gray-500 hover:bg-gray-50'
-                      }
-                    />
+                    {contract.folder_id && (
+                      <AssignContractFolderMenu
+                        contractId={contract.id}
+                        userId={currentUser?.id}
+                        initialFolderId={contract.folder_id}
+                        onFolderChange={(folderId) => {
+                          setContracts((prev) =>
+                            prev.map((c) => (c.id === contract.id ? { ...c, folder_id: folderId } : c))
+                          );
+                        }}
+                        variant="outline"
+                        className="border-transparent bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100"
+                      />
+                    )}
                     {contract.shareable_link && (
                       <Button
                         variant="ghost"

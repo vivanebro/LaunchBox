@@ -1,4 +1,4 @@
-import { supabaseServiceRole } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 
 function getDeviceType() {
   const ua = navigator.userAgent || '';
@@ -9,7 +9,7 @@ function getDeviceType() {
 
 export async function logContractView(contractId) {
   try {
-    const { data, error } = await supabaseServiceRole
+    const { data, error } = await supabase
       .from('contract_views')
       .insert([{
         contract_id: contractId,
@@ -29,7 +29,7 @@ export async function logContractView(contractId) {
 export async function updateContractTimeSpent(viewId, seconds) {
   if (!viewId) return;
   try {
-    await supabaseServiceRole
+    await supabase
       .from('contract_views')
       .update({ time_spent_seconds: Math.max(0, Math.round(seconds || 0)) })
       .eq('id', viewId);
@@ -41,7 +41,7 @@ export async function updateContractTimeSpent(viewId, seconds) {
 export async function fetchContractAnalytics(contractIds) {
   if (!Array.isArray(contractIds) || contractIds.length === 0) return {};
   try {
-    const { data, error } = await supabaseServiceRole
+    const { data, error } = await supabase
       .from('contract_views')
       .select('contract_id,time_spent_seconds,viewed_at')
       .in('contract_id', contractIds);

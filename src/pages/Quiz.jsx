@@ -192,7 +192,7 @@ export default function Quiz() {
         }
         const load = async () => {
             try {
-                const config = await supabaseClient.asServiceRole.entities.QuizConfig.get(quizId);
+                const config = await supabaseClient.entities.QuizConfig.get(quizId);
                 if (!config) {
                     setErrorMsg("This quiz doesn't exist.");
                     setPhase('error');

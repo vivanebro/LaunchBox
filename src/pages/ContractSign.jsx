@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabaseServiceRole } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { renderContractToHtml, replaceMergeFields } from '@/components/contracts/TipTapEditor';
 import SignaturePad from '@/components/contracts/SignatureCanvas';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ export default function ContractSign() {
     if (!shareId) { setNotFound(true); setLoading(false); return; }
     const load = async () => {
       try {
-        const { data, error } = await supabaseServiceRole
+        const { data, error } = await supabase
           .from('contracts')
           .select('*')
           .eq('shareable_link', shareId)
@@ -47,7 +47,7 @@ export default function ContractSign() {
         else {
           setContract(data);
           if (data.status === 'signed') {
-            const { data: signedList } = await supabaseServiceRole
+            const { data: signedList } = await supabase
               .from('signed_contracts')
               .select('*')
               .eq('contract_id', data.id)
@@ -120,13 +120,13 @@ export default function ContractSign() {
     } catch { return ''; }
   };
 
-  const generateAndUploadPdf = async (signedBody, signatureDataUrl, recordId) => {
+  const generatePdf = async (signedBody, signatureDataUrl) => {
     try {
       const div = document.createElement('div');
       if (contract?.logo_url) {
         const logoWrap = document.createElement('div');
         logoWrap.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;gap:12px;';
-        logoWrap.innerHTML = `<img src="${contract.logo_url}" alt="Logo" style="max-height:56px;max-width:220px;object-fit:contain;display:block;" />`;
+        logoWrap.innerHTML = `<img src="${contract.logo_url}" alt="Logo" style="max-height:80px;max-width:280px;object-fit:contain;display:block;" />`;
         div.appendChild(logoWrap);
       }
       const bodyWrap = document.createElement('div');
@@ -166,27 +166,7 @@ export default function ContractSign() {
       }
 
       const pdfBlob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      setPdfUrl(blobUrl);
-
-      try {
-        const fileName = `signed-contracts/${recordId}.pdf`;
-        const { error: uploadError } = await supabaseServiceRole.storage
-          .from('contracts')
-          .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
-
-        if (!uploadError) {
-          const { data: urlData } = supabaseServiceRole.storage.from('contracts').getPublicUrl(fileName);
-          const publicUrl = urlData?.publicUrl || '';
-          if (publicUrl) {
-            await supabaseServiceRole.from('signed_contracts').update({ pdf_url: publicUrl }).eq('id', recordId);
-            URL.revokeObjectURL(blobUrl);
-            setPdfUrl(publicUrl);
-          }
-        }
-      } catch (uploadErr) {
-        console.warn('PDF storage upload failed (client download still works):', uploadErr);
-      }
+      setPdfUrl(URL.createObjectURL(pdfBlob));
     } catch (e) {
       console.warn('PDF generation failed:', e);
     }
@@ -205,7 +185,8 @@ export default function ContractSign() {
       const frozenHtml = renderedHtml;
       const now = new Date().toISOString();
 
-      const { data: signedRecord, error: insertError } = await supabaseServiceRole
+      // Insert signed contract record (public RLS allows this)
+      const { data: signedRecord, error: insertError } = await supabase
         .from('signed_contracts')
         .insert([{
           contract_id: contract.id,
@@ -222,42 +203,21 @@ export default function ContractSign() {
       if (insertError) throw insertError;
       setSignedContractId(signedRecord.id);
 
-      await supabaseServiceRole
-        .from('contracts')
-        .update({ status: 'signed' })
-        .eq('id', contract.id);
-
-      await supabaseServiceRole
-        .from('notifications')
-        .insert([{
-          created_by: contract.created_by,
-          type: 'contract_signed',
-          title: 'Contract Signed',
-          message: `${clientName.trim()} signed "${contract.name}"`,
-          metadata: {
+      // Server-side: update contract status + send notification
+      try {
+        await supabase.functions.invoke('handle-contract-signed', {
+          body: {
             contract_id: contract.id,
             signed_contract_id: signedRecord.id,
             client_name: clientName.trim(),
           },
-          is_read: false,
-          is_viewed_celebration: false,
-        }]);
-
-      try {
-        await supabaseServiceRole.functions.invoke('notifyContractSigned', {
-          body: {
-            contractId: contract.id,
-            signedContractId: signedRecord.id,
-            clientName: clientName.trim(),
-            clientEmail: clientEmail.trim() || null,
-          },
         });
-      } catch (notifyErr) {
-        console.warn('Notification email failed (non-blocking):', notifyErr);
+      } catch (fnErr) {
+        console.warn('Post-sign function failed (non-blocking):', fnErr);
       }
 
       setStep('complete');
-      generateAndUploadPdf(frozenHtml, signatureDataUrl, signedRecord.id);
+      generatePdf(frozenHtml, signatureDataUrl);
     } catch (e) {
       console.error('Signing failed:', e);
       setError('Something went wrong. Please try again.');
@@ -297,7 +257,7 @@ export default function ContractSign() {
         <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
           <div className="flex items-start justify-between mb-8 gap-4">
             {contract.logo_url && (
-              <img src={contract.logo_url} alt="Logo" className="max-h-14 object-contain" />
+              <img src={contract.logo_url} alt="Logo" className="max-h-20 object-contain" />
             )}
             <div className="text-right">
               {contract.name && <h1 className="text-lg font-semibold text-gray-700">{contract.name}</h1>}
@@ -377,10 +337,9 @@ export default function ContractSign() {
             <img src={contract.logo_url} alt="Logo" className="max-h-16 object-contain mb-8" />
           )}
           <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
-            style={{ backgroundColor: `${accentColor}15` }}
+            className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-green-50"
           >
-            <CheckCircle2 className="w-10 h-10" style={{ color: accentColor }} />
+            <CheckCircle2 className="w-10 h-10 text-green-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Document Signed!</h1>
           <p className="text-gray-600 max-w-md mb-8">{msg}</p>
@@ -434,7 +393,7 @@ export default function ContractSign() {
       <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         <div className="flex items-start justify-between mb-8 gap-4">
           {contract.logo_url && (
-            <img src={contract.logo_url} alt="Logo" className="max-h-14 object-contain" />
+            <img src={contract.logo_url} alt="Logo" className="max-h-20 object-contain" />
           )}
           <div className="text-right">
             {contract.name && (
@@ -512,10 +471,16 @@ export default function ContractSign() {
             </p>
           )}
 
+          {contract.consent_text !== '' && (
+            <p className="text-xs text-gray-400 mt-4 max-w-sm">
+              {contract.consent_text || 'By clicking "Sign Document", you agree that your signature is the legal equivalent of your handwritten signature.'}
+            </p>
+          )}
+
           <Button
             onClick={handleSign}
             disabled={submitting || isPreviewMode}
-            className="w-full sm:w-auto mt-4 py-3 px-8 rounded-xl font-semibold text-white text-base"
+            className="w-full sm:w-auto mt-3 py-3 px-8 rounded-xl font-semibold text-white text-base"
             style={{ backgroundColor: accentColor, minWidth: 200 }}
           >
             {submitting ? (

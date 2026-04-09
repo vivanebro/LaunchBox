@@ -11,14 +11,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4ZmV3ZXp6YXJ0eWpzaWdwbG90Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTIzNTgzOSwiZXhwIjoyMDg2ODExODM5fQ.DOp6Aig8S6SrWinTUpc1qNLHNnbuRQ6v0hhtpqnQzXQ';
-
-export const supabaseServiceRole = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+// Service role key removed from client bundle for security.
+// Server-side operations use Supabase Edge Functions instead.
 
 // ─────────────────────────────────────────────────────────────
 // COLUMN WHITELISTS
@@ -85,7 +79,7 @@ const TABLE_COLUMNS = {
   contracts: new Set([
     'id', 'created_by', 'name', 'body', 'merge_field_definitions',
     'logo_url', 'accent_color', 'custom_confirmation_message',
-    'custom_button_label', 'custom_button_link', 'status',
+    'custom_button_label', 'custom_button_link', 'consent_text', 'status',
     'shareable_link', 'linked_package_id', 'folder_id', 'expires_at',
     'created_at', 'updated_at',
   ]),
@@ -137,8 +131,8 @@ export const getCurrentUser = async () => {
   return profile || { id: user.id, email: user.email };
 };
 
-const createEntityHelper = (tableName, isServiceRole = false) => {
-  const client = isServiceRole ? supabaseServiceRole : supabase;
+const createEntityHelper = (tableName) => {
+  const client = supabase;
 
   return {
     list: async (orderBy = '-created_date') => {
@@ -229,21 +223,6 @@ export const entities = {
   CostCalculatorTemplate: createEntityHelper('cost_calculator_templates'),
 };
 
-export const entitiesAsServiceRole = {
-  User: createEntityHelper('users', true),
-  Folder: createEntityHelper('folders', true),
-  PackageConfig: createEntityHelper('package_configs', true),
-  AccessCode: createEntityHelper('access_codes', true),
-  HealthReport: createEntityHelper('health_reports', true),
-  HelpRequest: createEntityHelper('help_requests', true),
-  QuizConfig: createEntityHelper('quiz_configs', true),
-  QuizSubmission: createEntityHelper('quiz_submissions', true),
-  Contract: createEntityHelper('contracts', true),
-  ContractTemplate: createEntityHelper('contract_templates', true),
-  SignedContract: createEntityHelper('signed_contracts', true),
-  Notification: createEntityHelper('notifications', true),
-  CostCalculatorTemplate: createEntityHelper('cost_calculator_templates', true),
-};
 
 export const auth = {
   me: getCurrentUser,
@@ -270,7 +249,4 @@ export const auth = {
 export default {
   entities,
   auth,
-  asServiceRole: {
-    entities: entitiesAsServiceRole
-  }
 };

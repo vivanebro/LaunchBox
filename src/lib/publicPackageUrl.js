@@ -38,7 +38,7 @@ export const validateCreatorSlug = (slug) => {
 export const isCreatorSlugAvailable = async (slug, excludeUserId = null) => {
   const normalized = slugify(slug, '');
   if (!normalized) return false;
-  const existing = await supabaseClient.asServiceRole.entities.User.filter({ creator_slug: normalized });
+  const existing = await supabaseClient.entities.User.filter({ creator_slug: normalized });
   const takenByOther = (existing || []).filter((u) => u.id !== excludeUserId);
   return takenByOther.length === 0;
 };
@@ -55,7 +55,7 @@ export const derivePackageSlug = (pkg) => {
 };
 
 const reserveUniqueSlug = async (creatorSlug, basePackageSlug, currentPackageId) => {
-  const existingForCreator = await supabaseClient.asServiceRole.entities.PackageConfig.filter({ creator_slug: creatorSlug });
+  const existingForCreator = await supabaseClient.entities.PackageConfig.filter({ creator_slug: creatorSlug });
   const taken = new Set(
     (existingForCreator || [])
       .filter((item) => item.id !== currentPackageId)

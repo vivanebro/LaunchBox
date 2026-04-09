@@ -12,7 +12,7 @@ import { Calendar } from '@/components/ui/calendar';
 import TipTapEditor from '@/components/contracts/TipTapEditor';
 import { takePendingContractFolderId } from '@/lib/folderUtils';
 import {
-  ArrowLeft, Save, Share2, AlertTriangle, Upload,
+  ArrowLeft, Save, Share2, AlertTriangle, Upload, Eye,
   LayoutTemplate, Info, X, CheckCircle2, Loader2, CalendarDays
 } from 'lucide-react';
 
@@ -34,18 +34,23 @@ export default function ContractEditor() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef(null);
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState('Untitled Contract');
   const [body, setBody] = useState('');
   const [accentColor, setAccentColor] = useState('#ff0044');
   const [logoUrl, setLogoUrl] = useState('');
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [buttonLabel, setButtonLabel] = useState('');
   const [buttonLink, setButtonLink] = useState('');
+  const [consentText, setConsentText] = useState('By clicking "Sign Document", you agree that your signature is the legal equivalent of your handwritten signature.');
   const [mergeFieldDefs, setMergeFieldDefs] = useState([]);
   const [shareableLink, setShareableLink] = useState('');
   const [status, setStatus] = useState('draft');
   const [expiresAt, setExpiresAt] = useState('');
   const [isExpiryCalendarOpen, setIsExpiryCalendarOpen] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [mergeFieldError, setMergeFieldError] = useState('');
 
   const autoSaveTimer = useRef(null);
   const isNewRef = useRef(!contractId && !templateEditId);
@@ -81,6 +86,7 @@ export default function ContractEditor() {
     setConfirmationMessage(c.custom_confirmation_message || '');
     setButtonLabel(c.custom_button_label || '');
     setButtonLink(c.custom_button_link || '');
+    setConsentText(c.consent_text ?? 'By clicking "Sign Document", you agree that your signature is the legal equivalent of your handwritten signature.');
     setMergeFieldDefs(c.merge_field_definitions || []);
     setShareableLink(c.shareable_link || '');
     setStatus(c.status || 'draft');
@@ -124,6 +130,7 @@ export default function ContractEditor() {
     custom_confirmation_message: confirmationMessage,
     custom_button_label: buttonLabel,
     custom_button_link: buttonLink,
+    consent_text: consentText,
     merge_field_definitions: mergeFieldDefs,
     expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
     updated_at: new Date().toISOString(),
@@ -191,13 +198,15 @@ export default function ContractEditor() {
     if (!file) return;
     setUploadingLogo(true);
     try {
-      const url = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => resolve(ev.target.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      setLogoUrl(url);
+      const { supabase } = await import('@/lib/supabaseClient');
+      const ext = file.name.split('.').pop() || 'png';
+      const fileName = `logos/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('contract-assets')
+        .upload(fileName, file, { contentType: file.type, upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from('contract-assets').getPublicUrl(fileName);
+      setLogoUrl(urlData.publicUrl);
       triggerAutoSave();
     } catch (err) {
       console.error('Logo upload failed:', err);
@@ -208,9 +217,10 @@ export default function ContractEditor() {
   const handleShare = async () => {
     const unfilled = mergeFieldDefs.filter(f => !f.value?.trim());
     if (unfilled.length > 0) {
-      alert(`Please fill in all merge field values before sharing:\n${unfilled.map(f => `• {${f.key}}`).join('\n')}`);
+      setMergeFieldError(`Fill in all merge fields before sharing: ${unfilled.map(f => `{${f.key}}`).join(', ')}`);
       return;
     }
+    setMergeFieldError('');
     await save();
     const link = shareableLink || crypto.randomUUID();
     if (savedIdRef.current) {
@@ -233,15 +243,23 @@ export default function ContractEditor() {
     setTimeout(() => setLinkCopied(false), 2000);
   };
 
-  const saveAsTemplate = async () => {
-    const tName = prompt('Template name:', name + ' (Template)');
-    if (!tName) return;
+  const openSaveAsTemplate = () => {
+    setTemplateName(name ? name + ' (Template)' : '');
+    setShowTemplateModal(true);
+  };
+
+  const confirmSaveAsTemplate = async () => {
+    if (!templateName.trim()) return;
+    setSavingTemplate(true);
     try {
-      await supabaseClient.entities.ContractTemplate.create({ name: tName, body });
-      alert('Saved as template!');
+      await supabaseClient.entities.ContractTemplate.create({ name: templateName.trim(), body });
+      setShowTemplateModal(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       console.error('Failed to save as template:', e);
     }
+    setSavingTemplate(false);
   };
 
   if (loading) {
@@ -318,8 +336,8 @@ export default function ContractEditor() {
           )}
           {saving && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
 
-          {!isTemplate && (
-            <Button variant="ghost" size="sm" className="gap-1.5" onClick={saveAsTemplate}>
+          {!isTemplate && contract && (
+            <Button variant="ghost" size="sm" className="gap-1.5" onClick={openSaveAsTemplate}>
               <LayoutTemplate className="w-4 h-4" />
               Save as Template
             </Button>
@@ -329,6 +347,25 @@ export default function ContractEditor() {
             <Save className="w-4 h-4" />
             Save
           </Button>
+
+          {!isTemplate && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={async () => {
+                await save();
+                const link = shareableLink || savedIdRef.current;
+                if (link) {
+                  window.open(`${window.location.origin}${createPageUrl('ContractSign')}?shareId=${shareableLink}&preview=true`, '_blank');
+                }
+              }}
+              disabled={!name.trim() || saving}
+            >
+              <Eye className="w-4 h-4" />
+              Preview
+            </Button>
+          )}
 
           {!isTemplate && (
             <Button size="sm" className="gap-1.5 bg-[#ff0044] hover:bg-[#cc0033] text-white" onClick={handleShare} disabled={!name.trim()}>
@@ -478,6 +515,24 @@ export default function ContractEditor() {
                 </div>
                 <Input value={buttonLink} onChange={(e) => { setButtonLink(e.target.value); triggerAutoSave(); }} placeholder="https://calendly.com/…" className="text-sm" />
               </div>
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs font-medium text-gray-600">Consent Text</label>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Consent text info">
+                          <Info className="w-3.5 h-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs leading-relaxed">
+                        Shown above the Sign button. Leave empty to hide it.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Textarea value={consentText} onChange={(e) => { setConsentText(e.target.value); triggerAutoSave(); }} placeholder="Leave empty to hide" rows={2} className="text-sm resize-none" />
+              </div>
             </div>
           </div>
 
@@ -488,6 +543,12 @@ export default function ContractEditor() {
                 <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                 Fill these in before sharing. Clients will see the values, not the placeholders.
               </p>
+              {mergeFieldError && (
+                <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3 flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  {mergeFieldError}
+                </p>
+              )}
               <div className="space-y-2">
                 {mergeFieldDefs.map((field) => (
                   <div key={field.key}>
@@ -519,6 +580,33 @@ export default function ContractEditor() {
               </Button>
             </div>
             <Button variant="outline" className="w-full" onClick={() => setShowShareModal(false)}>Done</Button>
+          </div>
+        </div>
+      )}
+
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowTemplateModal(false)}>
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Save as Template</h2>
+            <p className="text-gray-500 text-sm mb-5">Give your template a name so you can reuse it later.</p>
+            <Input
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="Template name"
+              className="mb-4"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') confirmSaveAsTemplate(); }}
+            />
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowTemplateModal(false)}>Cancel</Button>
+              <Button
+                className="flex-1 bg-[#ff0044] hover:bg-[#cc0033] text-white"
+                onClick={confirmSaveAsTemplate}
+                disabled={!templateName.trim() || savingTemplate}
+              >
+                {savingTemplate ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Template'}
+              </Button>
+            </div>
           </div>
         </div>
       )}
