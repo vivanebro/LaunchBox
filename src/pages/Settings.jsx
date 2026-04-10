@@ -11,21 +11,21 @@ import { useAuth } from '@/lib/AuthContext';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 
 const CURRENCIES = [
-  { code: 'USD', label: 'USD — US Dollar', symbol: '$' },
-  { code: 'EUR', label: 'EUR — Euro', symbol: '€' },
-  { code: 'GBP', label: 'GBP — British Pound', symbol: '£' },
-  { code: 'CAD', label: 'CAD — Canadian Dollar', symbol: 'CA$' },
-  { code: 'AUD', label: 'AUD — Australian Dollar', symbol: 'A$' },
-  { code: 'ILS', label: 'ILS — Israeli Shekel', symbol: '₪' },
-  { code: 'CHF', label: 'CHF — Swiss Franc', symbol: 'CHF' },
-  { code: 'SEK', label: 'SEK — Swedish Krona', symbol: 'kr' },
-  { code: 'NOK', label: 'NOK — Norwegian Krone', symbol: 'kr' },
-  { code: 'DKK', label: 'DKK — Danish Krone', symbol: 'kr' },
-  { code: 'NZD', label: 'NZD — New Zealand Dollar', symbol: 'NZ$' },
-  { code: 'SGD', label: 'SGD — Singapore Dollar', symbol: 'S$' },
-  { code: 'AED', label: 'AED — UAE Dirham', symbol: 'د.إ' },
-  { code: 'ZAR', label: 'ZAR — South African Rand', symbol: 'R' },
-  { code: 'BRL', label: 'BRL — Brazilian Real', symbol: 'R$' },
+  { code: 'USD', label: 'USD -US Dollar', symbol: '$' },
+  { code: 'EUR', label: 'EUR -Euro', symbol: '€' },
+  { code: 'GBP', label: 'GBP -British Pound', symbol: '£' },
+  { code: 'CAD', label: 'CAD -Canadian Dollar', symbol: 'CA$' },
+  { code: 'AUD', label: 'AUD -Australian Dollar', symbol: 'A$' },
+  { code: 'ILS', label: 'ILS -Israeli Shekel', symbol: '₪' },
+  { code: 'CHF', label: 'CHF -Swiss Franc', symbol: 'CHF' },
+  { code: 'SEK', label: 'SEK -Swedish Krona', symbol: 'kr' },
+  { code: 'NOK', label: 'NOK -Norwegian Krone', symbol: 'kr' },
+  { code: 'DKK', label: 'DKK -Danish Krone', symbol: 'kr' },
+  { code: 'NZD', label: 'NZD -New Zealand Dollar', symbol: 'NZ$' },
+  { code: 'SGD', label: 'SGD -Singapore Dollar', symbol: 'S$' },
+  { code: 'AED', label: 'AED -UAE Dirham', symbol: 'د.إ' },
+  { code: 'ZAR', label: 'ZAR -South African Rand', symbol: 'R' },
+  { code: 'BRL', label: 'BRL -Brazilian Real', symbol: 'R$' },
 ];
 
 export default function Settings() {
@@ -275,7 +275,7 @@ export default function Settings() {
               <p className="text-xs text-gray-500 mt-1">Used as the default when creating new packages</p>
             </div>
 
-            {/* Hidden for launch — folder system parked
+            {/* Hidden for launch -folder system parked
             <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-4">
               <div>
                 <p className="text-sm font-medium text-gray-900">Folder prompt after copy link</p>

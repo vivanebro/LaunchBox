@@ -723,6 +723,12 @@ export default function Results() {
           };
         }
       } else {
+        // Fetch user's default currency for new packages
+        let userCurrency = 'USD';
+        try {
+          const me = await supabaseClient.auth.me();
+          if (me?.default_currency) userCurrency = me.default_currency;
+        } catch (_) {}
         setConfig({
             business_name: 'My Studio',
             headline: 'Simple, transparent pricing',
@@ -803,7 +809,7 @@ export default function Results() {
             starter_duration: null,
             growth_duration: null,
             premium_duration: null,
-            currency: 'USD',
+            currency: userCurrency,
             pricing_availability: 'both',
             show_excluded_deliverables: true,
             show_package_buttons_in_edit_mode: true,
