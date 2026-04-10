@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bold, Italic, Underline, Heading1, Heading2, List, ListOrdered, ChevronDown, Plus } from 'lucide-react';
 import { STANDARD_MERGE_FIELDS } from './MergeFieldExtension';
 
@@ -24,6 +24,20 @@ export default function TipTapToolbar({ editor, onInsertMergeField }) {
   const [showFieldMenu, setShowFieldMenu] = useState(false);
   const [customFieldKey, setCustomFieldKey] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const fieldMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!showFieldMenu) return;
+    const handleClickOutside = (e) => {
+      if (fieldMenuRef.current && !fieldMenuRef.current.contains(e.target)) {
+        setShowFieldMenu(false);
+        setShowCustomInput(false);
+        setCustomFieldKey('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFieldMenu]);
 
   if (!editor) return null;
 
@@ -104,7 +118,7 @@ export default function TipTapToolbar({ editor, onInsertMergeField }) {
 
       <div className="w-px h-6 bg-gray-300 mx-1" />
 
-      <div className="relative">
+      <div className="relative" ref={fieldMenuRef}>
         <button
           type="button"
           onMouseDown={(e) => {

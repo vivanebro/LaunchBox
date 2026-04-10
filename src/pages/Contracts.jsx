@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import {
   FileSignature, Plus, LayoutTemplate, Copy, Pencil, Trash2,
-  CheckCircle2, Clock, Share2, FileText, Eye, Filter
+  CheckCircle2, Clock, Share2, FileText, Eye, Filter, AlertCircle
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -45,6 +45,7 @@ export default function Contracts() {
   const [copiedId, setCopiedId] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [contractAnalytics, setContractAnalytics] = useState({});
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -82,6 +83,7 @@ export default function Contracts() {
         setContractAnalytics(await fetchContractAnalytics(ids));
       } catch (e) {
         console.error('Failed to load contracts:', e);
+        setLoadError(true);
       }
       setLoading(false);
     };
@@ -165,6 +167,19 @@ export default function Contracts() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F5F7' }}>
         <div className="w-8 h-8 border-4 border-[#ff0044] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: '#F5F5F7' }}>
+        <div className="text-center max-w-sm">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Failed to load contracts</h2>
+          <p className="text-gray-500 mb-4">Something went wrong. Please try again.</p>
+          <Button onClick={() => window.location.reload()} variant="outline">Reload</Button>
+        </div>
       </div>
     );
   }
@@ -272,7 +287,7 @@ export default function Contracts() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <h3 className="font-semibold text-gray-900 truncate">{contract.name}</h3>
+                      <h3 className="font-semibold text-gray-900 truncate" title={contract.name}>{contract.name}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status.className}`}>
                         {status.label}
                       </span>
@@ -297,7 +312,7 @@ export default function Contracts() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {contract.folder_id && (
+                    {currentUser?.id && (
                       <AssignContractFolderMenu
                         contractId={contract.id}
                         userId={currentUser?.id}

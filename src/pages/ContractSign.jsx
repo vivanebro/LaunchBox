@@ -5,7 +5,7 @@ import { renderContractToHtml, replaceMergeFields } from '@/components/contracts
 import SignaturePad from '@/components/contracts/SignatureCanvas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CheckCircle2, Download, Loader2, RotateCcw, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Download, Loader2, RotateCcw, AlertCircle, FileDown } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { logContractView, updateContractTimeSpent } from '@/lib/contractAnalytics';
@@ -126,7 +126,11 @@ export default function ContractSign() {
       if (contract?.logo_url) {
         const logoWrap = document.createElement('div');
         logoWrap.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;gap:12px;';
-        logoWrap.innerHTML = `<img src="${contract.logo_url}" alt="Logo" style="max-height:80px;max-width:280px;object-fit:contain;display:block;" />`;
+        const logoImg = document.createElement('img');
+        logoImg.src = contract.logo_url;
+        logoImg.alt = 'Logo';
+        logoImg.style.cssText = `height:${logoHeight}px;max-width:280px;object-fit:contain;display:block;`;
+        logoWrap.appendChild(logoImg);
         div.appendChild(logoWrap);
       }
       const bodyWrap = document.createElement('div');
@@ -226,6 +230,17 @@ export default function ContractSign() {
   };
 
   const accentColor = contract?.accent_color || '#ff0044';
+  const logoHeight = contract?.logo_height || 80;
+
+  // #15: Determine if accent color is light (needs dark text)
+  const isLightColor = (hex) => {
+    const c = hex.replace('#', '');
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 160;
+  };
+  const buttonTextColor = isLightColor(accentColor) ? '#1a1a1a' : '#ffffff';
 
   if (loading) {
     return (
@@ -252,12 +267,78 @@ export default function ContractSign() {
 
   if (isSigned && step === 'view') {
     const signedBody = signedContract?.signed_body || renderedHtml;
+
+    const handleDownloadSigned = async () => {
+      try {
+        const div = document.createElement('div');
+        if (contract?.logo_url) {
+          const logoWrap = document.createElement('div');
+          logoWrap.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;gap:12px;';
+          const logoImg = document.createElement('img');
+          logoImg.src = contract.logo_url;
+          logoImg.alt = 'Logo';
+          logoImg.style.cssText = `height:${logoHeight}px;max-width:280px;object-fit:contain;display:block;`;
+          logoWrap.appendChild(logoImg);
+          div.appendChild(logoWrap);
+        }
+        const bodyWrap = document.createElement('div');
+        bodyWrap.innerHTML = signedBody;
+        div.appendChild(bodyWrap);
+        div.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;font-family:Inter,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;background:white;padding:40px;';
+        if (signedContract?.signature_image) {
+          const sigSection = document.createElement('div');
+          sigSection.style.cssText = 'margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;';
+          const sigLabel = document.createElement('p');
+          sigLabel.style.cssText = 'font-size:12px;color:#6b7280;margin:0 0 8px;';
+          sigLabel.textContent = 'Client Signature';
+          sigSection.appendChild(sigLabel);
+          const sigImg = document.createElement('img');
+          sigImg.src = signedContract.signature_image;
+          sigImg.style.cssText = 'max-width:240px;max-height:100px;display:block;';
+          sigSection.appendChild(sigImg);
+          const sigDate = document.createElement('p');
+          sigDate.style.cssText = 'font-size:12px;color:#6b7280;margin:8px 0 0;';
+          sigDate.textContent = `Signed: ${new Date(signedContract.signed_at).toLocaleString()}`;
+          sigSection.appendChild(sigDate);
+          div.appendChild(sigSection);
+        }
+        document.body.appendChild(div);
+        const canvas = await html2canvas(div, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        document.body.removeChild(div);
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgRatio = canvas.width / canvas.height;
+        let imgH = pageWidth / imgRatio;
+        let position = 0;
+        const imgData = canvas.toDataURL('image/png');
+        if (imgH <= pageHeight) {
+          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, imgH);
+        } else {
+          while (position < imgH) {
+            pdf.addImage(imgData, 'PNG', 0, -position, pageWidth, imgH);
+            position += pageHeight;
+            if (position < imgH) pdf.addPage();
+          }
+        }
+        const pdfBlob = pdf.output('blob');
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${contract.name || 'contract'}-signed.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        console.warn('PDF download failed:', e);
+      }
+    };
+
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
           <div className="flex items-start justify-between mb-8 gap-4">
             {contract.logo_url && (
-              <img src={contract.logo_url} alt="Logo" className="max-h-20 object-contain" />
+              <img src={contract.logo_url} alt="Logo" className="object-contain" style={{ height: `${logoHeight}px` }} />
             )}
             <div className="text-right">
               {contract.name && <h1 className="text-lg font-semibold text-gray-700">{contract.name}</h1>}
@@ -286,6 +367,15 @@ export default function ContractSign() {
                   {signedContract.signed_at && ` • ${new Date(signedContract.signed_at).toLocaleString()}`}
                 </p>
               </div>
+
+              <button
+                type="button"
+                onClick={handleDownloadSigned}
+                className="mt-6 flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <FileDown className="w-4 h-4" />
+                Download signed copy
+              </button>
             </>
           )}
         </div>
@@ -303,7 +393,7 @@ export default function ContractSign() {
       <div className="min-h-screen bg-white flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
           {contract.logo_url && (
-            <img src={contract.logo_url} alt="Logo" className="max-h-16 object-contain mb-8" />
+            <img src={contract.logo_url} alt="Logo" className="object-contain mb-8" style={{ height: `${logoHeight}px` }} />
           )}
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
@@ -334,7 +424,7 @@ export default function ContractSign() {
       <div className="min-h-screen bg-white flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
           {contract.logo_url && (
-            <img src={contract.logo_url} alt="Logo" className="max-h-16 object-contain mb-8" />
+            <img src={contract.logo_url} alt="Logo" className="object-contain mb-8" style={{ height: `${logoHeight}px` }} />
           )}
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-green-50"
@@ -350,8 +440,8 @@ export default function ContractSign() {
                 href={nextStepUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-3 px-6 rounded-xl font-semibold text-white text-center transition-opacity hover:opacity-90"
-                style={{ backgroundColor: accentColor }}
+                className="flex-1 py-3 px-6 rounded-xl font-semibold text-center transition-opacity hover:opacity-90"
+                style={{ backgroundColor: accentColor, color: buttonTextColor }}
               >
                 {contract.custom_button_label || 'Book Your Kickoff Call'}
               </a>
@@ -393,7 +483,7 @@ export default function ContractSign() {
       <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
         <div className="flex items-start justify-between mb-8 gap-4">
           {contract.logo_url && (
-            <img src={contract.logo_url} alt="Logo" className="max-h-20 object-contain" />
+            <img src={contract.logo_url} alt="Logo" className="object-contain" style={{ height: `${logoHeight}px` }} />
           )}
           <div className="text-right">
             {contract.name && (
@@ -472,7 +562,7 @@ export default function ContractSign() {
           )}
 
           {contract.consent_text !== '' && (
-            <p className="text-xs text-gray-400 mt-4 max-w-sm">
+            <p className="text-sm text-gray-500 mt-4 max-w-sm leading-relaxed">
               {contract.consent_text || 'By clicking "Sign Document", you agree that your signature is the legal equivalent of your handwritten signature.'}
             </p>
           )}
@@ -480,8 +570,8 @@ export default function ContractSign() {
           <Button
             onClick={handleSign}
             disabled={submitting || isPreviewMode}
-            className="w-full sm:w-auto mt-3 py-3 px-8 rounded-xl font-semibold text-white text-base"
-            style={{ backgroundColor: accentColor, minWidth: 200 }}
+            className="w-full sm:w-auto mt-3 py-3 px-8 rounded-xl font-semibold text-base"
+            style={{ backgroundColor: accentColor, color: buttonTextColor, minWidth: 200 }}
           >
             {submitting ? (
               <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Signing…</>

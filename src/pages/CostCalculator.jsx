@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { CostCalculatorPanel } from '@/components/CostCalculator/CostCalculatorPanel';
+import { EXAMPLE_TEMPLATE, EXAMPLE_TEMPLATE_ID } from '@/components/CostCalculator/exampleTemplate';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import supabaseClient from '@/lib/supabaseClient';
 
@@ -73,7 +74,7 @@ export default function CostCalculator() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(null);
 
-  const isEditing = editParam === 'new' || (editParam && editParam.length > 10);
+  const isEditing = editParam === 'new' || editParam === 'example' || (editParam && editParam.length > 10);
 
   const linkedPkg = useMemo(
     () => packages.find((p) => p.id === linkedPackageId) || null,
@@ -122,6 +123,15 @@ export default function CostCalculator() {
         setLinkedPackageId('');
         setCurrency('USD');
         setCostBody(null);
+        setManualRefPrice('');
+        setLoading(false);
+        return;
+      }
+      if (editParam === 'example') {
+        setTemplateName(EXAMPLE_TEMPLATE.name);
+        setLinkedPackageId('');
+        setCurrency(EXAMPLE_TEMPLATE.currency);
+        setCostBody(EXAMPLE_TEMPLATE.body);
         setManualRefPrice('');
         setLoading(false);
         return;
@@ -181,7 +191,7 @@ export default function CostCalculator() {
         currency: displayCurrency,
         updated_at: new Date().toISOString(),
       };
-      if (editParam === 'new') {
+      if (editParam === 'new' || editParam === 'example') {
         await supabaseClient.entities.CostCalculatorTemplate.create(payload);
       } else {
         await supabaseClient.entities.CostCalculatorTemplate.update(editParam, payload);
@@ -437,72 +447,64 @@ export default function CostCalculator() {
           </div>
         )}
 
-        {templates.length === 0 ? (
+        <div className="space-y-3">
+          {/* Built-in example template */}
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl border border-gray-200 p-12 text-center shadow-sm"
+            layout
+            onClick={() => setSearchParams({ edit: 'example' })}
+            className="bg-white rounded-2xl border border-dashed border-gray-200 shadow-sm px-5 py-4 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer"
           >
-            <div
-              className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)' }}
-            >
-              <Calculator className="w-8 h-8 text-white" />
+            <div className="w-11 h-11 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+              <Calculator className="w-5 h-5 text-gray-400" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">No templates yet</h2>
-            <p className="text-gray-500 mb-6 max-w-md mx-auto">
-              Create your first template to standardize how you estimate costs and margins across packages.
-            </p>
-            <Button
-              onClick={() => setSearchParams({ edit: 'new' })}
-              className="rounded-full bg-[#ff0044] hover:bg-[#cc0033]"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create template
-            </Button>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-gray-600 truncate">{EXAMPLE_TEMPLATE.name}</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Click to view example template
+              </p>
+            </div>
           </motion.div>
-        ) : (
-          <div className="space-y-3">
-            {templates.map((t) => (
-              <motion.div
-                key={t.id}
-                layout
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4 hover:shadow-md transition-shadow"
-              >
-                <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                  <Calculator className="w-5 h-5 text-[#ff0044]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{t.name}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {t.linked_package_id ? 'Linked package · ' : ''}
-                    Updated {t.updated_at ? new Date(t.updated_at).toLocaleDateString() : '—'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full"
-                    onClick={() => setSearchParams({ edit: t.id })}
-                    title="Edit"
-                  >
-                    <Pencil className="w-4 h-4 text-gray-500" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full"
-                    onClick={() => setDeleteId(t.id)}
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
-                  </Button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
+
+          {/* User templates */}
+          {templates.map((t) => (
+            <motion.div
+              key={t.id}
+              layout
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex items-center gap-4 hover:shadow-md transition-shadow"
+            >
+              <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                <Calculator className="w-5 h-5 text-[#ff0044]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-gray-900 truncate">{t.name}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {t.linked_package_id ? 'Linked package · ' : ''}
+                  Updated {t.updated_at ? new Date(t.updated_at).toLocaleDateString() : '—'}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                  onClick={() => setSearchParams({ edit: t.id })}
+                  title="Edit"
+                >
+                  <Pencil className="w-4 h-4 text-gray-500" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                  onClick={() => setDeleteId(t.id)}
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
+                </Button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
 
         <p className="text-center text-sm text-gray-400 mt-10">
           Tip: open any package in the editor and use <strong className="text-gray-600">Use template</strong> in the

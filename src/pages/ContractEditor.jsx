@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from '@/components/ui/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -38,6 +39,7 @@ export default function ContractEditor() {
   const [body, setBody] = useState('');
   const [accentColor, setAccentColor] = useState('#ff0044');
   const [logoUrl, setLogoUrl] = useState('');
+  const [logoHeight, setLogoHeight] = useState(80);
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [buttonLabel, setButtonLabel] = useState('');
   const [buttonLink, setButtonLink] = useState('');
@@ -83,6 +85,7 @@ export default function ContractEditor() {
     setBody(c.body || '');
     setAccentColor(c.accent_color || '#ff0044');
     setLogoUrl(c.logo_url || '');
+    setLogoHeight(c.logo_height || 80);
     setConfirmationMessage(c.custom_confirmation_message || '');
     setButtonLabel(c.custom_button_label || '');
     setButtonLink(c.custom_button_link || '');
@@ -100,6 +103,7 @@ export default function ContractEditor() {
     setBody(t.body || '');
     setAccentColor(t.accent_color || '#ff0044');
     setLogoUrl(t.logo_url || '');
+    setLogoHeight(t.logo_height || 80);
     setConfirmationMessage(t.custom_confirmation_message || '');
     setButtonLabel(t.custom_button_label || '');
     setButtonLink(t.custom_button_link || '');
@@ -116,6 +120,7 @@ export default function ContractEditor() {
     body,
     accent_color: accentColor,
     logo_url: logoUrl,
+    logo_height: logoHeight,
     custom_confirmation_message: confirmationMessage,
     custom_button_label: buttonLabel,
     custom_button_link: buttonLink,
@@ -127,6 +132,7 @@ export default function ContractEditor() {
     body,
     accent_color: accentColor,
     logo_url: logoUrl,
+    logo_height: logoHeight,
     custom_confirmation_message: confirmationMessage,
     custom_button_label: buttonLabel,
     custom_button_link: buttonLink,
@@ -170,9 +176,10 @@ export default function ContractEditor() {
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       console.error('Save failed:', e);
+      toast({ title: 'Failed to save contract. Please try again.', variant: 'destructive' });
     }
     setSaving(false);
-  }, [name, body, accentColor, logoUrl, confirmationMessage, buttonLabel, buttonLink, mergeFieldDefs, expiresAt, isTemplate]);
+  }, [name, body, accentColor, logoUrl, logoHeight, confirmationMessage, buttonLabel, buttonLink, mergeFieldDefs, expiresAt, isTemplate]);
 
   const triggerAutoSave = useCallback(() => {
     clearTimeout(autoSaveTimer.current);
@@ -394,11 +401,26 @@ export default function ContractEditor() {
             <div className="mb-4">
               <label className="text-sm font-medium text-gray-700 block mb-1.5">Logo</label>
               {logoUrl ? (
-                <div className="relative group">
-                  <img src={logoUrl} alt="Logo" className="max-h-16 object-contain rounded-lg border border-gray-200 p-2" />
-                  <button onClick={() => setLogoUrl('')} className="absolute top-1 right-1 w-5 h-5 bg-red-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <X className="w-3 h-3 text-red-600" />
-                  </button>
+                <div className="space-y-2">
+                  <div className="relative group flex items-center justify-center rounded-lg border border-gray-200 p-3 bg-gray-50/50">
+                    <img src={logoUrl} alt="Logo" className="object-contain" style={{ height: `${logoHeight}px`, maxWidth: '100%' }} />
+                    <button onClick={() => { setLogoUrl(''); setLogoHeight(80); }} className="absolute top-1 right-1 w-5 h-5 bg-red-100 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X className="w-3 h-3 text-red-600" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-8">Size</span>
+                    <input
+                      type="range"
+                      min="30"
+                      max="160"
+                      value={logoHeight}
+                      onChange={(e) => { setLogoHeight(parseInt(e.target.value)); triggerAutoSave(); }}
+                      className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      style={{ accentColor }}
+                    />
+                    <span className="text-xs text-gray-400 w-10 text-right">{logoHeight}px</span>
+                  </div>
                 </div>
               ) : (
                 <button
