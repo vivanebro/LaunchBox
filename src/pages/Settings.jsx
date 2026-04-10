@@ -11,21 +11,21 @@ import { useAuth } from '@/lib/AuthContext';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 
 const CURRENCIES = [
-  { code: 'USD', label: 'USD -US Dollar', symbol: '$' },
-  { code: 'EUR', label: 'EUR -Euro', symbol: '€' },
-  { code: 'GBP', label: 'GBP -British Pound', symbol: '£' },
-  { code: 'CAD', label: 'CAD -Canadian Dollar', symbol: 'CA$' },
-  { code: 'AUD', label: 'AUD -Australian Dollar', symbol: 'A$' },
-  { code: 'ILS', label: 'ILS -Israeli Shekel', symbol: '₪' },
-  { code: 'CHF', label: 'CHF -Swiss Franc', symbol: 'CHF' },
-  { code: 'SEK', label: 'SEK -Swedish Krona', symbol: 'kr' },
-  { code: 'NOK', label: 'NOK -Norwegian Krone', symbol: 'kr' },
-  { code: 'DKK', label: 'DKK -Danish Krone', symbol: 'kr' },
-  { code: 'NZD', label: 'NZD -New Zealand Dollar', symbol: 'NZ$' },
-  { code: 'SGD', label: 'SGD -Singapore Dollar', symbol: 'S$' },
-  { code: 'AED', label: 'AED -UAE Dirham', symbol: 'د.إ' },
-  { code: 'ZAR', label: 'ZAR -South African Rand', symbol: 'R' },
-  { code: 'BRL', label: 'BRL -Brazilian Real', symbol: 'R$' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'CAD', symbol: 'CA$', name: 'Canadian Dollar' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+  { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' },
+  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
+  { code: 'SEK', symbol: 'kr', name: 'Swedish Krona' },
+  { code: 'NOK', symbol: 'kr', name: 'Norwegian Krone' },
+  { code: 'DKK', symbol: 'kr', name: 'Danish Krone' },
+  { code: 'NZD', symbol: 'NZ$', name: 'New Zealand Dollar' },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
+  { code: 'BRL', symbol: 'R$', name: 'Brazilian Real' },
 ];
 
 export default function Settings() {
@@ -269,7 +269,7 @@ export default function Settings() {
                 className="w-full h-12 bg-gray-50 border border-gray-200 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff0044]/20 focus:border-[#ff0044]"
               >
                 {CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.code}>{c.label}</option>
+                  <option key={c.code} value={c.code}>{c.symbol} {c.code} - {c.name}</option>
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">Used as the default when creating new packages</p>

@@ -532,7 +532,14 @@ export default function Results() {
         if (loadedConfig.starter_duration === undefined) loadedConfig.starter_duration = null;
         if (loadedConfig.growth_duration === undefined) loadedConfig.growth_duration = null;
         if (loadedConfig.premium_duration === undefined) loadedConfig.premium_duration = null;
-        if (loadedConfig.currency === undefined) loadedConfig.currency = 'USD';
+        if (loadedConfig.currency === undefined) {
+          try {
+            const me = await supabaseClient.auth.me();
+            loadedConfig.currency = me?.default_currency || 'USD';
+          } catch (_) {
+            loadedConfig.currency = 'USD';
+          }
+        }
         if (loadedConfig.pricing_availability === undefined) loadedConfig.pricing_availability = 'both';
         if (loadedConfig.show_excluded_deliverables === undefined) loadedConfig.show_excluded_deliverables = true;
         if (loadedConfig.show_package_buttons_in_edit_mode === undefined) loadedConfig.show_package_buttons_in_edit_mode = true;

@@ -58,6 +58,16 @@ export default function PackageBuilder() {
 
   const brandColor = config?.brand_color || '#ff0044';
 
+  // Load user's default currency for new packages
+  useEffect(() => {
+    if (config.currency) return; // Already has currency (editing existing)
+    supabaseClient.auth.me().then((u) => {
+      if (u?.default_currency) {
+        setConfig((prev) => ({ ...prev, currency: u.default_currency }));
+      }
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
