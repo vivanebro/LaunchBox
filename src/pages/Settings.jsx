@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, Mail, Save, Loader2, Link as LinkIcon, DollarSign, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, Mail, Save, Loader2, Link as LinkIcon, DollarSign, Lock, Eye, EyeOff, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from '@/components/ui/use-toast';
 import supabaseClient from '@/lib/supabaseClient';
 import { supabase } from '@/lib/supabaseClient';
@@ -41,6 +45,11 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+
+  // Delete account
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadUser();
@@ -148,6 +157,29 @@ export default function Settings() {
       toast({ title: error.message || 'Failed to update password.', variant: 'destructive' });
     }
     setChangingPassword(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') return;
+    setDeleting(true);
+    try {
+      // Delete all user data from public tables
+      const userId = user.id;
+      const tables = ['package_configs', 'contracts', 'contract_templates', 'cost_calculator_templates', 'quiz_configs', 'notifications', 'folders'];
+      for (const table of tables) {
+        await supabase.from(table).delete().eq('created_by', userId);
+      }
+      await supabase.from('users').delete().eq('id', userId);
+
+      // Sign out and redirect
+      await supabase.auth.signOut();
+      logout(false);
+      window.location.href = createPageUrl('Welcome');
+    } catch (error) {
+      console.error('Account deletion failed:', error);
+      toast({ title: 'Failed to delete account. Please contact support.', variant: 'destructive' });
+      setDeleting(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -394,7 +426,58 @@ export default function Settings() {
             </Button>
           </div>
         </motion.div>
+
+        {/* Danger Zone */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-3xl p-8 shadow-sm border border-red-100 mt-6"
+        >
+          <h3 className="text-lg font-bold text-red-600 mb-1">Danger Zone</h3>
+          <p className="text-sm text-gray-500 mb-4">Permanently delete your account and all data</p>
+          <Button
+            onClick={() => setShowDeleteDialog(true)}
+            variant="outline"
+            className="h-10 px-6 font-semibold rounded-xl border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete Account
+          </Button>
+        </motion.div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={(open) => { if (!open) { setShowDeleteDialog(false); setDeleteConfirmText(''); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <span className="block">This will permanently delete your account, all your packages, contracts, templates, and data. This cannot be undone.</span>
+              <span className="block font-medium text-gray-700">Type <strong>DELETE</strong> to confirm:</span>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE"
+                className="mt-2"
+              />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText !== 'DELETE' || deleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting...</>
+              ) : (
+                'Delete my account'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
