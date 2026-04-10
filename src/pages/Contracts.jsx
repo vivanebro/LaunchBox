@@ -312,6 +312,7 @@ export default function Contracts() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* Hidden for launch — folder system parked
                     {currentUser?.id && (
                       <AssignContractFolderMenu
                         contractId={contract.id}
@@ -326,6 +327,7 @@ export default function Contracts() {
                         className="border-transparent bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100"
                       />
                     )}
+                    */}
                     {contract.shareable_link && (
                       <Button
                         variant="ghost"

@@ -575,6 +575,7 @@ export default function MyPackages() {
                             </Button>
                           </div>
 
+                          {/* Hidden for launch — folder system parked
                           <div className="w-full flex justify-center py-1">
                             <AssignFolderMenu
                               packageId={pkg.id}
@@ -585,6 +586,7 @@ export default function MyPackages() {
                               className="w-full justify-between max-w-full"
                             />
                           </div>
+                          */}
 
                           <div className="grid grid-cols-4 gap-2">
                             <Tooltip>
@@ -678,6 +680,7 @@ export default function MyPackages() {
           isMobile={isMobile}
         />
 
+        {/* Hidden for launch — folder system parked
         <CopyLinkFolderPrompt
           open={!!copyPromptPkg}
           onOpenChange={(o) => {
@@ -690,6 +693,7 @@ export default function MyPackages() {
           userId={currentUser?.id}
           onAssigned={() => loadPackages()}
         />
+        */}
 
         <AlertDialog open={!!confirmWonLost} onOpenChange={(o) => !o && setConfirmWonLost(null)}>
           <AlertDialogContent>

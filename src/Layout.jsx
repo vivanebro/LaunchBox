@@ -401,7 +401,8 @@ export default function Layout({ children, currentPageName }) {
               )}
             </div>
 
-            <Link 
+            {/* Hidden for launch — Clients & Projects folder system parked
+            <Link
               to="/ClientsProjects"
               className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
                 currentPageName === 'ClientsProjects'
@@ -426,6 +427,7 @@ export default function Layout({ children, currentPageName }) {
                 </span>
               </span>
             </Link>
+            */}
 
             <Link 
               to={createPageUrl('Settings')}

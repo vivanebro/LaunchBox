@@ -219,6 +219,7 @@ export default function Settings() {
               />
             </div>
 
+            {/* Hidden for launch — folder system parked
             <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-4">
               <div>
                 <p className="text-sm font-medium text-gray-900">Folder prompt after copy link</p>
@@ -237,6 +238,7 @@ export default function Settings() {
                 aria-label="Toggle folder assignment prompt after copying link"
               />
             </div>
+            */}
           </div>
 
           <div className="flex gap-4 mt-8">

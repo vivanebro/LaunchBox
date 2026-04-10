@@ -4422,6 +4422,7 @@ export default function Results() {
             <Undo2 className="w-4 h-4 mr-2" />
             Undo
           </Button>
+          {/* Hidden for launch — folder system parked
           {!isPreviewMode && packageId && profileUser?.id && (
             <AssignFolderMenu
               packageId={packageId}
@@ -4432,6 +4433,7 @@ export default function Results() {
               }}
             />
           )}
+          */}
         </div>
 
         <div className="text-center">
@@ -4959,9 +4961,11 @@ export default function Results() {
                 toast({ title: 'Link copied!' });
                 const u = await supabaseClient.auth.me();
                 setProfileUser(u);
+                /* Hidden for launch — folder system parked
                 if (!isPreviewMode && !u?.hide_copy_link_folder_prompt) {
                   setShowCopyLinkFolderPrompt(true);
                 }
+                */
               }}
               variant="outline"
               className="h-12 px-8 font-semibold rounded-full bg-white border-2 text-blue-600 hover:bg-blue-50"
@@ -6060,6 +6064,7 @@ export default function Results() {
         )}
       </AnimatePresence>
 
+      {/* Hidden for launch — folder system parked
       {!isPreviewMode && (
         <CopyLinkFolderPrompt
           open={showCopyLinkFolderPrompt}
@@ -6082,6 +6087,7 @@ export default function Results() {
           }}
         />
       )}
+      */}
 
       {/* Fresh-from-wizard preview modal */}
       <AnimatePresence>
