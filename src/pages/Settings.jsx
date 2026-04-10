@@ -2,12 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, Mail, Calendar, Save, Loader2, Link as LinkIcon } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { User, Mail, Save, Loader2, Link as LinkIcon, DollarSign, Lock, Eye, EyeOff } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 import supabaseClient from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
+
+const CURRENCIES = [
+  { code: 'USD', label: 'USD — US Dollar', symbol: '$' },
+  { code: 'EUR', label: 'EUR — Euro', symbol: '€' },
+  { code: 'GBP', label: 'GBP — British Pound', symbol: '£' },
+  { code: 'CAD', label: 'CAD — Canadian Dollar', symbol: 'CA$' },
+  { code: 'AUD', label: 'AUD — Australian Dollar', symbol: 'A$' },
+  { code: 'ILS', label: 'ILS — Israeli Shekel', symbol: '₪' },
+  { code: 'CHF', label: 'CHF — Swiss Franc', symbol: 'CHF' },
+  { code: 'SEK', label: 'SEK — Swedish Krona', symbol: 'kr' },
+  { code: 'NOK', label: 'NOK — Norwegian Krone', symbol: 'kr' },
+  { code: 'DKK', label: 'DKK — Danish Krone', symbol: 'kr' },
+  { code: 'NZD', label: 'NZD — New Zealand Dollar', symbol: 'NZ$' },
+  { code: 'SGD', label: 'SGD — Singapore Dollar', symbol: 'S$' },
+  { code: 'AED', label: 'AED — UAE Dirham', symbol: 'د.إ' },
+  { code: 'ZAR', label: 'ZAR — South African Rand', symbol: 'R' },
+  { code: 'BRL', label: 'BRL — Brazilian Real', symbol: 'R$' },
+];
 
 export default function Settings() {
   const { logout } = useAuth();
@@ -16,6 +35,12 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [slugError, setSlugError] = useState(null);
   const [slugChecking, setSlugChecking] = useState(false);
+
+  // Password change
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     loadUser();
@@ -59,6 +84,7 @@ export default function Settings() {
     try {
       const updates = {
         full_name: user.full_name,
+        default_currency: user.default_currency || 'USD',
         hide_copy_link_folder_prompt: Boolean(user.hide_copy_link_folder_prompt),
       };
       if (user.creator_slug !== undefined) {
@@ -89,12 +115,39 @@ export default function Settings() {
         }
       }
       setUser({ ...user, ...updates });
-      alert('Profile updated successfully!');
+      toast({ title: 'Settings saved.' });
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Failed to update profile');
+      toast({ title: 'Failed to save settings.', variant: 'destructive' });
     }
     setSaving(false);
+  };
+
+  const handlePasswordChange = async () => {
+    if (!newPassword.trim()) {
+      toast({ title: 'Please enter a new password.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: 'Password must be at least 6 characters.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Passwords do not match.', variant: 'destructive' });
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast({ title: 'Password updated successfully.' });
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      console.error('Password change failed:', error);
+      toast({ title: error.message || 'Failed to update password.', variant: 'destructive' });
+    }
+    setChangingPassword(false);
   };
 
   const handleLogout = async () => {
@@ -103,8 +156,6 @@ export default function Settings() {
     } catch (error) {
       console.error('Error signing out from Supabase:', error);
     }
-
-    // Clear Base44 auth state as well, then return to app welcome.
     logout(false);
     window.location.href = createPageUrl('Welcome');
   };
@@ -132,7 +183,7 @@ export default function Settings() {
           className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mb-6"
         >
           <div className="flex items-center gap-6 mb-8">
-            <div 
+            <div
               className="w-24 h-24 rounded-2xl flex items-center justify-center text-white text-3xl font-bold"
               style={{ background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)' }}
             >
@@ -209,14 +260,19 @@ export default function Settings() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Calendar className="w-4 h-4 inline mr-2" />
-                Role
+                <DollarSign className="w-4 h-4 inline mr-2" />
+                Default Currency
               </label>
-              <Input
-                value={user?.role || 'user'}
-                disabled
-                className="h-12 bg-gray-100 border-gray-200 text-gray-500"
-              />
+              <select
+                value={user?.default_currency || 'USD'}
+                onChange={(e) => setUser({ ...user, default_currency: e.target.value })}
+                className="w-full h-12 bg-gray-50 border border-gray-200 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff0044]/20 focus:border-[#ff0044]"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Used as the default when creating new packages</p>
             </div>
 
             {/* Hidden for launch — folder system parked
@@ -266,6 +322,75 @@ export default function Settings() {
               className="h-12 px-8 font-semibold rounded-xl border-2 border-gray-200 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
             >
               Logout
+            </Button>
+          </div>
+        </motion.div>
+
+        {/* Password Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100"
+        >
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Change Password</h3>
+          <p className="text-sm text-gray-500 mb-6">Update your account password</p>
+
+          <div className="space-y-4 max-w-md">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Lock className="w-4 h-4 inline mr-2" />
+                New Password
+              </label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  className="h-12 bg-gray-50 border-gray-200 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Lock className="w-4 h-4 inline mr-2" />
+                Confirm Password
+              </label>
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter new password"
+                className={`h-12 bg-gray-50 border-gray-200 ${confirmPassword && confirmPassword !== newPassword ? 'border-red-400' : ''}`}
+              />
+              {confirmPassword && confirmPassword !== newPassword && (
+                <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
+              )}
+            </div>
+
+            <Button
+              onClick={handlePasswordChange}
+              disabled={changingPassword || !newPassword || !confirmPassword}
+              variant="outline"
+              className="h-12 px-6 font-semibold rounded-xl border-2 border-gray-200"
+            >
+              {changingPassword ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Password'
+              )}
             </Button>
           </div>
         </motion.div>

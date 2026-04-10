@@ -51,8 +51,8 @@ const TABLE_COLUMNS = {
     'id', 'name', 'parent_id', 'created_by', 'is_example', 'created_date', 'updated_date',
   ]),
   users: new Set([
-    'id', 'email', 'full_name', 'role', 'creator_slug', 'created_date', 'updated_date',
-    'hide_copy_link_folder_prompt',
+    'id', 'email', 'full_name', 'role', 'creator_slug', 'default_currency',
+    'created_date', 'updated_date', 'hide_copy_link_folder_prompt',
   ]),
   help_requests: new Set([
     'id', 'message', 'status', 'created_by', 'created_date', 'updated_date',

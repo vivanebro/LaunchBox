@@ -255,7 +255,7 @@ export default function Layout({ children, currentPageName }) {
   return (
     <ErrorBoundary>
       <div className="min-h-screen flex" style={{ backgroundColor: '#F5F5F7' }}>
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0">
           <div className="p-6">
             <Link to={createPageUrl('Dashboard')} className="flex items-center relative">
               <img 
@@ -269,7 +269,8 @@ export default function Layout({ children, currentPageName }) {
             </Link>
           </div>
 
-          <nav className="flex-1 px-4 space-y-2">
+          <nav className="flex-1 px-4 flex flex-col">
+          <div className="space-y-2 flex-1">
             <Link 
               to={createPageUrl('Dashboard')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
@@ -428,8 +429,10 @@ export default function Layout({ children, currentPageName }) {
               </span>
             </Link>
             */}
+          </div>
 
-            <Link 
+          <div className="space-y-1 border-t border-gray-100 pt-2 pb-2">
+            <Link
               to={createPageUrl('Settings')}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
                 currentPageName === 'Settings'
@@ -445,7 +448,7 @@ export default function Layout({ children, currentPageName }) {
             </Link>
 
             {isAdmin && (
-              <Link 
+              <Link
                 to={createPageUrl('HelpRequests')}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
                   currentPageName === 'HelpRequests'
@@ -460,6 +463,7 @@ export default function Layout({ children, currentPageName }) {
                 Help Requests
               </Link>
             )}
+          </div>
           </nav>
         </aside>
 
