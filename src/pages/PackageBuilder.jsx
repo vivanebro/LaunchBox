@@ -1,20 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
 
 import StepIndicator from '../components/builder/StepIndicator';
 import Step1Name from '../components/builder/Step1Name';
-import Step2Deliverables from '../components/builder/Step2Deliverables';
-import Step3Bonuses from '../components/builder/Step3Bonuses';
-import Step4Duration from '../components/builder/Step4Duration';
-import Step5Pricing from '../components/builder/Step5Pricing';
-import Step6Urgency from '../components/builder/Step6Urgency';
-import Step7Guarantee from '../components/builder/Step7Guarantee';
+import Step2PricingMode from '../components/builder/Step2PricingMode';
+import Step3Deliverables from '../components/builder/Step2Deliverables';
+import Step4Bonuses from '../components/builder/Step3Bonuses';
+import Step5Duration from '../components/builder/Step4Duration';
+import Step6Pricing from '../components/builder/Step5Pricing';
+import Step7Urgency from '../components/builder/Step6Urgency';
+import Step8Guarantee from '../components/builder/Step7Guarantee';
 
-const TOTAL_STEPS = 7;
+// Steps: 1-Name, 2-PricingMode, 3-Deliverables, 4-Bonuses, 5-Duration, 6-Pricing, 7-Urgency, 8-Guarantee
+// Duration (step 5) is skipped when pricing_availability === 'retainer'
+const BASE_TOTAL_STEPS = 8;
 
 export default function PackageBuilder() {
   const [step, setStep] = useState(1);
@@ -95,9 +98,39 @@ export default function PackageBuilder() {
     setConfig(prev => ({ ...prev, ...updates }));
   };
 
+  const skipDuration = config.pricing_availability === 'retainer';
+  const totalSteps = skipDuration ? BASE_TOTAL_STEPS - 1 : BASE_TOTAL_STEPS;
+
+  // Map visual step number to actual step number (accounting for skipped Duration)
+  const visualToActual = (vis) => {
+    if (!skipDuration) return vis;
+    // When Duration (actual 5) is skipped, visual 5+ maps to actual 6+
+    return vis >= 5 ? vis + 1 : vis;
+  };
+  const actualToVisual = (act) => {
+    if (!skipDuration) return act;
+    return act > 5 ? act - 1 : act;
+  };
+
   const handleNext = async () => {
-    if (step < TOTAL_STEPS) {
-      setStep(step + 1);
+    const visualStep = actualToVisual(step);
+    if (visualStep < totalSteps) {
+      let nextActual = step + 1;
+      // Skip Duration step (actual 5) when ongoing-only
+      if (skipDuration && nextActual === 5) {
+        // Set ongoing defaults for duration fields
+        updateConfig({
+          project_duration: 'Ongoing',
+          duration_min: null,
+          duration_max: null,
+          duration_unit: 'ongoing',
+          duration_starter: null,
+          duration_growth: null,
+          duration_premium: null,
+        });
+        nextActual = 6;
+      }
+      setStep(nextActual);
     } else {
       // Final step - show generating animation, then save and go to results
       setIsProcessing(true);
@@ -150,16 +183,20 @@ export default function PackageBuilder() {
 
   const handleBack = () => {
     if (step > 1) {
-      setStep(step - 1);
+      let prevActual = step - 1;
+      // Skip Duration step (actual 5) when going back too
+      if (skipDuration && prevActual === 5) prevActual = 4;
+      setStep(prevActual);
     }
   };
 
   const canProceed = () => {
     switch(step) {
       case 1: return config.package_set_name?.trim().length > 0;
-      case 2: return config.core_deliverables?.length > 0;
-      case 4: return config.project_duration;
-      case 5: return config.typical_price > 0;
+      case 2: return !!config.pricing_availability;
+      case 3: return config.core_deliverables?.length > 0;
+      case 5: return config.project_duration;
+      case 6: return config.typical_price > 0;
       default: return true;
     }
   };
@@ -262,7 +299,7 @@ export default function PackageBuilder() {
     <div className="min-h-screen" style={{ backgroundColor: '#F5F5F7' }}>
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Step Indicator */}
-        <StepIndicator currentStep={step} totalSteps={TOTAL_STEPS} onStepClick={setStep} />
+        <StepIndicator currentStep={actualToVisual(step)} totalSteps={totalSteps} onStepClick={(vis) => setStep(visualToActual(vis))} />
 
         {/* Step Content */}
         <AnimatePresence mode="wait">
@@ -275,12 +312,13 @@ export default function PackageBuilder() {
             className="bg-white rounded-3xl p-8 shadow-lg border border-gray-200"
           >
             {step === 1 && <Step1Name data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 2 && <Step2Deliverables data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 3 && <Step3Bonuses data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 4 && <Step4Duration data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 5 && <Step5Pricing data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 6 && <Step6Urgency data={config} onChange={updateConfig} onNext={handleNext} />}
-            {step === 7 && <Step7Guarantee data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 2 && <Step2PricingMode data={config} onChange={updateConfig} />}
+            {step === 3 && <Step3Deliverables data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 4 && <Step4Bonuses data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 5 && <Step5Duration data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 6 && <Step6Pricing data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 7 && <Step7Urgency data={config} onChange={updateConfig} onNext={handleNext} />}
+            {step === 8 && <Step8Guarantee data={config} onChange={updateConfig} onNext={handleNext} />}
           </motion.div>
         </AnimatePresence>
 
@@ -305,7 +343,7 @@ export default function PackageBuilder() {
             className="h-14 px-10 text-base font-semibold rounded-full shadow-lg hover:shadow-xl transition-all text-white border-0 disabled:from-gray-300 disabled:to-gray-400"
             style={{ background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)' }}
           >
-            {step === TOTAL_STEPS ? 'Generate Packages' : 'Continue'}
+            {actualToVisual(step) === totalSteps ? 'Generate Packages' : 'Continue'}
           </Button>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature, AlertCircle } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature, AlertCircle, Sun, Moon } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { toPng } from 'html-to-image';
@@ -84,12 +84,25 @@ const CURRENCIES = [
 
 // Button configuration options for Get Started
 const BUTTON_OPTIONS = [
-  { id: 'book_a_call', label: 'Book a Call', placeholder: 'Paste your calendar link', hint: 'best if you haven\'t presented the offer live yet' },
-  { id: 'lock_your_spot', label: 'Lock Your Spot', placeholder: 'Paste your payment link', hint: 'best after presenting, or if you want them to buy straight away' },
-  { id: 'sign_contract', label: 'Sign Contract', placeholder: 'Paste your e-signature link', hint: 'best if you want them to sign before paying' },
-  { id: 'apply', label: 'Apply', placeholder: 'Paste your form link', hint: 'best if you want to qualify them first' },
-  { id: 'custom', label: 'Custom', placeholder: 'Paste the link here', hint: '' }
+  { id: 'book_a_call', label: 'Book a Call', placeholder: 'Paste your calendar link', hint: 'Send them to your calendar so they can book a time with you', tag: 'Most common' },
+  { id: 'lock_your_spot', label: 'Lock Your Spot', placeholder: 'Paste your payment link', hint: 'Send them straight to payment so they can buy now' },
+  { id: 'sign_contract', label: 'Sign Contract', placeholder: 'Paste your e-signature link', hint: 'Send them to sign a contract before paying' },
+  { id: 'apply', label: 'Apply', placeholder: 'Paste your form link', hint: 'Send them to a form so you can qualify them first' },
+  { id: 'custom', label: 'Custom', placeholder: 'Paste the link here', hint: 'Use any link you want' }
 ];
+
+const DISCOUNT_TEMPLATES = [
+  { label: 'Pay 3 months upfront', percent: 10 },
+  { label: 'Pay in full upfront', percent: 15 },
+  { label: 'Book multiple services', percent: 15 },
+  { label: 'Refer a friend', percent: 10 },
+];
+
+const calcDiscountPrice = (price, percent) => {
+  if (!price || !percent) return price;
+  const discounted = price * (1 - percent / 100);
+  return Math.ceil(discounted / 50) * 50;
+};
 
 const getCTAOptionEmoji = (optionId) => {
   const emojis = { book_a_call: '📅', lock_your_spot: '🔒', sign_contract: '✍️', apply: '📋', custom: '✏️' };
@@ -262,6 +275,9 @@ export default function Results() {
   const [exporting, setExporting] = React.useState(false);
   const [exportingPdf, setExportingPdf] = React.useState(false);
   const [showExportDropdown, setShowExportDropdown] = React.useState(false);
+  const [showSettingsSidebar, setShowSettingsSidebar] = React.useState(false);
+  const [discountActive, setDiscountActive] = React.useState(false);
+  const [showDiscountConfig, setShowDiscountConfig] = React.useState(false);
   const [showPdfSubmenu, setShowPdfSubmenu] = React.useState(false);
   const exportDropdownRef = React.useRef(null);
   const [canUndo, setCanUndo] = useState(false);
@@ -347,7 +363,10 @@ export default function Results() {
     const isFreshBuild = localStorage.getItem('freshFromWizard') === 'true';
     if (isFreshBuild) {
       localStorage.removeItem('freshFromWizard');
-      setIsFreshReveal(true);
+      if (localStorage.getItem('hideResultsHint') !== 'true') {
+        setIsFreshReveal(true);
+        setTimeout(() => setIsFreshReveal(false), 12500);
+      }
     }
     setIsPreviewMode(isPreview);
     setIsEmbedMode(isEmbed);
@@ -525,9 +544,9 @@ export default function Results() {
         
         // Initialize new fields for existing configs if they don't exist
         if (loadedConfig.pricing_label_onetime === undefined) loadedConfig.pricing_label_onetime = 'one-time';
-        if (loadedConfig.pricing_label_retainer === undefined) loadedConfig.pricing_label_retainer = 'monthly';
-        if (loadedConfig.pricing_button_label_onetime === undefined) loadedConfig.pricing_button_label_onetime = 'One-time Project';
-        if (loadedConfig.pricing_button_label_retainer === undefined) loadedConfig.pricing_button_label_retainer = 'Monthly Retainer';
+        if (loadedConfig.pricing_label_retainer === undefined) loadedConfig.pricing_label_retainer = 'ongoing';
+        if (loadedConfig.pricing_button_label_onetime === undefined) loadedConfig.pricing_button_label_onetime = 'One-time';
+        if (loadedConfig.pricing_button_label_retainer === undefined) loadedConfig.pricing_button_label_retainer = 'Ongoing';
         if (loadedConfig.retainer_discount_text === undefined) loadedConfig.retainer_discount_text = '15% off one-time price';
         if (loadedConfig.starter_duration === undefined) loadedConfig.starter_duration = null;
         if (loadedConfig.growth_duration === undefined) loadedConfig.growth_duration = null;
@@ -541,6 +560,16 @@ export default function Results() {
           }
         }
         if (loadedConfig.pricing_availability === undefined) loadedConfig.pricing_availability = 'both';
+        // Fill duration defaults when ongoing-only packages need one-time durations
+        if (loadedConfig.pricing_availability !== 'retainer' && (!loadedConfig.duration_min || loadedConfig.project_duration === 'Ongoing')) {
+          loadedConfig.project_duration = '1-3 weeks';
+          loadedConfig.duration_min = 1;
+          loadedConfig.duration_max = 3;
+          loadedConfig.duration_unit = 'weeks';
+          loadedConfig.duration_starter = { value: 3, unit: 'weeks' };
+          loadedConfig.duration_growth = { value: 2, unit: 'weeks' };
+          loadedConfig.duration_premium = { value: 1, unit: 'weeks' };
+        }
         if (loadedConfig.show_excluded_deliverables === undefined) loadedConfig.show_excluded_deliverables = true;
         if (loadedConfig.show_package_buttons_in_edit_mode === undefined) loadedConfig.show_package_buttons_in_edit_mode = true;
         // Migrate old button_links to new structure
@@ -577,7 +606,6 @@ export default function Results() {
         }
 
 
-        console.log('Loaded config button_links:', loadedConfig.button_links);
 
         // Migrate old popularPackageIndex to new structure
         if (typeof loadedConfig.popularPackageIndex === 'number') {
@@ -809,9 +837,9 @@ export default function Results() {
             pricingMode: 'one-time',
             brand_color: '#ff0044',
             pricing_label_onetime: 'one-time',
-            pricing_label_retainer: 'monthly',
-            pricing_button_label_onetime: 'One-time Project',
-            pricing_button_label_retainer: 'Monthly Retainer',
+            pricing_label_retainer: 'ongoing',
+            pricing_button_label_onetime: 'One-time',
+            pricing_button_label_retainer: 'Ongoing',
             retainer_discount_text: '15% off one-time price',
             starter_duration: null,
             growth_duration: null,
@@ -921,7 +949,6 @@ export default function Results() {
     setConfig(updatedConfig);
     configRef.current = updatedConfig;
     localStorage.setItem('packageConfig', JSON.stringify(updatedConfig));
-    console.log(`Updated ${field}:`, value);
 
     // Auto-update pricing mode when availability changes
     if (field === 'pricing_availability') {
@@ -929,6 +956,19 @@ export default function Results() {
         setPricingMode('one-time');
       } else if (value === 'retainer') {
         setPricingMode('retainer');
+      }
+      // When switching to 'both' from ongoing-only, fill in missing duration defaults
+      if ((value === 'both' || value === 'onetime') && !updatedConfig.project_duration) {
+        updatedConfig.project_duration = '1-3 weeks';
+        updatedConfig.duration_min = 1;
+        updatedConfig.duration_max = 3;
+        updatedConfig.duration_unit = 'weeks';
+        updatedConfig.duration_starter = { value: 3, unit: 'weeks' };
+        updatedConfig.duration_growth = { value: 2, unit: 'weeks' };
+        updatedConfig.duration_premium = { value: 1, unit: 'weeks' };
+        setConfig({ ...updatedConfig });
+        configRef.current = updatedConfig;
+        localStorage.setItem('packageConfig', JSON.stringify(updatedConfig));
       }
     }
   };
@@ -1010,9 +1050,9 @@ export default function Results() {
     const existingLabel = config.button_links?.[modeKey]?.[tier + '_label'] || '';
     setConfigureModalTier(tier);
     setConfigureModalStep(1);
-    setConfigureModalOption(existingType || 'lock_your_spot');
+    setConfigureModalOption(existingType || 'book_a_call');
     setConfigureModalLink(existingLink);
-    setConfigureModalCustomLabel(existingType === 'custom' ? existingLabel : '');
+    setConfigureModalCustomLabel(existingLabel || BUTTON_OPTIONS.find(o => o.id === (existingType || 'book_a_call'))?.label || 'Book a Call');
     // Detect sign source for sign_contract
     const isLaunchBoxContract = existingType === 'sign_contract' && existingLink && (
       existingLink.includes('shareId=') || existingLink.includes('/contractsign')
@@ -1034,9 +1074,9 @@ export default function Results() {
     if (!configureModalTier) return;
     const modeKey = getCurrentModeKey();
     const selectedOption = BUTTON_OPTIONS.find(o => o.id === configureModalOption);
-    const label = configureModalOption === 'custom'
-      ? (configureModalCustomLabel.trim() || 'Custom')
-      : (selectedOption?.label || 'Lock Your Spot');
+    const label = configureModalCustomLabel.trim()
+      || selectedOption?.label
+      || 'Lock Your Spot';
     const linkValue = configureModalLink.trim();
 
     const currentLinks = config?.button_links || {};
@@ -1181,8 +1221,8 @@ export default function Results() {
   
 
   const handleStartEditingToggleLabels = () => {
-    setTempLabelOnetime(config.pricing_button_label_onetime || 'One-time Project');
-    setTempLabelRetainer(config.pricing_button_label_retainer || 'Monthly Retainer');
+    setTempLabelOnetime(config.pricing_button_label_onetime || 'One-time');
+    setTempLabelRetainer(config.pricing_button_label_retainer || 'Ongoing');
     setEditingToggleLabels(true);
   };
 
@@ -1815,9 +1855,26 @@ export default function Results() {
     );
   }
 
+  const fmtDur = (val, unit) => {
+    const u = val === 1 ? unit.replace(/s$/, '') : unit;
+    return `${val} ${u} to delivery`;
+  };
+
   const getDurationForTier = (tier) => {
+    // Use tier-specific durations if available
+    if (tier === 'starter' && config.duration_starter) {
+      return fmtDur(config.duration_starter.value, config.duration_starter.unit);
+    }
+    if (tier === 'growth' && config.duration_growth) {
+      return fmtDur(config.duration_growth.value, config.duration_growth.unit);
+    }
+    if ((tier === 'premium' || tier === 'elite') && config.duration_premium) {
+      return fmtDur(config.duration_premium.value, config.duration_premium.unit);
+    }
+
     if (!config.duration_min || !config.duration_max || !config.duration_unit) {
-      return config.project_duration ? `${config.project_duration} to delivery` : '';
+      if (!config.project_duration || config.project_duration === 'Ongoing') return '';
+      return `${config.project_duration} to delivery`;
     }
 
     const min = config.duration_min;
@@ -1825,14 +1882,14 @@ export default function Results() {
     const unit = config.duration_unit;
 
     if (tier === 'starter') {
-      return max === min ? `${max} ${unit} to delivery` : `${max} ${unit} to delivery`;
+      return fmtDur(max, unit);
     } else if (tier === 'growth') {
       const middle = min === max ? max : Math.ceil((min + max) / 2);
-      return `${middle} ${unit} to delivery`;
+      return fmtDur(middle, unit);
     } else if (tier === 'elite') {
-      return min === min ? `${Math.max(1, min - 1)} ${unit} to delivery` : `${Math.max(1, min - 1)} ${unit} to delivery`;
+      return fmtDur(Math.max(1, min - 1), unit);
     } else {
-      return min === min ? `${min} ${unit} to delivery` : `${min} ${unit} to delivery`;
+      return fmtDur(min, unit);
     }
   };
 
@@ -2572,7 +2629,10 @@ export default function Results() {
     }
 
     const buttonLink = config.button_links?.[modeKey]?.[tier];
-    const displayLabel = customLabel || (isCustomOffer ? 'Get Custom Offer' : 'Lock Your Spot');
+    const hasLink = !!buttonLink;
+    const displayLabel = hasLink
+      ? (customLabel || (isCustomOffer ? 'Get Custom Offer' : 'Lock Your Spot'))
+      : (isCustomOffer ? 'Get Custom Offer' : 'Add Your Link');
 
     const ensureHttps = (url) => {
       if (!url) return '';
@@ -2594,46 +2654,22 @@ export default function Results() {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
+        <Button
+          onClick={(e) => { e.preventDefault(); if (onConfigureClick) onConfigureClick(tier); }}
+          className={`${buttonClasses} cursor-pointer`}
+          style={buttonStyle}
+        >
+          {displayLabel}
+        </Button>
         {buttonLink ? (
-          <a
-            href={ensureHttps(buttonLink)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonClasses}
-            style={{ ...buttonStyle, textDecoration: 'none' }}
-          >
-            {displayLabel}
-          </a>
-        ) : (
-          <Button
-            onClick={(e) => e.preventDefault()}
-            className={buttonClasses}
-            style={buttonStyle}
-          >
-            {displayLabel}
-          </Button>
-        )}
-        {buttonLink && (
           <div className="absolute -bottom-6 left-0 right-0 text-center">
             <span className="text-xs text-gray-400 truncate block px-2" title={ensureHttps(buttonLink)}>
               🔗 {buttonLink}
             </span>
           </div>
-        )}
-        {!buttonLink && !isCustomOffer && onConfigureClick && (
-          <div className="absolute -bottom-6 left-0 right-0 text-center px-2">
-            <span className="text-xs text-gray-500">
-              Using a different strategy for this offer? (
-              <button
-                type="button"
-                onClick={() => onConfigureClick(tier)}
-                className="text-xs font-medium underline hover:no-underline inline"
-                style={{ color: brandColor }}
-              >
-                Change
-              </button>
-              )
-            </span>
+        ) : (
+          <div className="absolute -bottom-5 left-0 right-0 text-center opacity-0 group-hover/button:opacity-100 transition-opacity">
+            <span className="text-xs text-gray-400">Choose what happens when clients click this</span>
           </div>
         )}
         {!isCustomOffer && onConfigureClick && (showConfigOnHover || showConfigAlways) && (
@@ -2650,9 +2686,9 @@ export default function Results() {
               <button
                 onClick={() => onConfigureClick(tier)}
                 className="w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all"
-                title="Configure button"
+                title="Edit button"
               >
-                <Settings className="w-4 h-4" style={{ color: brandColor }} />
+                <Edit2 className="w-4 h-4" style={{ color: brandColor }} />
               </button>
             )}
             {onRemoveClick && (
@@ -2695,22 +2731,22 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-4 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`flex justify-center gap-5 items-start ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
         const originalPrice = config[originalPriceKey];
 
         return (
+          <div key={index} className="flex-1 overflow-visible" style={{ zIndex: pkg.popular ? 10 : 1 }}>
           <motion.div
-            key={index}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className={`relative bg-white rounded-3xl ${packages.length === 4 ? 'p-6' : 'p-8'} border-2 flex flex-col group/package ${
+            className={`relative bg-white rounded-3xl border-2 flex flex-col group/package transition-all duration-[400ms] ease-out ${
               pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
-            }`}
-            style={pkg.popular ? { borderColor: brandColor } : {}}
+            } ${packages.length === 4 ? 'p-6' : 'p-8'}`}
+            style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: packages.length === 4 ? '38px 30px' : '46px 32px' } : {}}
           >
             {packages.length > 1 && (
               <button
@@ -2812,7 +2848,7 @@ export default function Results() {
 
             <div className="flex-grow flex flex-col">
               <div className={packages.length === 4 ? 'min-h-[390px] flex flex-col' : ''}>
-                <div className="text-center mb-4">
+                <div className="text-center mb-1">
                   <div
                     className={`inline-block px-6 py-2 rounded-full text-white font-bold shadow-md ${packages.length === 4 ? 'text-base' : 'text-lg'}`}
                     style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
@@ -2830,7 +2866,7 @@ export default function Results() {
 
                 <div className="mb-0 group/origprice">
                   {/* Original/strikethrough price */}
-                  <div className="h-8 flex items-center justify-center mb-1">
+                  <div className="h-4 flex items-center justify-center">
                     {originalPrice > 0 ? (
                       <div className="flex items-center gap-2">
                         <EditablePrice
@@ -2856,10 +2892,22 @@ export default function Results() {
                     ) : <div />}
                   </div>
                   <div>
+                    {discountActive && config.commitment_discount_enabled && (config.commitment_discount_percent || 0) > 0 && (
+                      <div className="text-center mb-0.5">
+                        <span className="text-lg text-gray-400 line-through">{currencySymbol}{pkg.price.toLocaleString()}</span>
+                        <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: brandColor }}>{config.commitment_discount_percent}% off</span>
+                      </div>
+                    )}
                     <div className="flex items-baseline gap-1 justify-center">
                       <EditablePrice
-                        value={pkg.price}
+                        value={discountActive && config.commitment_discount_enabled ? (() => { const ok = `${tierName}_${pricingMode === 'one-time' ? 'onetime' : 'retainer'}`; return config.commitment_discount_prices?.[ok] || calcDiscountPrice(pkg.price, config.commitment_discount_percent); })() : pkg.price}
                         onSave={(newPrice) => {
+                          if (discountActive && config.commitment_discount_enabled) {
+                            const prices = { ...(config.commitment_discount_prices || {}) };
+                            prices[`${tierName}_${pricingMode === 'one-time' ? 'onetime' : 'retainer'}`] = newPrice;
+                            updateConfig('commitment_discount_prices', prices);
+                            return;
+                          }
                           if (pricingMode === 'one-time') {
                             const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
                             updateConfigMultiple({
@@ -2876,19 +2924,19 @@ export default function Results() {
                       />
                       <span className="text-base text-gray-500">
                         / <EditableText
-                          value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                          value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'ongoing')}
                           onSave={(newValue) => {
                             const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
                             updateConfig(field, newValue);
                           }}
                           className="inline text-base"
-                          placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                          placeholder={pricingMode === 'one-time' ? 'one-time' : 'ongoing'}
                           brandColor={brandColor}
                         />
                       </span>
                     </div>
                     {pricingMode === 'retainer' && (
-                      <div className="mt-1 flex justify-center">
+                      <div className="mt-1 flex justify-center gap-5 items-start">
                         {retainerDiscountText?.trim() ? (
                           <div className="relative group/discount inline-block">
                             <EditableText
@@ -2933,7 +2981,7 @@ export default function Results() {
                   />
                 )}
                 {pricingMode === 'one-time' && (
-                  <p className={`text-gray-900 font-bold mb-6 text-center ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}>
+                  <p className={`text-gray-900 font-bold mt-4 mb-5 text-center ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}>
                     <EditableText
                       value={pkg.duration || '2-4 weeks to delivery'}
                       onSave={(newValue) => updatePackageDuration(tierName, newValue)}
@@ -2946,7 +2994,7 @@ export default function Results() {
 
                 {pkg.description !== null ? (
                   <div
-                    className={`mb-6 rounded-xl relative group/desc overflow-hidden ${
+                    className={`mb-5 rounded-xl relative group/desc overflow-hidden ${
                       packages.length === 4 ? 'p-2 min-h-[48px] max-h-[48px]' : 'p-4 min-h-[64px] max-h-[64px]'
                     }`}
                     style={{ backgroundColor: `${brandColor}15` }}
@@ -2985,8 +3033,16 @@ export default function Results() {
                   </button>
                 )}
 
-                <div className={`space-y-2 mb-4`}>
-                  <p className="text-sm font-semibold text-gray-500 uppercase">Deliverables</p>
+                <div className={`space-y-2 mb-5`}>
+                  <p className="text-sm font-semibold text-gray-500 uppercase">
+                    <EditableText
+                      value={config.deliverables_label || 'Deliverables'}
+                      onSave={(v) => updateConfig('deliverables_label', v)}
+                      className="inline text-sm font-semibold uppercase"
+                      placeholder="Deliverables"
+                      brandColor={brandColor}
+                    />
+                  </p>
 
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
@@ -3057,8 +3113,17 @@ export default function Results() {
                 </div>
               </div>
 
+              {config.show_bonuses !== false && (
               <div className="space-y-2 mb-8 pt-4 border-t border-gray-200">
-                <p className="text-sm font-semibold text-gray-500 uppercase">Bonuses</p>
+                <p className="text-sm font-semibold text-gray-500 uppercase">
+                  <EditableText
+                    value={config.bonuses_label || 'Bonuses'}
+                    onSave={(v) => updateConfig('bonuses_label', v)}
+                    className="inline text-sm font-semibold uppercase"
+                    placeholder="Bonuses"
+                    brandColor={brandColor}
+                  />
+                </p>
 
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
@@ -3121,6 +3186,7 @@ export default function Results() {
                   Add Bonus
                 </button>
               </div>
+              )}
             </div>
 
             {showPackageButtonsInEditMode && (
@@ -3141,6 +3207,7 @@ export default function Results() {
             </>
             )}
             </motion.div>
+            </div>
             );
             })}
             </div>
@@ -3163,24 +3230,24 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-4 ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`flex justify-center gap-5 items-start ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
         const originalPrice = config[originalPriceKey];
 
         return (
+          <div key={index} className="flex-1 overflow-visible" style={{ zIndex: pkg.popular ? 10 : 1 }}>
           <motion.div
-            key={index}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className={`relative rounded-3xl ${packages.length === 4 ? 'p-6' : 'p-8'} text-white shadow-2xl flex flex-col group/package ${
+            className={`relative rounded-3xl text-white shadow-2xl flex flex-col group/package transition-all duration-[400ms] ease-out ${
               pkg.popular
                 ? ''
                 : 'bg-gradient-to-br from-gray-800 to-gray-900'
-            }`}
-            style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})` } : {}}
+            } ${packages.length === 4 ? 'p-6' : 'p-8'}`}
+            style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: packages.length === 4 ? '38px 30px' : '46px 32px' } : {}}
           >
             {packages.length > 1 && (
               <button
@@ -3295,7 +3362,7 @@ export default function Results() {
 
                 <div className="mb-0 group/origprice">
                   {/* Original/strikethrough price */}
-                  <div className="h-8 flex items-center justify-center mb-1">
+                  <div className="h-4 flex items-center justify-center">
                     {originalPrice > 0 ? (
                       <div className="flex items-center gap-2">
                         <EditablePrice
@@ -3322,10 +3389,22 @@ export default function Results() {
                     ) : <div />}
                   </div>
                   <div>
+                    {discountActive && config.commitment_discount_enabled && (config.commitment_discount_percent || 0) > 0 && (
+                      <div className="text-center mb-0.5">
+                        <span className="text-lg text-white/50 line-through">{currencySymbol}{pkg.price.toLocaleString()}</span>
+                        <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full bg-white/20 text-white">{config.commitment_discount_percent}% off</span>
+                      </div>
+                    )}
                     <div className="flex items-baseline gap-1 justify-center">
                       <EditablePrice
-                        value={pkg.price}
+                        value={discountActive && config.commitment_discount_enabled ? (() => { const ok = `${tierName}_${pricingMode === 'one-time' ? 'onetime' : 'retainer'}`; return config.commitment_discount_prices?.[ok] || calcDiscountPrice(pkg.price, config.commitment_discount_percent); })() : pkg.price}
                         onSave={(newPrice) => {
+                          if (discountActive && config.commitment_discount_enabled) {
+                            const prices = { ...(config.commitment_discount_prices || {}) };
+                            prices[`${tierName}_${pricingMode === 'one-time' ? 'onetime' : 'retainer'}`] = newPrice;
+                            updateConfig('commitment_discount_prices', prices);
+                            return;
+                          }
                           if (pricingMode === 'one-time') {
                             const retainerPrice = roundToNearest50IfNeeded(Math.round(newPrice * 0.85));
                             updateConfigMultiple({
@@ -3342,20 +3421,20 @@ export default function Results() {
                       />
                       <span className="text-base text-white/70">
                         / <EditableText
-                          value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                          value={pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'ongoing')}
                           onSave={(newValue) => {
                             const field = pricingMode === 'one-time' ? 'pricing_label_onetime' : 'pricing_label_retainer';
                             updateConfig(field, newValue);
                           }}
                           className="inline text-base"
-                          placeholder={pricingMode === 'one-time' ? 'one-time' : 'monthly'}
+                          placeholder={pricingMode === 'one-time' ? 'one-time' : 'ongoing'}
                           darkMode={true}
                           brandColor={brandColor}
                         />
                       </span>
                     </div>
                     {pricingMode === 'retainer' && (
-                      <div className="mt-1 flex justify-center">
+                      <div className="mt-1 flex justify-center gap-5 items-start">
                         {retainerDiscountText?.trim() ? (
                           <div className="relative group/discount inline-block">
                             <EditableText
@@ -3455,7 +3534,16 @@ export default function Results() {
                 )}
 
                 <div className={`space-y-2 mb-4`}>
-                  <p className="text-sm font-semibold text-white/70 uppercase">Deliverables</p>
+                  <p className="text-sm font-semibold text-white/70 uppercase">
+                    <EditableText
+                      value={config.deliverables_label || 'Deliverables'}
+                      onSave={(v) => updateConfig('deliverables_label', v)}
+                      className="inline text-sm font-semibold uppercase"
+                      placeholder="Deliverables"
+                      darkMode={true}
+                      brandColor={brandColor}
+                    />
+                  </p>
 
                   <Droppable droppableId={`deliverables-${tierName}`} type="deliverable">
                     {(provided) => (
@@ -3523,8 +3611,18 @@ export default function Results() {
                 </div>
               </div>
 
+              {config.show_bonuses !== false && (
               <div className="space-y-2 mb-8 pt-4 border-t border-white/20">
-                <p className="text-xs font-bold uppercase tracking-wider">Bonuses</p>
+                <p className="text-xs font-bold uppercase tracking-wider">
+                  <EditableText
+                    value={config.bonuses_label || 'Bonuses'}
+                    onSave={(v) => updateConfig('bonuses_label', v)}
+                    className="inline text-xs font-bold uppercase tracking-wider"
+                    placeholder="Bonuses"
+                    darkMode={true}
+                    brandColor={brandColor}
+                  />
+                </p>
 
                 <Droppable droppableId={`bonuses-${tierName}`} type="bonus">
                   {(provided) => (
@@ -3588,6 +3686,7 @@ export default function Results() {
                   Add Bonus
                 </button>
               </div>
+              )}
             </div>
 
             {showPackageButtonsInEditMode && (
@@ -3608,6 +3707,7 @@ export default function Results() {
             </>
             )}
             </motion.div>
+            </div>
             );
             })}
             </div>
@@ -3631,7 +3731,7 @@ export default function Results() {
     );
 
     return (
-              <div className={`grid gap-4 ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+              <div className={`flex justify-center gap-5 items-start ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
                 {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
@@ -3684,8 +3784,7 @@ export default function Results() {
                     const currentMode = getCurrentModeKey();
                     const uniqueTierKey = `${pkg.tier}_${currentMode}`;
                     const tierLabel = pkg.name || pkg.tier;
-                    const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
-                    console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
+                    const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Ongoing');
                     const packageIdForClick = packageId;
                     const doClick = (viewId) => { if (viewId) logButtonClick(viewId, uniqueTierKey, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
@@ -3701,13 +3800,13 @@ export default function Results() {
         }
 
         return (
+        <div key={index} className="flex-1 overflow-visible" style={{ zIndex: pkg.popular ? 10 : 1 }}>
         <motion.div
-          key={index}
           {...getPreviewMotionProps(index)}
-          className={`relative bg-white rounded-3xl border-2 flex flex-col ${
+          className={`relative bg-white rounded-3xl border-2 flex flex-col transition-all duration-[400ms] ease-out ${
             pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
           } ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
-          style={pkg.popular ? { borderColor: brandColor } : {}}
+          style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: previewPackages.length === 4 ? '30px 16px' : '38px 24px' } : {}}
         >
           {pkg.popular && (
             <div
@@ -3739,12 +3838,18 @@ export default function Results() {
                   </div>
                 )}
                 <div>
+                  {discountActive && config.commitment_discount_enabled && (config.commitment_discount_percent || 0) > 0 && (
+                    <div className="text-center mb-0.5">
+                      <span className={`text-gray-400 line-through ${previewPackages.length === 4 ? 'text-sm' : 'text-lg'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</span>
+                      <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: brandColor }}>{config.commitment_discount_percent}% off</span>
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-1 justify-center">
                     <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-xl' : 'text-3xl'}`}>
-                      {currencySymbol}{(pkg.price || 0).toLocaleString()}
+                      {currencySymbol}{(() => { if (discountActive && config.commitment_discount_enabled) { const ok = `${pkg.tier}_${pricingMode === 'one-time' ? 'onetime' : 'retainer'}`; return (config.commitment_discount_prices?.[ok] || calcDiscountPrice(pkg.price, config.commitment_discount_percent)).toLocaleString(); } return (pkg.price || 0).toLocaleString(); })()}
                     </div>
                     <span className={`text-gray-500 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
-                      / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                      / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'ongoing')}
                     </span>
                   </div>
                   {pricingMode === 'retainer' && retainerDiscountText?.trim() && (
@@ -3780,7 +3885,7 @@ export default function Results() {
               </div>
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
-                <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
+                <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{config.deliverables_label || 'Deliverables'}</p>
                 <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
                   {deliverableTemplate.map((templateDeliverable, i) => {
                     const deliverable = pkg.deliverables[i];
@@ -3814,9 +3919,9 @@ export default function Results() {
                 </div>
               </div>
 
-            {(maxBonuses > 0 || pkg.bonuses.length > 0) && (
+            {config.show_bonuses !== false && (maxBonuses > 0 || pkg.bonuses.length > 0) && (
               <div className={`pt-4 border-t border-gray-200 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
-                <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Bonuses</p>
+                <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{config.bonuses_label || 'Bonuses'}</p>
                 <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
@@ -3858,8 +3963,7 @@ export default function Results() {
               const currentMode = getCurrentModeKey();
               const uniqueTierKey = `${pkg.tier}_${currentMode}`;
               const tierLabel = pkg.name || pkg.tier;
-              const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
-              console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
+              const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Ongoing');
               const packageIdForClick = packageId;
               const doClick = (viewId) => { if (viewId) logButtonClick(viewId, uniqueTierKey, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
@@ -3870,6 +3974,7 @@ export default function Results() {
           </a>
           )}
         </motion.div>
+        </div>
         );
       })}
     </div>
@@ -3892,7 +3997,7 @@ export default function Results() {
     );
 
     return (
-    <div className={`grid gap-4 ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`flex justify-center gap-5 items-start ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
       {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
@@ -3941,8 +4046,7 @@ export default function Results() {
                     const currentMode = getCurrentModeKey();
                     const uniqueTierKey = `${pkg.tier}_${currentMode}`;
                     const tierLabel = pkg.name || pkg.tier;
-                    const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
-                    console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
+                    const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Ongoing');
                     const packageIdForClick = packageId;
                     const doClick = (viewId) => { if (viewId) logButtonClick(viewId, uniqueTierKey, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
@@ -3958,15 +4062,15 @@ export default function Results() {
         }
 
         return (
+        <div key={index} className="flex-1 overflow-visible" style={{ zIndex: pkg.popular ? 10 : 1 }}>
         <motion.div
-          key={index}
           {...getPreviewMotionProps(index)}
-          className={`relative rounded-3xl text-white shadow-2xl flex flex-col ${
+          className={`relative rounded-3xl text-white shadow-2xl flex flex-col transition-all duration-[400ms] ease-out ${
             pkg.popular
               ? ''
               : 'bg-gradient-to-br from-gray-800 to-gray-900'
           } ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
-          style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})` } : {}}
+          style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: previewPackages.length === 4 ? '30px 16px' : '38px 24px' } : {}}
         >
           {pkg.popular && (
             <div className={`absolute -top-2 right-3 bg-yellow-400 rounded-full flex items-center justify-center text-gray-900 font-bold shadow-lg ${previewPackages.length === 4 ? 'w-12 h-12 text-[10px]' : 'w-16 h-16 text-xs'}`}>
@@ -3992,10 +4096,18 @@ export default function Results() {
                   </div>
                 )}
                 <div>
+                  {discountActive && config.commitment_discount_enabled && (config.commitment_discount_percent || 0) > 0 && (
+                    <div className="text-center mb-0.5">
+                      <span className={`text-white/50 line-through ${previewPackages.length === 4 ? 'text-sm' : 'text-lg'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</span>
+                      <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/20 text-white">{config.commitment_discount_percent}% off</span>
+                    </div>
+                  )}
                   <div className="flex items-baseline gap-1 justify-center">
-                    <div className={`font-bold ${previewPackages.length === 4 ? 'text-xl' : 'text-3xl'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</div>
+                    <div className={`font-bold ${previewPackages.length === 4 ? 'text-xl' : 'text-3xl'}`}>
+                      {currencySymbol}{(() => { if (discountActive && config.commitment_discount_enabled) { const ok = `${pkg.tier}_${pricingMode === 'one-time' ? 'onetime' : 'retainer'}`; return (config.commitment_discount_prices?.[ok] || calcDiscountPrice(pkg.price, config.commitment_discount_percent)).toLocaleString(); } return (pkg.price || 0).toLocaleString(); })()}
+                    </div>
                     <span className={`text-white/70 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
-                      / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'monthly')}
+                      / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'ongoing')}
                     </span>
                   </div>
                   {pricingMode === 'retainer' && retainerDiscountText?.trim() && (
@@ -4031,7 +4143,7 @@ export default function Results() {
               </div>
 
               <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
-                <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>Deliverables</p>
+                <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{config.deliverables_label || 'Deliverables'}</p>
                 <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
                   {deliverableTemplate.map((templateDeliverable, i) => {
                     const deliverable = pkg.deliverables[i];
@@ -4062,9 +4174,9 @@ export default function Results() {
                 </div>
               </div>
 
-            {(maxBonuses > 0 || pkg.bonuses.length > 0) && (
+            {config.show_bonuses !== false && (maxBonuses > 0 || pkg.bonuses.length > 0) && (
               <div className={`pt-4 border-t border-white/20 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
-                <p className={`font-bold uppercase tracking-wider ${previewPackages.length === 4 ? 'text-[10px]' : 'text-xs'}`}>Bonuses</p>
+                <p className={`font-bold uppercase tracking-wider ${previewPackages.length === 4 ? 'text-[10px]' : 'text-xs'}`}>{config.bonuses_label || 'Bonuses'}</p>
                 <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
@@ -4103,8 +4215,7 @@ export default function Results() {
               const currentMode = getCurrentModeKey();
               const uniqueTierKey = `${pkg.tier}_${currentMode}`;
               const tierLabel = pkg.name || pkg.tier;
-              const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Monthly');
-              console.log('CLICK DEBUG:', { tier: pkg.tier, tierLabel, modeLabel, packageId });
+              const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Ongoing');
               const packageIdForClick = packageId;
               const doClick = (viewId) => { if (viewId) logButtonClick(viewId, uniqueTierKey, tierLabel, modeLabel, packageIdForClick); };
                     if (window.__analyticsViewId) { doClick(window.__analyticsViewId); }
@@ -4115,6 +4226,7 @@ export default function Results() {
           </a>
           )}
         </motion.div>
+        </div>
         );
       })}
     </div>
@@ -4196,7 +4308,7 @@ export default function Results() {
             </div>
           </div>
         )}
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6" style={{ zoom: 0.8 }}>
           <div ref={exportRef}>
           <div className="text-center">
             {config.logo_url && (
@@ -4216,7 +4328,7 @@ export default function Results() {
           </div>
 
           {(config.pricing_availability === 'both') && (
-            <div className="flex justify-center mb-8 md:mb-12 mt-8 md:mt-12">
+            <div className="flex justify-center gap-5 items-start mb-8 md:mb-12 mt-8 md:mt-12">
               <div className="inline-flex rounded-full bg-white p-1 md:p-1.5 shadow-lg border border-gray-200">
                 <button
                   onClick={() => setPricingMode('one-time')}
@@ -4225,7 +4337,7 @@ export default function Results() {
                   }`}
                   style={pricingMode === 'one-time' ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` } : {}}
                 >
-                  {config.pricing_button_label_onetime || 'One-time Project'}
+                  {config.pricing_button_label_onetime || 'One-time'}
                 </button>
                 <button
                   onClick={() => setPricingMode('retainer')}
@@ -4234,9 +4346,30 @@ export default function Results() {
                   }`}
                   style={pricingMode === 'retainer' ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` } : {}}
                 >
-                  {config.pricing_button_label_retainer || 'Monthly Retainer'}
+                  {config.pricing_button_label_retainer || 'Ongoing'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Client-facing discount toggle */}
+          {config.commitment_discount_enabled && (config.commitment_discount_percent || 0) > 0 && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => setDiscountActive(!discountActive)}
+                className={`flex items-center gap-3 px-5 py-2.5 rounded-full border transition-all ${
+                  discountActive
+                    ? 'bg-green-50 border-green-300 shadow-md'
+                    : 'bg-white border-gray-200 hover:border-gray-300 shadow-sm'
+                }`}
+              >
+                <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${discountActive ? 'bg-green-500' : 'bg-gray-300'}`}>
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${discountActive ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </div>
+                <span className={`text-sm font-medium ${discountActive ? 'text-green-700' : 'text-gray-600'}`}>
+                  {config.commitment_discount_label || 'Commitment discount'}{config.commitment_discount_percent ? `, save ${config.commitment_discount_percent}%` : ''}
+                </span>
+              </button>
             </div>
           )}
 
@@ -4400,65 +4533,280 @@ export default function Results() {
         </div>
       )}
       <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-center gap-4 mb-8">
-          {config?.from_template && (
+        {/* Toolbar */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            {config?.from_template && (
+              <Button
+                onClick={() => {
+                  pendingNavigationRef.current = createPageUrl('Templates');
+                  setShowExitEditModeModal(true);
+                }}
+                variant="ghost"
+                className="text-gray-600 hover:text-gray-900 hover:bg-white rounded-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Templates
+              </Button>
+            )}
             <Button
               onClick={() => {
-                pendingNavigationRef.current = createPageUrl('Templates');
+                pendingNavigationRef.current = null;
                 setShowExitEditModeModal(true);
               }}
-              variant="ghost"
-              className="text-gray-600 hover:text-gray-900 hover:bg-white rounded-full"
+              variant="outline"
+              className="border border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-full font-medium text-sm h-9 px-4"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Templates
+              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+              Wizard
             </Button>
+            <Button
+              onClick={handleUndo}
+              disabled={!canUndo}
+              variant="outline"
+              className="border border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm h-9 px-4"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5 mr-1.5" />
+              Undo
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSettingsSidebar(prev => !prev)}
+              className={`flex items-center gap-1.5 h-9 px-4 rounded-full border text-sm font-medium transition-all ${
+                showSettingsSidebar
+                  ? 'border-blue-400 bg-blue-50 text-blue-600'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Settings
+            </button>
+            <div className="relative" ref={exportDropdownRef}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!exporting && !exportingPdf) setShowExportDropdown((prev) => !prev);
+                }}
+                disabled={exporting || exportingPdf}
+                className="flex items-center gap-1.5 h-9 px-4 rounded-full border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-all disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {exporting ? 'Exporting...' : exportingPdf ? 'PDF...' : 'Export'}
+              </button>
+              {showExportDropdown && !exporting && !exportingPdf && (
+                <div className="absolute top-full mt-2 right-0 z-20 min-w-[180px]">
+                  <div className="relative">
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden">
+                      <button
+                        onClick={async () => {
+                          setShowExportDropdown(false);
+                          setShowPdfSubmenu(false);
+                          await exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, isPreviewMode, setPricingMode });
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl"
+                      >
+                        Image
+                      </button>
+                      <button
+                        onClick={() => setShowPdfSubmenu((prev) => !prev)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between border-t border-gray-100 rounded-b-xl"
+                      >
+                        PDF
+                        <ChevronRight className={`w-4 h-4 transition-transform ${showPdfSubmenu ? 'rotate-90' : ''}`} />
+                      </button>
+                    </div>
+                    {showPdfSubmenu && (
+                      <div className="absolute left-full top-10 ml-1 bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden z-30 min-w-[120px]">
+                        <button
+                          onClick={async () => {
+                            setShowExportDropdown(false);
+                            setShowPdfSubmenu(false);
+                            await downloadAsPdf('portrait');
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl"
+                        >
+                          Portrait
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setShowExportDropdown(false);
+                            setShowPdfSubmenu(false);
+                            await downloadAsPdf('landscape');
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 rounded-b-xl"
+                        >
+                          Landscape
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="h-9 px-5 font-semibold rounded-full text-white text-sm"
+              style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5 mr-1.5" />
+                  Save & Preview
+                </>
+              )}
+            </Button>
+            {packageId && (
+              <Button
+                onClick={async () => {
+                  const baseUrl = window.location.origin;
+                  const currentUser = await supabaseClient.auth.me();
+                  const previewPath = await getPublicPreviewPath(
+                    { ...(configRef.current || config || {}), id: packageId },
+                    currentUser
+                  );
+                  await navigator.clipboard.writeText(baseUrl + previewPath);
+                  toast({ title: 'Link copied!' });
+                  setProfileUser(currentUser);
+                }}
+                variant="outline"
+                className="h-9 px-4 font-semibold rounded-full border border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 text-sm"
+              >
+                <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
+                Share
+              </Button>
+            )}
+            {packageId && (
+              <Button
+                onClick={async () => {
+                  const baseUrl = window.location.origin;
+                  const currentUser = await supabaseClient.auth.me();
+                  const previewPath = await getPublicPreviewPath(
+                    { ...(configRef.current || config || {}), id: packageId },
+                    currentUser
+                  );
+                  const previewUrl = new URL(baseUrl + previewPath);
+                  previewUrl.searchParams.set('embed', 'true');
+                  const iframeId = `launchbox-embed-${packageId}`;
+                  const embedCode = `<iframe id="${iframeId}" src="${previewUrl.toString()}" width="100%" style="border:0;border-radius:12px;min-height:800px;" scrolling="no"></iframe>
+<script>
+(function() {
+  var iframe = document.getElementById('${iframeId}');
+  if (!iframe) return;
+  function onMessage(event) {
+    if (!event.data || event.data.type !== 'launchbox:embedHeight') return;
+    if (typeof event.data.height !== 'number') return;
+    iframe.style.height = Math.max(800, event.data.height) + 'px';
+  }
+  window.addEventListener('message', onMessage);
+})();
+</script>`;
+                  navigator.clipboard.writeText(embedCode);
+                  alert('Embed code copied to clipboard!');
+                }}
+                variant="outline"
+                className="h-9 px-4 font-semibold rounded-full border border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 text-sm"
+              >
+                <Copy className="w-3.5 h-3.5 mr-1.5" />
+                Embed
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* First-time hint overlay */}
+        <AnimatePresence>
+          {isFreshReveal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.2 } }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
+              onClick={() => setIsFreshReveal(false)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ type: 'spring', duration: 0.4 }}
+                className="relative bg-white rounded-2xl shadow-xl px-8 py-6 max-w-sm text-center overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="text-base font-semibold text-gray-900 mb-1">Your packages are ready!</p>
+                <p className="text-sm text-gray-500 mb-5">Review and edit anything below. When you're done, hit <strong className="text-gray-700">Save & Preview</strong> to see how it looks - then share the link with your clients.</p>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setIsFreshReveal(false)}
+                    className="px-5 py-2 rounded-full text-sm font-semibold text-white shadow-md hover:scale-105 transition-transform"
+                    style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                  >
+                    Got it
+                  </button>
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('hideResultsHint', 'true');
+                      setIsFreshReveal(false);
+                    }}
+                    className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    Don't show again
+                  </button>
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ backgroundColor: brandColor, opacity: 0.4 }}
+                    initial={{ width: '0%' }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 12, ease: 'linear' }}
+                  />
+                </div>
+              </motion.div>
+            </motion.div>
           )}
-          <Button
-            onClick={() => {
-              pendingNavigationRef.current = null;
-              setShowExitEditModeModal(true);
-            }}
-            variant="outline"
-            className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-full font-medium"
+        </AnimatePresence>
+
+        <div style={{ zoom: 0.8 }}>
+        {/* Design theme switcher */}
+        <div className="flex items-center justify-center gap-1 mb-3">
+          <button
+            onClick={() => setCurrentDesign(0)}
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+              currentDesign === 0 ? 'bg-gray-200 text-gray-500' : 'text-gray-300 hover:text-gray-400'
+            }`}
+            title="Light Mode"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Wizard
-          </Button>
-          <Button
-            onClick={handleUndo}
-            disabled={!canUndo}
-            variant="outline"
-            className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Undo (Ctrl+Z)"
+            <Sun className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setCurrentDesign(1)}
+            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+              currentDesign === 1 ? 'bg-gray-200 text-gray-500' : 'text-gray-300 hover:text-gray-400'
+            }`}
+            title="Dark Mode"
           >
-            <Undo2 className="w-4 h-4 mr-2" />
-            Undo
-          </Button>
-          {/* Hidden for launch — folder system parked
-          {!isPreviewMode && packageId && profileUser?.id && (
-            <AssignFolderMenu
-              packageId={packageId}
-              userId={profileUser.id}
-              initialFolderId={config?.folder_id}
-              onFolderChange={(fid) => {
-                setConfig((c) => (c ? { ...c, folder_id: fid } : c));
-              }}
-            />
-          )}
-          */}
+            <Moon className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         <div className="text-center">
           {config.logo_url && (
-            <img 
-              src={config.logo_url} 
-              alt="Logo" 
+            <img
+              src={config.logo_url}
+              alt="Logo"
               className="w-auto mx-auto object-contain"
               style={{ height: `${config.logo_height || 80}px` }}
             />
           )}
-          <h1 className="text-4xl font-bold mb-3 text-gray-900">
+          <h1 className="text-5xl font-bold mb-3 text-gray-900">
             <EditableText
               value={config.headline}
               onSave={(newValue) => updateConfig('headline', newValue)}
@@ -4478,241 +4826,10 @@ export default function Results() {
           </p>
         </div>
 
-        {/* Logo, Brand Color & Currency Settings */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 mb-8 max-w-2xl mx-auto mt-6">
-          {/* Logo Upload Section */}
-          <div className="pb-4 border-b border-gray-100 mb-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-semibold text-gray-700">Logo</span>
-                <div className="flex items-center gap-3">
-                  {config.logo_url && (
-                    <img 
-                      src={config.logo_url} 
-                      alt="Logo" 
-                      className="w-auto object-contain"
-                      style={{ height: `${config.logo_height || 80}px` }}
-                    />
-                  )}
-                  <label className="relative">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      disabled={uploadingLogo}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={uploadingLogo}
-                      className="cursor-pointer"
-                      onClick={(e) => e.currentTarget.previousElementSibling.click()}
-                    >
-                      {uploadingLogo ? (
-                        <>
-                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>{config.logo_url ? 'Change Logo' : 'Upload Logo'}</>
-                      )}
-                    </Button>
-                  </label>
-                  {config.logo_url && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => updateConfig('logo_url', '')}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              </div>
-              {config.logo_url && (
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500 w-16">Size</span>
-                  <input
-                    type="range"
-                    min="100"
-                    max="250"
-                    value={config.logo_height || 80}
-                    onChange={(e) => updateConfig('logo_height', parseInt(e.target.value))}
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    style={{
-                      accentColor: brandColor
-                    }}
-                  />
-                  <span className="text-xs text-gray-500 w-12">{config.logo_height || 80}px</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Brand Color Section */}
-          <div className="flex items-center justify-between gap-4 pb-4 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-gray-700">Brand Color</span>
-              <div className="flex gap-1.5">
-                {COLOR_PRESETS.map((preset) => (
-                  <button
-                    key={preset.color}
-                    onClick={() => updateConfig('brand_color', preset.color)}
-                    className={`w-8 h-8 rounded-lg border-2 transition-all hover:scale-110 ${
-                      config.brand_color === preset.color ? 'border-gray-900 ring-2 ring-offset-1 ring-gray-900' : 'border-gray-200'
-                    }`}
-                    style={{ backgroundColor: preset.color }}
-                    title={preset.name}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="color"
-                value={config.brand_color || '#ff0044'}
-                onChange={(e) => updateConfig('brand_color', e.target.value)}
-                className="w-10 h-8 cursor-pointer border-gray-200 p-0"
-              />
-              <Input
-                type="text"
-                value={config.brand_color || '#ff0044'}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value.startsWith('#') && /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
-                    updateConfig('brand_color', value);
-                  }
-                }}
-                placeholder="#FF0044"
-                className="w-24 h-8 font-mono text-xs"
-              />
-            </div>
-          </div>
-
-          {/* Currency Section */}
-          <div className="pt-4 pb-4 border-b border-gray-100">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-gray-700">Currency</span>
-              <div className="flex gap-2">
-                {CURRENCIES.map((currency) => (
-                  <button
-                    key={currency.code}
-                    onClick={() => updateConfig('currency', currency.code)}
-                    className={`px-3 py-1.5 rounded-lg border-2 transition-all hover:scale-105 ${
-                      (config.currency || 'USD') === currency.code
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-blue-300'
-                    }`}
-                  >
-                    <div className="text-lg leading-none">{currency.symbol}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing Availability Section */}
-          <div className="pt-4">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-gray-700">Show Pricing For</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => updateConfig('pricing_availability', 'both')}
-                  className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
-                    (config.pricing_availability || 'both') === 'both'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'
-                  }`}
-                >
-                  Both
-                </button>
-                <button
-                  onClick={() => updateConfig('pricing_availability', 'onetime')}
-                  className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
-                    config.pricing_availability === 'onetime'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'
-                  }`}
-                >
-                  One-time Only
-                </button>
-                <button
-                  onClick={() => updateConfig('pricing_availability', 'retainer')}
-                  className={`px-4 py-2 rounded-lg border-2 transition-all text-sm font-medium ${
-                    config.pricing_availability === 'retainer'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'
-                  }`}
-                >
-                  Retainer Only
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="pt-4">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-gray-700">Show Excluded Items</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showExcludedDeliverables}
-                onClick={() => updateConfig('show_excluded_deliverables', !showExcludedDeliverables)}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                  showExcludedDeliverables ? 'bg-blue-500' : 'bg-gray-300'
-                }`}
-                title={showExcludedDeliverables ? 'On' : 'Off'}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-                    showExcludedDeliverables ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-          </div>
-
-        <div className="flex items-center justify-center gap-4 mb-8">
-          <Button
-            onClick={prevDesign}
-            variant="outline"
-            size="icon"
-            className="rounded-full bg-white hover:bg-gray-100 border-2 border-gray-300"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-
-          <div className="flex items-center gap-2">
-            {[0, 1].map((idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentDesign(idx)}
-                className={`w-3 h-3 rounded-full transition-all ${
-                  currentDesign === idx ? 'w-8' : 'bg-gray-300'
-                }`}
-                style={currentDesign === idx ? { backgroundColor: brandColor } : {}}
-              />
-            ))}
-          </div>
-
-          <Button
-            onClick={nextDesign}
-            variant="outline"
-            size="icon"
-            className="rounded-full bg-white hover:bg-gray-100 border-2 border-gray-300"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </Button>
-        </div>
-
-        <p className="text-center text-gray-600 mb-8">{currentDesign === 0 ? 'Light Mode' : 'Dark Mode'}</p>
+        <div className="h-10" />
 
         {(config.pricing_availability === 'both') && (
-          <div className="flex justify-center mb-8">
+          <div className="flex justify-center gap-5 items-start mb-8">
             <div ref={toggleEditRef} className="relative inline-flex rounded-full bg-white p-1.5 shadow-lg border border-gray-200 group/toggle">
               <button
                 onClick={(e) => {
@@ -4742,7 +4859,7 @@ export default function Results() {
                       }}
                       className="h-8 text-sm font-semibold text-center"
                       style={{ borderColor: brandColor }}
-                      placeholder="One-time Project"
+                      placeholder="One-time"
                     />
                   </div>
                   <div className="px-8 py-3 rounded-full">
@@ -4755,7 +4872,7 @@ export default function Results() {
                       }}
                       className="h-8 text-sm font-semibold text-center"
                       style={{ borderColor: brandColor }}
-                      placeholder="Monthly Retainer"
+                      placeholder="Ongoing"
                     />
                   </div>
                 </>
@@ -4768,7 +4885,7 @@ export default function Results() {
                     }`}
                     style={pricingMode === 'one-time' ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` } : {}}
                   >
-                    {config.pricing_button_label_onetime || 'One-time Project'}
+                    {config.pricing_button_label_onetime || 'One-time'}
                   </button>
                   <button
                     onClick={() => setPricingMode('retainer')}
@@ -4777,7 +4894,7 @@ export default function Results() {
                     }`}
                     style={pricingMode === 'retainer' ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` } : {}}
                   >
-                    {config.pricing_button_label_retainer || 'Monthly Retainer'}
+                    {config.pricing_button_label_retainer || 'Ongoing'}
                   </button>
                 </>
               )}
@@ -4785,9 +4902,136 @@ export default function Results() {
           </div>
         )}
 
+        {/* Commitment Discount Config */}
+        {showDiscountConfig && (
+          <div className="relative bg-white rounded-2xl p-6 shadow-sm border border-gray-200 mb-8 max-w-sm mx-auto text-center">
+            <button
+              onClick={() => setShowDiscountConfig(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-semibold text-gray-900 block mb-2">Commitment Discount</span>
+            <p className="text-xs text-gray-500 mb-5">Give clients a reason to commit. They toggle this on and get a lower price.</p>
+
+            {/* Quick templates */}
+            <div className="flex flex-wrap justify-center gap-2 mb-5">
+              {DISCOUNT_TEMPLATES.map((t) => (
+                <button
+                  key={t.label}
+                  type="button"
+                  onClick={() => {
+                    updateConfigMultiple({
+                      commitment_discount_label: t.label,
+                      commitment_discount_percent: t.percent,
+                    });
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    config.commitment_discount_label === t.label
+                      ? 'text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  style={config.commitment_discount_label === t.label ? { backgroundColor: brandColor } : {}}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Slider + label grouped */}
+            <div className="bg-gray-50 rounded-xl p-4 mb-5">
+              {/* Discount slider */}
+              <div className="mb-4 max-w-[220px] mx-auto">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-gray-500">Discount</label>
+                  <span className="text-sm font-bold" style={{ color: brandColor }}>{config.commitment_discount_percent || 0}% off</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={config.commitment_discount_percent || 0}
+                  onChange={(e) => updateConfig('commitment_discount_percent', parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  style={{ accentColor: brandColor }}
+                />
+                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+
+              {/* Label input */}
+              <div className="max-w-[260px] mx-auto">
+                <label className="text-xs font-medium text-gray-500 block mb-1 text-left">Label</label>
+                <Input
+                  value={config.commitment_discount_label || ''}
+                  onChange={(e) => updateConfig('commitment_discount_label', e.target.value)}
+                  placeholder="e.g. Pay 3 months upfront"
+                  className="h-9 rounded-lg text-sm text-center"
+                />
+              </div>
+            </div>
+
+            <Button
+              onClick={() => { setDiscountActive(false); setTimeout(() => setDiscountActive(true), 50); setShowDiscountConfig(false); }}
+              className="w-full max-w-[200px] h-10 rounded-full text-white font-semibold text-sm"
+              style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+            >
+              Save
+            </Button>
+            <button
+              onClick={() => { updateConfigMultiple({ commitment_discount_enabled: false, commitment_discount_percent: 0, commitment_discount_label: '', commitment_discount_prices: null }); setDiscountActive(false); setShowDiscountConfig(false); }}
+              className="block mx-auto mt-3 text-xs text-gray-400 hover:text-red-500 transition-colors"
+            >
+              Remove discount
+            </button>
+          </div>
+        )}
+
+        {/* Discount toggle - always visible */}
+        {!showDiscountConfig && (
+          <div className="flex justify-center mb-10">
+            <button
+              onClick={() => {
+                if (!config.commitment_discount_enabled) {
+                  updateConfigMultiple({ commitment_discount_enabled: true, commitment_discount_percent: 10, commitment_discount_label: 'Pay 3 months upfront' });
+                  setShowDiscountConfig(true);
+                } else {
+                  setDiscountActive(!discountActive);
+                }
+              }}
+              className={`flex items-center gap-3 px-5 py-2.5 rounded-full border transition-all ${
+                discountActive && config.commitment_discount_enabled
+                  ? 'bg-green-50 border-green-300 shadow-md'
+                  : 'bg-white border-gray-200 hover:border-gray-300 shadow-sm'
+              }`}
+            >
+              <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${discountActive && config.commitment_discount_enabled ? 'bg-green-500' : 'bg-gray-300'}`}>
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${discountActive && config.commitment_discount_enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </div>
+              <span className={`text-sm font-medium ${discountActive && config.commitment_discount_enabled ? 'text-green-700' : 'text-gray-500'}`}>
+                {config.commitment_discount_enabled
+                  ? `${config.commitment_discount_label || 'Commitment discount'}${config.commitment_discount_percent ? `, save ${config.commitment_discount_percent}%` : ''}`
+                  : 'Add a commitment discount'
+                }
+              </span>
+              {!isPreviewMode && config.commitment_discount_enabled && (
+                <Edit2
+                  className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); setShowDiscountConfig(true); }}
+                />
+              )}
+            </button>
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           <motion.div
-            key={`${currentDesign}-${pricingMode}`}
+            key={`${currentDesign}-${pricingMode}-${discountActive}`}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
@@ -4795,20 +5039,19 @@ export default function Results() {
             className="mb-12"
             style={costCalculatorTier ? { pointerEvents: 'none' } : undefined}
           >
-            <div ref={exportRef}>{renderCurrentDesign()}</div>
+            <div className="flex items-center">
+              <div className="flex-1" ref={exportRef}>{renderCurrentDesign()}</div>
 
-            {packages.length < 4 && (
-              <div className="flex justify-center mt-8">
-                <Button
+              {packages.length < 4 && (
+                <button
                   onClick={handleAddPackage}
-                  variant="outline"
-                  className="border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-600 hover:text-blue-600 rounded-2xl px-8 py-6 font-medium"
+                  className="flex-shrink-0 -ml-1 w-6 h-16 flex items-center justify-center rounded-r-full bg-white shadow-md hover:shadow-lg hover:w-8 transition-all"
+                  title="Add another package"
                 >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Add Another Package
-                </Button>
-              </div>
-            )}
+                  <Plus className="w-5 h-5" style={{ color: brandColor }} />
+                </button>
+              )}
+            </div>
           </motion.div>
         </AnimatePresence>
 
@@ -4878,154 +5121,110 @@ export default function Results() {
             </button>
           )}
         </div>
-
-        <div className="flex justify-center gap-4 flex-wrap">
-          <div className="relative" ref={exportDropdownRef}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!exporting && !exportingPdf) setShowExportDropdown((prev) => !prev);
-              }}
-              disabled={exporting || exportingPdf}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
-            >
-              <Download className="w-4 h-4" />
-              {exporting ? 'Exporting...' : exportingPdf ? 'Exporting PDF...' : 'Export'}
-              {showExportDropdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-            {showExportDropdown && !exporting && !exportingPdf && (
-              <div className="absolute bottom-full mb-2 left-0 z-20 min-w-[180px]">
-                <div className="relative">
-                  <div className="bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden">
-                    <button
-                      onClick={async () => {
-                        setShowExportDropdown(false);
-                        setShowPdfSubmenu(false);
-                        await exportPackageAsImages({ exportRef, packageName: config.package_set_name || config.business_name || 'package', config, pricingMode, setExporting, setIsPreviewMode, isPreviewMode, setPricingMode });
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl"
-                    >
-                      Image
-                    </button>
-                    <button
-                      onClick={() => setShowPdfSubmenu((prev) => !prev)}
-                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between border-t border-gray-100 rounded-b-xl"
-                    >
-                      PDF
-                      <ChevronRight className={`w-4 h-4 transition-transform ${showPdfSubmenu ? 'rotate-90' : ''}`} />
-                    </button>
-                  </div>
-                  {showPdfSubmenu && (
-                    <div className="absolute left-full top-10 ml-1 bg-white border border-gray-200 rounded-xl shadow-md overflow-hidden z-30 min-w-[120px]">
-                      <button
-                        onClick={async () => {
-                          setShowExportDropdown(false);
-                          setShowPdfSubmenu(false);
-                          await downloadAsPdf('portrait');
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl"
-                      >
-                        Portrait
-                      </button>
-                      <button
-                        onClick={async () => {
-                          setShowExportDropdown(false);
-                          setShowPdfSubmenu(false);
-                          await downloadAsPdf('landscape');
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 rounded-b-xl"
-                      >
-                        Landscape
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            variant="outline"
-            className="h-12 px-8 font-semibold rounded-full bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" style={{ color: brandColor }} />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Save & Preview
-              </>
-            )}
-          </Button>
-          {packageId && (
-            <Button
-              onClick={async () => {
-                const baseUrl = window.location.origin;
-                const currentUser = await supabaseClient.auth.me();
-                const previewPath = await getPublicPreviewPath(
-                  { ...(configRef.current || config || {}), id: packageId },
-                  currentUser
-                );
-                await navigator.clipboard.writeText(baseUrl + previewPath);
-                toast({ title: 'Link copied!' });
-                const u = await supabaseClient.auth.me();
-                setProfileUser(u);
-                /* Hidden for launch — folder system parked
-                if (!isPreviewMode && !u?.hide_copy_link_folder_prompt) {
-                  setShowCopyLinkFolderPrompt(true);
-                }
-                */
-              }}
-              variant="outline"
-              className="h-12 px-8 font-semibold rounded-full bg-white border-2 text-blue-600 hover:bg-blue-50"
-              style={{ borderColor: `${brandColor}40` }}
-            >
-              <LinkIcon className="w-4 h-4 mr-2" />
-              Copy Link
-            </Button>
-          )}
-          {packageId && (
-            <Button
-              onClick={async () => {
-                const baseUrl = window.location.origin;
-                const currentUser = await supabaseClient.auth.me();
-                const previewPath = await getPublicPreviewPath(
-                  { ...(configRef.current || config || {}), id: packageId },
-                  currentUser
-                );
-                const previewUrl = new URL(baseUrl + previewPath);
-                previewUrl.searchParams.set('embed', 'true');
-                const iframeId = `launchbox-embed-${packageId}`;
-                const embedCode = `<iframe id="${iframeId}" src="${previewUrl.toString()}" width="100%" style="border:0;border-radius:12px;min-height:800px;" scrolling="no"></iframe>
-<script>
-(function() {
-  var iframe = document.getElementById('${iframeId}');
-  if (!iframe) return;
-  function onMessage(event) {
-    if (!event.data || event.data.type !== 'launchbox:embedHeight') return;
-    if (typeof event.data.height !== 'number') return;
-    iframe.style.height = Math.max(800, event.data.height) + 'px';
-  }
-  window.addEventListener('message', onMessage);
-})();
-</script>`;
-                navigator.clipboard.writeText(embedCode);
-                alert('Embed code copied to clipboard!');
-              }}
-              variant="outline"
-              className="h-12 px-8 font-semibold rounded-full bg-white border-2 text-purple-600 hover:bg-purple-50"
-              style={{ borderColor: `${brandColor}40` }}
-            >
-              <LinkIcon className="w-4 h-4 mr-2" />
-              Copy Embed Code
-            </Button>
-          )}
         </div>
+
       </div>
+
+      {/* Settings Sidebar */}
+      {showSettingsSidebar && (
+        <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl border-l border-gray-200 z-40 overflow-y-auto">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-base font-bold text-gray-900">Settings</h3>
+              <button
+                onClick={() => setShowSettingsSidebar(false)}
+                className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+              >
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Logo */}
+            <div className="pb-4 border-b border-gray-100 mb-4">
+              <span className="text-sm font-semibold text-gray-700 block mb-3">Logo</span>
+              <div className="flex items-center gap-2">
+                {config.logo_url && (
+                  <img src={config.logo_url} alt="Logo" className="w-auto object-contain max-h-10" />
+                )}
+                <label className="relative">
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={uploadingLogo} className="hidden" />
+                  <Button type="button" variant="outline" size="sm" disabled={uploadingLogo} className="cursor-pointer text-xs" onClick={(e) => e.currentTarget.previousElementSibling.click()}>
+                    {uploadingLogo ? 'Uploading...' : config.logo_url ? 'Change' : 'Upload'}
+                  </Button>
+                </label>
+                {config.logo_url && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => updateConfig('logo_url', '')} className="text-red-500 hover:text-red-700 text-xs px-2">
+                    Remove
+                  </Button>
+                )}
+              </div>
+              {config.logo_url && (
+                <div className="flex items-center gap-2 mt-3">
+                  <span className="text-xs text-gray-500">Size</span>
+                  <input type="range" min="100" max="250" value={config.logo_height || 80} onChange={(e) => updateConfig('logo_height', parseInt(e.target.value))} className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" style={{ accentColor: brandColor }} />
+                  <span className="text-xs text-gray-400 w-10">{config.logo_height || 80}px</span>
+                </div>
+              )}
+            </div>
+
+            {/* Brand Color */}
+            <div className="pb-4 border-b border-gray-100 mb-4">
+              <span className="text-sm font-semibold text-gray-700 block mb-3">Brand Color</span>
+              <div className="flex gap-1.5 flex-wrap mb-2">
+                {COLOR_PRESETS.map((preset) => (
+                  <button key={preset.color} onClick={() => updateConfig('brand_color', preset.color)} className={`w-7 h-7 rounded-lg border-2 transition-all hover:scale-110 ${config.brand_color === preset.color ? 'border-gray-900 ring-1 ring-offset-1 ring-gray-900' : 'border-gray-200'}`} style={{ backgroundColor: preset.color }} title={preset.name} />
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input type="color" value={config.brand_color || '#ff0044'} onChange={(e) => updateConfig('brand_color', e.target.value)} className="w-8 h-7 cursor-pointer border-gray-200 p-0" />
+                <Input type="text" value={config.brand_color || '#ff0044'} onChange={(e) => { const v = e.target.value; if (v.startsWith('#') && /^#[0-9A-Fa-f]{0,6}$/.test(v)) updateConfig('brand_color', v); }} placeholder="#FF0044" className="w-24 h-7 font-mono text-xs" />
+              </div>
+            </div>
+
+            {/* Currency */}
+            <div className="pb-4 border-b border-gray-100 mb-4">
+              <span className="text-sm font-semibold text-gray-700 block mb-3">Currency</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {CURRENCIES.map((currency) => (
+                  <button key={currency.code} onClick={() => updateConfig('currency', currency.code)} className={`px-2.5 py-1 rounded-lg border transition-all text-sm ${(config.currency || 'USD') === currency.code ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                    {currency.symbol}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Pricing Availability */}
+            <div className="pb-4 border-b border-gray-100 mb-4">
+              <span className="text-sm font-semibold text-gray-700 block mb-3">Pricing Type</span>
+              <div className="flex gap-1.5">
+                <button onClick={() => updateConfig('pricing_availability', 'both')} className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${(config.pricing_availability || 'both') === 'both' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'}`}>Both</button>
+                <button onClick={() => updateConfig('pricing_availability', 'onetime')} className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${config.pricing_availability === 'onetime' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'}`}>One-time</button>
+                <button onClick={() => updateConfig('pricing_availability', 'retainer')} className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${config.pricing_availability === 'retainer' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'}`}>Ongoing</button>
+              </div>
+            </div>
+
+            {/* Show Bonuses */}
+            <div className="pb-4 border-b border-gray-100 mb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700">Show Bonuses</span>
+                <button type="button" role="switch" aria-checked={config.show_bonuses !== false} onClick={() => updateConfig('show_bonuses', config.show_bonuses === false ? true : false)} className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${config.show_bonuses !== false ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${config.show_bonuses !== false ? 'translate-x-5' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Show Excluded Items */}
+            <div className="pb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700">Show Excluded Items</span>
+                <button type="button" role="switch" aria-checked={showExcludedDeliverables} onClick={() => updateConfig('show_excluded_deliverables', !showExcludedDeliverables)} className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${showExcludedDeliverables ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${showExcludedDeliverables ? 'translate-x-5' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cost Calculator Panel */}
       {!isPreviewMode && costCalculatorTier && packages.find((p) => p.tier === costCalculatorTier) && (
@@ -5436,82 +5635,87 @@ export default function Results() {
           <SheetContent side="bottom" className="rounded-t-3xl max-h-[90vh] overflow-y-auto">
             <SheetHeader className="text-left pb-4">
               <SheetTitle>
-                {configureModalStep === 1 ? 'Configure Button' : 'Add Your Link'}
+                {configureModalStep === 1 ? 'Where should clients go?' : configureModalOption === 'sign_contract' ? 'Sign Contract' : 'Add Your Link'}
               </SheetTitle>
             </SheetHeader>
             <div className="pb-8">
               {configureModalStep === 1 ? (
                 <>
-                  <p className="text-gray-600 text-sm mb-4">What should this button do?</p>
-                  <div className="space-y-3 mb-6">
-                    {BUTTON_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setConfigureModalOption(opt.id)}
-                        className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${
-                          configureModalOption === opt.id
-                            ? 'bg-white'
-                            : 'bg-white/80'
-                        }`}
-                        style={configureModalOption === opt.id ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
-                      >
-                        <span className="text-lg flex-shrink-0">{getCTAOptionEmoji(opt.id)}</span>
-                        <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-gray-900 block">{opt.label}</span>
-                          {opt.hint && (
-                            <span className="text-xs text-gray-500 block mt-0.5">({opt.hint})</span>
-                          )}
-                        </div>
-                        {configureModalOption === opt.id && (
-                          <Check className="w-5 h-5 flex-shrink-0" style={{ color: brandColor }} />
-                        )}
-                      </button>
-                    ))}
+                  <p className="text-gray-500 text-sm mb-5">Pick a button label and paste the link. This is what your clients click to take the next step.</p>
+
+                  {/* Button label */}
+                  <div className="mb-4">
+                    <label className="text-sm font-semibold text-gray-700 block mb-2">Button text</label>
+                    <Input
+                      value={configureModalCustomLabel}
+                      onChange={(e) => setConfigureModalCustomLabel(e.target.value)}
+                      placeholder="e.g. Book a Call"
+                      className="h-11 rounded-xl"
+                    />
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {['Book a Call', 'Lock Your Spot', 'Get Started', 'Apply Now', 'Sign Contract'].map((label) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => { setConfigureModalCustomLabel(label); setConfigureModalOption(BUTTON_OPTIONS.find(o => o.label === label)?.id || 'custom'); }}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                            configureModalCustomLabel === label
+                              ? 'text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                          style={configureModalCustomLabel === label ? { backgroundColor: brandColor } : {}}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Link input */}
+                  <div className="mb-5">
+                    <label className="text-sm font-semibold text-gray-700 block mb-2">Link</label>
+                    <Input
+                      value={configureModalLink}
+                      onChange={(e) => setConfigureModalLink(e.target.value)}
+                      placeholder="Paste your link (Calendly, Stripe, Typeform, etc.)"
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+
+                  {/* Sign contract option */}
+                  <button
+                    type="button"
+                    onClick={() => { setConfigureModalOption('sign_contract'); setConfigureModalSignSource('launchbox'); setConfigureModalStep(2); }}
+                    className="w-full text-left p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-all flex items-center gap-3 mb-4"
+                  >
+                    <FileSignature className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-700">Or connect a LaunchBox contract instead</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  </button>
+
+                  {/* Apply to all */}
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="text-sm text-gray-600">Apply to all packages</span>
+                    <button type="button" role="switch" aria-checked={configureModalCopyToAll} onClick={() => setConfigureModalCopyToAll(!configureModalCopyToAll)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${configureModalCopyToAll ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${configureModalCopyToAll ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+
                   <Button
-                    onClick={() => setConfigureModalStep(2)}
-                    className="w-full h-12 rounded-full text-white font-semibold"
+                    onClick={() => { if (!configureModalOption || configureModalOption === 'sign_contract') setConfigureModalOption('custom'); saveConfigureModal(); }}
+                    disabled={!configureModalLink.trim() && !configureModalCustomLabel.trim()}
+                    className="w-full h-12 rounded-full text-white font-semibold disabled:opacity-50"
                     style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                   >
-                    Next
+                    Save
                   </Button>
                 </>
               ) : configureModalOption === 'sign_contract' ? (
                 <>
-                  <div className="mb-4">
-                    <span className="text-sm font-medium text-gray-700">Sign Contract</span>
-                  </div>
-                  <div className="space-y-3 mb-5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfigureModalSignSource('launchbox');
-                        const keep = (configureModalLink || '').startsWith('template::')
-                          ? userContractTemplates.some((t) => `template::${t.id}` === configureModalLink)
-                          : (userContracts || []).some((c) => buildContractSignUrl(c.shareable_link) === configureModalLink);
-                        const firstTemplateValue = userContractTemplates[0] ? `template::${userContractTemplates[0].id}` : '';
-                        const fallback = selectableLaunchBoxContracts[0] ? buildContractSignUrl(selectableLaunchBoxContracts[0].shareable_link) : firstTemplateValue;
-                        setConfigureModalLink(keep ? configureModalLink : fallback);
-                      }}
-                      className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'launchbox' ? 'bg-white' : 'bg-white/80'}`}
-                      style={configureModalSignSource === 'launchbox' ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
-                    >
-                      <FileSignature className="w-5 h-5 flex-shrink-0" style={{ color: brandColor }} />
-                      <span className="font-medium">Use a LaunchBox contract</span>
-                      {configureModalSignSource === 'launchbox' && <Check className="w-5 h-5 flex-shrink-0 ml-auto" style={{ color: brandColor }} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setConfigureModalSignSource('external'); setConfigureModalLink(configureModalSignSource === 'launchbox' ? '' : configureModalLink); }}
-                      className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'external' ? 'bg-white' : 'bg-white/80'}`}
-                      style={configureModalSignSource === 'external' ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
-                    >
-                      <LinkIcon className="w-5 h-5 flex-shrink-0" />
-                      <span className="font-medium">Use an external link</span>
-                      {configureModalSignSource === 'external' && <Check className="w-5 h-5 flex-shrink-0 ml-auto" style={{ color: brandColor }} />}
-                    </button>
-                  </div>
-                  {configureModalSignSource === 'launchbox' ? (
+                  <p className="text-gray-500 text-sm mb-4">Select a contract your clients will sign when they click the button.</p>
+                  {(
                     isLoadingUserContracts ? (
                       <div className="mb-4 p-4 rounded-2xl bg-white text-center shadow-sm">
                         <div className="inline-flex items-center gap-2 text-sm text-gray-600">
@@ -5574,28 +5778,19 @@ export default function Results() {
                         </Button>
                       </div>
                     )
-                  ) : (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Paste your e-signature link</label>
-                      <Input
-                        value={configureModalLink}
-                        onChange={(e) => setConfigureModalLink(e.target.value)}
-                        placeholder="https://docu.sign/… or your signing tool link"
-                        className="w-full h-12 text-base rounded-xl border-0 shadow-sm focus:shadow-md"
-                        style={{ boxShadow: `0 0 0 2px ${brandColor}20, 0 10px 30px -18px ${brandColor}80` }}
-                      />
-                    </div>
                   )}
                   <p className="text-xs text-gray-400 mb-4">
-                    If no link is attached, this button won&apos;t be visible to clients.
+                    If no contract is selected, this button won&apos;t be visible to clients.
                   </p>
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white mb-6 shadow-sm">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Apply to all packages</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Use this link for every CTA button</p>
-                    </div>
-                    <Switch checked={configureModalCopyToAll} onCheckedChange={setConfigureModalCopyToAll} />
+
+                  {/* Apply to all */}
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="text-sm text-gray-600">Apply to all packages</span>
+                    <button type="button" role="switch" aria-checked={configureModalCopyToAll} onClick={() => setConfigureModalCopyToAll(!configureModalCopyToAll)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${configureModalCopyToAll ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${configureModalCopyToAll ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
                   </div>
+
                   <div className="flex gap-3">
                     <Button variant="outline" onClick={() => setConfigureModalStep(1)} className="flex-1 h-12 rounded-full border-0 shadow-sm hover:shadow-md text-gray-700 hover:bg-white font-semibold">Back</Button>
                     <Button onClick={saveConfigureModal} className="flex-1 h-12 rounded-full text-white font-semibold" style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}>Save</Button>
@@ -5687,7 +5882,7 @@ export default function Results() {
             >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-900">
-                  {configureModalStep === 1 ? 'Configure Button' : 'Add Your Link'}
+                  {configureModalStep === 1 ? 'Where should clients go?' : configureModalOption === 'sign_contract' ? 'Sign Contract' : 'Add Your Link'}
                 </h3>
                 <button
                   onClick={closeConfigureModal}
@@ -5699,76 +5894,81 @@ export default function Results() {
 
               {configureModalStep === 1 ? (
                 <>
-                  <p className="text-gray-600 text-sm mb-4">What should this button do?</p>
-                  <div className="space-y-3 mb-6">
-                    {BUTTON_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setConfigureModalOption(opt.id)}
-                        className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${
-                          configureModalOption === opt.id
-                            ? 'bg-white'
-                            : 'bg-white/80'
-                        }`}
-                        style={configureModalOption === opt.id ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
-                      >
-                        <span className="text-lg flex-shrink-0">{getCTAOptionEmoji(opt.id)}</span>
-                        <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-gray-900 block">{opt.label}</span>
-                          {opt.hint && (
-                            <span className="text-xs text-gray-500 block mt-0.5">({opt.hint})</span>
-                          )}
-                        </div>
-                        {configureModalOption === opt.id && (
-                          <Check className="w-5 h-5 flex-shrink-0" style={{ color: brandColor }} />
-                        )}
-                      </button>
-                    ))}
+                  <p className="text-gray-500 text-sm mb-5">Pick a button label and paste the link. This is what your clients click to take the next step.</p>
+
+                  {/* Button label */}
+                  <div className="mb-4">
+                    <label className="text-sm font-semibold text-gray-700 block mb-2">Button text</label>
+                    <Input
+                      value={configureModalCustomLabel}
+                      onChange={(e) => setConfigureModalCustomLabel(e.target.value)}
+                      placeholder="e.g. Book a Call"
+                      className="h-11 rounded-xl"
+                    />
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {['Book a Call', 'Lock Your Spot', 'Get Started', 'Apply Now', 'Sign Contract'].map((label) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => { setConfigureModalCustomLabel(label); setConfigureModalOption(BUTTON_OPTIONS.find(o => o.label === label)?.id || 'custom'); }}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                            configureModalCustomLabel === label
+                              ? 'text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                          style={configureModalCustomLabel === label ? { backgroundColor: brandColor } : {}}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Link input */}
+                  <div className="mb-5">
+                    <label className="text-sm font-semibold text-gray-700 block mb-2">Link</label>
+                    <Input
+                      value={configureModalLink}
+                      onChange={(e) => setConfigureModalLink(e.target.value)}
+                      placeholder="Paste your link (Calendly, Stripe, Typeform, etc.)"
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+
+                  {/* Sign contract option */}
+                  <button
+                    type="button"
+                    onClick={() => { setConfigureModalOption('sign_contract'); setConfigureModalSignSource('launchbox'); setConfigureModalStep(2); }}
+                    className="w-full text-left p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-all flex items-center gap-3 mb-4"
+                  >
+                    <FileSignature className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-700">Or connect a LaunchBox contract instead</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  </button>
+
+                  {/* Apply to all */}
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="text-sm text-gray-600">Apply to all packages</span>
+                    <button type="button" role="switch" aria-checked={configureModalCopyToAll} onClick={() => setConfigureModalCopyToAll(!configureModalCopyToAll)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${configureModalCopyToAll ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${configureModalCopyToAll ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+
                   <Button
-                    onClick={() => setConfigureModalStep(2)}
-                    className="w-full h-12 rounded-full text-white font-semibold"
+                    onClick={() => { if (!configureModalOption || configureModalOption === 'sign_contract') setConfigureModalOption('custom'); saveConfigureModal(); }}
+                    disabled={!configureModalLink.trim() && !configureModalCustomLabel.trim()}
+                    className="w-full h-12 rounded-full text-white font-semibold disabled:opacity-50"
                     style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                   >
-                    Next
+                    Save
                   </Button>
                 </>
               ) : configureModalOption === 'sign_contract' ? (
                 <>
-                  <div className="mb-4">
-                    <span className="text-sm font-medium text-gray-700">Sign Contract</span>
-                  </div>
-                  <div className="space-y-3 mb-5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfigureModalSignSource('launchbox');
-                        const keep = (configureModalLink || '').startsWith('template::')
-                          ? userContractTemplates.some((t) => `template::${t.id}` === configureModalLink)
-                          : (userContracts || []).some((c) => buildContractSignUrl(c.shareable_link) === configureModalLink);
-                        const firstTemplateValue = userContractTemplates[0] ? `template::${userContractTemplates[0].id}` : '';
-                        const fallback = selectableLaunchBoxContracts[0] ? buildContractSignUrl(selectableLaunchBoxContracts[0].shareable_link) : firstTemplateValue;
-                        setConfigureModalLink(keep ? configureModalLink : fallback);
-                      }}
-                      className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'launchbox' ? 'bg-white' : 'bg-white/80'}`}
-                      style={configureModalSignSource === 'launchbox' ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
-                    >
-                      <FileSignature className="w-5 h-5 flex-shrink-0" style={{ color: brandColor }} />
-                      <span className="font-medium">Use a LaunchBox contract</span>
-                      {configureModalSignSource === 'launchbox' && <Check className="w-5 h-5 flex-shrink-0 ml-auto" style={{ color: brandColor }} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setConfigureModalSignSource('external'); setConfigureModalLink(configureModalSignSource === 'launchbox' ? '' : configureModalLink); }}
-                      className={`w-full text-left p-4 rounded-2xl transition-all flex items-center gap-3 shadow-sm hover:shadow-md ${configureModalSignSource === 'external' ? 'bg-white' : 'bg-white/80'}`}
-                      style={configureModalSignSource === 'external' ? { boxShadow: `0 0 0 2px ${brandColor}20, 0 8px 24px -16px ${brandColor}80` } : {}}
-                    >
-                      <LinkIcon className="w-5 h-5 flex-shrink-0" />
-                      <span className="font-medium">Use an external link</span>
-                      {configureModalSignSource === 'external' && <Check className="w-5 h-5 flex-shrink-0 ml-auto" style={{ color: brandColor }} />}
-                    </button>
-                  </div>
-                  {configureModalSignSource === 'launchbox' ? (
+                  <p className="text-gray-500 text-sm mb-4">Select a contract your clients will sign when they click the button.</p>
+                  {(
                     isLoadingUserContracts ? (
                       <div className="mb-4 p-4 rounded-2xl bg-white text-center shadow-sm">
                         <div className="inline-flex items-center gap-2 text-sm text-gray-600">
@@ -5831,28 +6031,19 @@ export default function Results() {
                         </Button>
                       </div>
                     )
-                  ) : (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Paste your e-signature link</label>
-                      <Input
-                        value={configureModalLink}
-                        onChange={(e) => setConfigureModalLink(e.target.value)}
-                        placeholder="https://docu.sign/… or your signing tool link"
-                        className="w-full h-12 text-base rounded-xl border-0 shadow-sm focus:shadow-md"
-                        style={{ boxShadow: `0 0 0 2px ${brandColor}20, 0 10px 30px -18px ${brandColor}80` }}
-                      />
-                    </div>
                   )}
                   <p className="text-xs text-gray-400 mb-4">
-                    If no link is attached, this button won&apos;t be visible to clients.
+                    If no contract is selected, this button won&apos;t be visible to clients.
                   </p>
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white mb-6 shadow-sm">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Apply to all packages</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Use this link for every CTA button</p>
-                    </div>
-                    <Switch checked={configureModalCopyToAll} onCheckedChange={setConfigureModalCopyToAll} />
+
+                  {/* Apply to all */}
+                  <div className="flex items-center justify-between mb-5">
+                    <span className="text-sm text-gray-600">Apply to all packages</span>
+                    <button type="button" role="switch" aria-checked={configureModalCopyToAll} onClick={() => setConfigureModalCopyToAll(!configureModalCopyToAll)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${configureModalCopyToAll ? 'bg-blue-500' : 'bg-gray-300'}`}>
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${configureModalCopyToAll ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
                   </div>
+
                   <div className="flex gap-3">
                     <Button variant="outline" onClick={() => setConfigureModalStep(1)} className="flex-1 h-12 rounded-full border-0 shadow-sm hover:shadow-md text-gray-700 hover:bg-white font-semibold">Back</Button>
                     <Button onClick={saveConfigureModal} className="flex-1 h-12 rounded-full text-white font-semibold" style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}>Save</Button>
@@ -6102,49 +6293,6 @@ export default function Results() {
       )}
       */}
 
-      {/* Fresh-from-wizard preview modal */}
-      <AnimatePresence>
-        {isFreshReveal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-6"
-            onClick={() => setIsFreshReveal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 30 }}
-              transition={{ type: 'spring', duration: 0.4 }}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-y-auto p-8"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Here's how your packages will look</h2>
-                <p className="text-gray-500 text-sm">This is the client view. Let's finalize it to your liking.</p>
-              </div>
-
-              {/* Compact preview of packages */}
-              <div className="pointer-events-none">
-                <div style={{ transform: 'scale(0.75)', transformOrigin: 'top center' }}>
-                  {renderCurrentPreviewDesign()}
-                </div>
-              </div>
-
-              <div className="text-center mt-6">
-                <button
-                  onClick={() => setIsFreshReveal(false)}
-                  className="px-6 py-3 rounded-full text-white font-semibold shadow-lg hover:scale-105 transition-transform"
-                  style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
-                >
-                  Customize Your Packages
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

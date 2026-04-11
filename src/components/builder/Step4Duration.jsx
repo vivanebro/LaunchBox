@@ -66,18 +66,6 @@ export default function Step4Duration({ data, onChange, onNext }) {
     }
   };
 
-  const selectOngoing = () => {
-    onChange({
-      project_duration: 'Ongoing',
-      duration_min: null,
-      duration_max: null,
-      duration_unit: 'ongoing',
-      duration_starter: null,
-      duration_growth: null,
-      duration_premium: null,
-      pricing_availability: 'retainer'
-    });
-  };
 
   const applyCustom = () => {
     const min = parseInt(customMin);
@@ -125,17 +113,6 @@ export default function Step4Duration({ data, onChange, onNext }) {
             {duration.label}
           </Badge>
         ))}
-        <Badge
-          onClick={selectOngoing}
-          className={cn(
-            "cursor-pointer px-6 py-3 text-sm font-medium transition-all hover:scale-105 border-2",
-            selectedDuration === 'Ongoing'
-              ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-              : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
-          )}
-        >
-          Ongoing / Retainer
-        </Badge>
       </div>
 
       <div className="space-y-2">
@@ -208,12 +185,6 @@ export default function Step4Duration({ data, onChange, onNext }) {
         </div>
       )}
 
-      {selectedDuration === 'Ongoing' && (
-        <div className="p-5 bg-gray-50 rounded-xl text-center">
-          <div className="text-lg font-bold text-indigo-600">Ongoing Monthly Retainer</div>
-          <p className="text-sm text-gray-400 mt-1">Continuous service with monthly billing</p>
-        </div>
-      )}
     </div>
   );
 }

@@ -122,7 +122,7 @@ export function PackageAnalyticsPanel({ isOpen, onClose, pkg, analytics, isMobil
                       .sort((x, y) => y[1] - x[1])
                       .map(([tierKey, count]) => {
                         const { tier, modeKey } = parseUniqueTierKey(tierKey);
-                        const modeLabel = modeKey === 'retainer' ? 'Monthly' : 'One-Time';
+                        const modeLabel = modeKey === 'retainer' ? 'Ongoing' : 'One-Time';
                         const label = `${a.tierLabels?.[tierKey] || tier} (${modeLabel})`;
                         return (
                           <TierBarRow
