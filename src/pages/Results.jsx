@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature, AlertCircle, Sun, Moon } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature, AlertCircle, Sun, Moon, Package } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { toPng } from 'html-to-image';
@@ -264,6 +264,7 @@ export default function Results() {
   const [tempLabelOnetime, setTempLabelOnetime] = useState('');
   const [tempLabelRetainer, setTempLabelRetainer] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAddPackageMenu, setShowAddPackageMenu] = useState(false);
   const [showExitEditModeModal, setShowExitEditModeModal] = useState(false);
   const [packageToDelete, setPackageToDelete] = useState(null);
   const [lastDeletedTier, setLastDeletedTier] = useState(null);
@@ -853,13 +854,13 @@ export default function Results() {
                 starter: 'Starter',
                 growth: 'Growth',
                 premium: 'Premium',
-                elite: 'Elite'
+                elite: 'Enterprise'
               },
               retainer: {
                 starter: 'Starter',
                 growth: 'Growth',
                 premium: 'Premium',
-                elite: 'Elite'
+                elite: 'Enterprise'
               }
             },
             button_links: {
@@ -1944,7 +1945,7 @@ export default function Results() {
       deliverables: config.package_data?.[modeKey]?.[tier]?.deliverables || [],
       bonuses: config.package_data?.[modeKey]?.[tier]?.bonuses || [],
       popular: currentModePopularIndex === index,
-      isCustomOffer: tier === 'elite'
+      isCustomOffer: config.custom_offer_tiers?.[tier] === true
     };
     });
 
@@ -2017,7 +2018,7 @@ export default function Results() {
     setPackageToDelete(null);
   };
 
-  const handleAddPackage = async () => {
+  const handleAddPackage = async (asCustomOffer = false) => {
     const modeKey = getCurrentModeKey();
     const currentConfig = configRef.current || config;
     const currentActive = currentConfig.active_packages?.[modeKey] || ['starter', 'growth', 'premium'];
@@ -2034,7 +2035,7 @@ export default function Results() {
 
     if (nextTier) {
       const updatedActive = [...currentActive, nextTier];
-      
+
       const updatedActivePackages = {
         onetime: modeKey === 'onetime' ? updatedActive : (currentConfig.active_packages?.onetime || ['starter', 'growth', 'premium']),
         retainer: modeKey === 'retainer' ? updatedActive : (currentConfig.active_packages?.retainer || ['starter', 'growth', 'premium'])
@@ -2042,7 +2043,17 @@ export default function Results() {
 
       const updates = { active_packages: updatedActivePackages };
 
-      if (nextTier === 'elite' && !currentConfig.price_elite) {
+      // Mark as custom offer or regular package
+      const customOfferTiers = { ...(currentConfig.custom_offer_tiers || {}) };
+      customOfferTiers[nextTier] = asCustomOffer;
+      updates.custom_offer_tiers = customOfferTiers;
+
+      if (!asCustomOffer && nextTier === 'elite' && !currentConfig.price_elite) {
+        updates.price_elite = 0;
+        updates.price_elite_retainer = 0;
+      }
+
+      if (asCustomOffer && nextTier === 'elite' && !currentConfig.price_elite) {
         const elitePrice = Math.round(currentConfig.price_premium * 1.5);
         const eliteRetainerPrice = Math.round(elitePrice * 0.85);
         updates.price_elite = elitePrice;
@@ -2050,6 +2061,7 @@ export default function Results() {
       }
 
       updateConfigMultiple(updates);
+      setShowAddPackageMenu(false);
     }
   };
 
@@ -2726,8 +2738,8 @@ export default function Results() {
     const bonusTemplate = Array.from({ length: maxBonuses }, (_, idx) =>
       packages.find(p => !p.isCustomOffer && p.bonuses[idx])?.bonuses[idx] || ''
     );
-    const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
-    const bonusesMinHeight = packages.length === 4 ? maxBonuses * 28 : maxBonuses * 32;
+    const deliverablesMinHeight = maxDeliverables * 32;
+    const bonusesMinHeight = maxBonuses * 32;
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -2745,8 +2757,8 @@ export default function Results() {
             transition={{ delay: index * 0.1 }}
             className={`relative bg-white rounded-3xl border-2 flex flex-col group/package transition-all duration-[400ms] ease-out ${
               pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
-            } ${packages.length === 4 ? 'p-6' : 'p-8'}`}
-            style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: packages.length === 4 ? '38px 30px' : '46px 32px' } : {}}
+            } p-8`}
+            style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: '46px 32px' } : {}}
           >
             {packages.length > 1 && (
               <button
@@ -2764,23 +2776,23 @@ export default function Results() {
               <div className="flex-grow flex flex-col items-center justify-center py-12">
                 <div className="text-center mb-8">
                   <div 
-                    className={`inline-block px-8 py-3 rounded-full text-white font-bold shadow-md mb-6 ${packages.length === 4 ? 'text-xl' : 'text-2xl'}`}
+                    className={`inline-block px-8 py-3 rounded-full text-white font-bold shadow-md mb-6 text-2xl`}
                     style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                   >
                     <EditableText
                       value={pkg.name}
                       onSave={(newValue) => updatePackageName(tierName, newValue)}
-                      className={`inline font-bold ${packages.length === 4 ? 'text-xl' : 'text-2xl'}`}
+                      className={`inline font-bold text-2xl`}
                       placeholder="Custom Offer"
                       darkMode={true}
                       brandColor="#fff"
                     />
                   </div>
-                  <h3 className={`font-bold text-gray-900 mb-4 ${packages.length === 4 ? 'text-2xl' : 'text-3xl'}`}>
+                  <h3 className={`font-bold text-gray-900 mb-4 text-3xl`}>
                     <EditableText
                       value={config.package_descriptions?.[modeKey]?.[tierName] || 'Need Something Different?'}
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                      className={`inline font-bold ${packages.length === 4 ? 'text-2xl' : 'text-3xl'}`}
+                      className={`inline font-bold text-3xl`}
                       placeholder="Need Something Different?"
                       brandColor={brandColor}
                     />
@@ -2847,10 +2859,10 @@ export default function Results() {
             )}
 
             <div className="flex-grow flex flex-col">
-              <div className={packages.length === 4 ? 'min-h-[390px] flex flex-col' : ''}>
+              <div className="">
                 <div className="text-center mb-1">
                   <div
-                    className={`inline-block px-6 py-2 rounded-full text-white font-bold shadow-md ${packages.length === 4 ? 'text-base' : 'text-lg'}`}
+                    className={`inline-block px-6 py-2 rounded-full text-white font-bold shadow-md text-lg`}
                     style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                   >
                     <EditableText
@@ -2918,7 +2930,7 @@ export default function Results() {
                             updateConfig(`price_${tierName}_retainer`, newPrice);
                           }
                         }}
-                        className={`font-bold inline-block ${packages.length === 4 ? 'text-2xl' : 'text-3xl'}`}
+                        className={`font-bold inline-block text-3xl`}
                         style={{ color: brandColor }}
                         brandColor={brandColor}
                       />
@@ -2981,11 +2993,11 @@ export default function Results() {
                   />
                 )}
                 {pricingMode === 'one-time' && (
-                  <p className={`text-gray-900 font-bold mt-4 mb-5 text-center ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}>
+                  <p className={`text-gray-900 font-bold mt-4 mb-5 text-center text-xl`}>
                     <EditableText
                       value={pkg.duration || '2-4 weeks to delivery'}
                       onSave={(newValue) => updatePackageDuration(tierName, newValue)}
-                      className={`inline font-bold ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}
+                      className={`inline font-bold text-xl`}
                       placeholder="2-4 weeks to delivery"
                       brandColor={brandColor}
                     />
@@ -2995,7 +3007,7 @@ export default function Results() {
                 {pkg.description !== null ? (
                   <div
                     className={`mb-5 rounded-xl relative group/desc overflow-hidden ${
-                      packages.length === 4 ? 'p-2 min-h-[48px] max-h-[48px]' : 'p-4 min-h-[64px] max-h-[64px]'
+                      'p-4 min-h-[64px] max-h-[64px]'
                     }`}
                     style={{ backgroundColor: `${brandColor}15` }}
                   >
@@ -3225,8 +3237,8 @@ export default function Results() {
     const bonusTemplate = Array.from({ length: maxBonuses }, (_, idx) =>
       packages.find(p => !p.isCustomOffer && p.bonuses[idx])?.bonuses[idx] || ''
     );
-    const deliverablesMinHeight = packages.length === 4 ? maxDeliverables * 28 : maxDeliverables * 32;
-    const bonusesMinHeight = packages.length === 4 ? maxBonuses * 28 : maxBonuses * 32;
+    const deliverablesMinHeight = maxDeliverables * 32;
+    const bonusesMinHeight = maxBonuses * 32;
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -3246,8 +3258,8 @@ export default function Results() {
               pkg.popular
                 ? ''
                 : 'bg-gradient-to-br from-gray-800 to-gray-900'
-            } ${packages.length === 4 ? 'p-6' : 'p-8'}`}
-            style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: packages.length === 4 ? '38px 30px' : '46px 32px' } : {}}
+            } p-8`}
+            style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: '46px 32px' } : {}}
           >
             {packages.length > 1 && (
               <button
@@ -3265,22 +3277,22 @@ export default function Results() {
               <div className="flex-grow flex flex-col items-center justify-center py-12">
                 <div className="text-center mb-8">
                   <div 
-                    className={`inline-block px-8 py-3 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md mb-6 ${packages.length === 4 ? 'text-xl' : 'text-2xl'}`}
+                    className={`inline-block px-8 py-3 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md mb-6 text-2xl`}
                   >
                     <EditableText
                       value={pkg.name}
                       onSave={(newValue) => updatePackageName(tierName, newValue)}
-                      className={`inline font-bold ${packages.length === 4 ? 'text-xl' : 'text-2xl'}`}
+                      className={`inline font-bold text-2xl`}
                       placeholder="Custom Offer"
                       darkMode={true}
                       brandColor="#fff"
                     />
                   </div>
-                  <h3 className={`font-bold text-white mb-4 ${packages.length === 4 ? 'text-2xl' : 'text-3xl'}`}>
+                  <h3 className={`font-bold text-white mb-4 text-3xl`}>
                     <EditableText
                       value={config.package_descriptions?.[modeKey]?.[tierName] || 'Need Something Different?'}
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                      className={`inline font-bold ${packages.length === 4 ? 'text-2xl' : 'text-3xl'}`}
+                      className={`inline font-bold text-3xl`}
                       placeholder="Need Something Different?"
                       darkMode={true}
                       brandColor={brandColor}
@@ -3346,9 +3358,9 @@ export default function Results() {
             )}
 
             <div className="flex-grow flex flex-col">
-              <div className={packages.length === 4 ? 'min-h-[390px] flex flex-col' : ''}>
+              <div className="">
                 <div className="text-center mb-4">
-                  <div className={`inline-block px-6 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md ${packages.length === 4 ? 'text-base' : 'text-lg'}`}>
+                  <div className={`inline-block px-6 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md text-lg`}>
                     <EditableText
                       value={pkg.name}
                       onSave={(newValue) => updatePackageName(tierName, newValue)}
@@ -3415,7 +3427,7 @@ export default function Results() {
                             updateConfig(`price_${tierName}_retainer`, newPrice);
                           }
                         }}
-                        className={`font-bold text-white inline-block ${packages.length === 4 ? 'text-2xl' : 'text-3xl'}`}
+                        className={`font-bold text-white inline-block text-3xl`}
                         darkMode={true}
                         brandColor={brandColor}
                       />
@@ -3480,11 +3492,11 @@ export default function Results() {
                   />
                 )}
                 {pricingMode === 'one-time' && (
-                  <p className={`text-white font-bold mb-6 text-center ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}>
+                  <p className={`text-white font-bold mb-6 text-center text-xl`}>
                     <EditableText
                       value={pkg.duration || '2-4 weeks to delivery'}
                       onSave={(newValue) => updatePackageDuration(tierName, newValue)}
-                      className={`inline font-bold ${packages.length === 4 ? 'text-lg' : 'text-xl'}`}
+                      className={`inline font-bold text-xl`}
                       placeholder="2-4 weeks to delivery"
                       darkMode={true}
                       brandColor={brandColor}
@@ -3495,7 +3507,7 @@ export default function Results() {
                 {pkg.description !== null ? (
                   <div
                     className={`mb-6 rounded-xl relative group/desc overflow-hidden ${
-                      packages.length === 4 ? 'p-2 min-h-[48px] max-h-[48px]' : 'p-4 min-h-[64px] max-h-[64px]'
+                      'p-4 min-h-[64px] max-h-[64px]'
                     }`}
                     style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}
                   >
@@ -3721,11 +3733,11 @@ export default function Results() {
     const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
       previewPackages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
     );
-    const rowGap = previewPackages.length === 4 ? 4 : 12;
-    const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
+    const rowGap = 12;
+    const deliverablesMinHeight = maxDeliverables * 28;
     const deliverablesHeight = deliverablesMinHeight + Math.max(0, maxDeliverables - 1) * rowGap;
-    const bonusesHeight = maxBonuses > 0 ? (previewPackages.length === 4 ? maxBonuses * 24 : maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
-    const descHeight = previewPackages.length === 4 ? 48 : 64;
+    const bonusesHeight = maxBonuses > 0 ? (maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
+    const descHeight = 64;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
     );
@@ -3750,20 +3762,20 @@ export default function Results() {
             <motion.div
               key={index}
               {...getPreviewMotionProps(index)}
-              className={`relative bg-white rounded-3xl border-2 border-gray-200 shadow-lg flex flex-col ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
+              className={`relative bg-white rounded-3xl border-2 border-gray-200 shadow-lg flex flex-col p-6`}
             >
-              <div className={`flex-grow flex flex-col items-center justify-center ${previewPackages.length === 4 ? 'py-6' : 'py-12'}`}>
+              <div className={`flex-grow flex flex-col items-center justify-center py-12`}>
                 <div className="text-center mb-4">
                   <div 
-                    className={`inline-block px-4 py-2 rounded-full text-white font-bold shadow-md mb-3 ${previewPackages.length === 4 ? 'text-base' : 'text-2xl'}`}
+                    className={`inline-block px-4 py-2 rounded-full text-white font-bold shadow-md mb-3 text-2xl`}
                     style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                   >
                     {pkg.name}
                   </div>
-                  <h3 className={`font-bold text-gray-900 mb-2 ${previewPackages.length === 4 ? 'text-lg' : 'text-3xl'}`}>
+                  <h3 className={`font-bold text-gray-900 mb-2 text-3xl`}>
                     {config.package_descriptions?.[modeKey]?.[pkg.tier] || 'Need Something Different?'}
                   </h3>
-                  <p className={`text-gray-600 mb-4 mx-auto ${previewPackages.length === 4 ? 'text-xs max-w-[180px]' : 'text-base max-w-xs'}`}>
+                  <p className={`text-gray-600 mb-4 mx-auto text-base max-w-xs`}>
                     {config.package_descriptions?.[modeKey]?.[pkg.tier + '_subtitle'] || "Let's create a custom package tailored specifically to your needs"}
                   </p>
                 </div>
@@ -3772,7 +3784,7 @@ export default function Results() {
                   href={finalLink || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`w-full font-semibold rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:opacity-90 ${previewPackages.length === 4 ? 'h-10 text-sm' : 'h-12'}`}
+                  className={`w-full font-semibold rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:opacity-90 h-12`}
                   style={{
                     background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)`,
                     textDecoration: 'none'
@@ -3805,12 +3817,12 @@ export default function Results() {
           {...getPreviewMotionProps(index)}
           className={`relative bg-white rounded-3xl border-2 flex flex-col transition-all duration-[400ms] ease-out ${
             pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
-          } ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
-          style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: previewPackages.length === 4 ? '30px 16px' : '38px 24px' } : {}}
+          } p-6`}
+          style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: '38px 24px' } : {}}
         >
           {pkg.popular && (
             <div
-              className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full font-bold text-white whitespace-nowrap ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}
+              className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full font-bold text-white whitespace-nowrap text-sm`}
               style={{ backgroundColor: brandColor }}
             >
               {popularBadgeText}
@@ -3820,7 +3832,7 @@ export default function Results() {
           <div className="flex-grow flex flex-col">
               <div className="text-center mb-3">
                 <div 
-                  className={`inline-block px-4 py-1.5 rounded-full text-white font-bold shadow-md ${previewPackages.length === 4 ? 'text-sm' : 'text-lg'}`}
+                  className={`inline-block px-4 py-1.5 rounded-full text-white font-bold shadow-md text-lg`}
                   style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                 >
                   {pkg.name}
@@ -3840,15 +3852,15 @@ export default function Results() {
                 <div>
                   {discountActive && config.commitment_discount_enabled && (config.commitment_discount_percent || 0) > 0 && (
                     <div className="text-center mb-0.5">
-                      <span className={`text-gray-400 line-through ${previewPackages.length === 4 ? 'text-sm' : 'text-lg'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</span>
+                      <span className={`text-gray-400 line-through text-lg`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</span>
                       <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: brandColor }}>{config.commitment_discount_percent}% off</span>
                     </div>
                   )}
                   <div className="flex items-baseline gap-1 justify-center">
-                    <div className={`font-bold text-gray-900 ${previewPackages.length === 4 ? 'text-xl' : 'text-3xl'}`}>
+                    <div className={`font-bold text-gray-900 text-3xl`}>
                       {currencySymbol}{(() => { if (discountActive && config.commitment_discount_enabled) { const ok = `${pkg.tier}_${pricingMode === 'one-time' ? 'onetime' : 'retainer'}`; return (config.commitment_discount_prices?.[ok] || calcDiscountPrice(pkg.price, config.commitment_discount_percent)).toLocaleString(); } return (pkg.price || 0).toLocaleString(); })()}
                     </div>
-                    <span className={`text-gray-500 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
+                    <span className={`text-gray-500 text-base`}>
                       / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'ongoing')}
                     </span>
                   </div>
@@ -3858,20 +3870,20 @@ export default function Results() {
                 </div>
               </div>
               {pricingMode === 'one-time' && (
-                <p className={`text-gray-900 font-bold mb-4 text-center ${previewPackages.length === 4 ? 'text-base' : 'text-2xl'}`}>
+                <p className={`text-gray-900 font-bold mb-4 text-center text-2xl`}>
                   {pkg.duration ? pkg.duration : '2-4 weeks to delivery'}
                 </p>
               )}
 
               <div
                 className={`rounded-xl mb-4 overflow-hidden ${
-                  previewPackages.length === 4 ? 'p-2' : 'p-4'
+                  'p-4'
                 }`}
                 style={{ height: `${descHeight}px`, minHeight: `${descHeight}px`, backgroundColor: pkg.description != null ? `${brandColor}15` : 'transparent' }}
               >
                 {pkg.description != null && (
                   <p
-                    className={`text-gray-700 ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}
+                    className={`text-gray-700 text-sm`}
                     style={{
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
@@ -3884,9 +3896,9 @@ export default function Results() {
                 )}
               </div>
 
-              <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
-                <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{config.deliverables_label || 'Deliverables'}</p>
-                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
+              <div className={`mb-4 space-y-2`}>
+                <p className={`font-semibold text-gray-500 uppercase text-sm`}>{config.deliverables_label || 'Deliverables'}</p>
+                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className="space-y-2">
                   {deliverableTemplate.map((templateDeliverable, i) => {
                     const deliverable = pkg.deliverables[i];
                     const isIncluded = i < pkg.deliverables.length;
@@ -3897,20 +3909,20 @@ export default function Results() {
                       : (isIncluded ? (typeof deliverable === 'string' ? deliverable : deliverable?.type || '') : '');
 
                     if (!isIncluded && !showExcludedDeliverables) {
-                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                      return <div key={i} className={`flex items-start gap-1.5 min-h-[28px]`} aria-hidden />;
                     }
 
                     return (
                       <div key={i} className="flex items-start gap-1.5">
                         {isIncluded ? (
                           <Check
-                            className={`flex-shrink-0 mt-0.5 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`}
+                            className={`flex-shrink-0 mt-0.5 w-5 h-5`}
                             style={{ color: brandColor }}
                           />
                         ) : (
-                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 w-5 h-5`} />
                         )}
-                        <span className={`${isIncluded ? 'text-gray-700' : 'text-gray-400'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
+                        <span className={`${isIncluded ? 'text-gray-700' : 'text-gray-400'} text-sm`}>
                           {label}
                         </span>
                       </div>
@@ -3920,24 +3932,24 @@ export default function Results() {
               </div>
 
             {config.show_bonuses !== false && (maxBonuses > 0 || pkg.bonuses.length > 0) && (
-              <div className={`pt-4 border-t border-gray-200 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
-                <p className={`font-semibold text-gray-500 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{config.bonuses_label || 'Bonuses'}</p>
-                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
+              <div className={`pt-4 border-t border-gray-200 mb-10 space-y-2`}>
+                <p className={`font-semibold text-gray-500 uppercase text-sm`}>{config.bonuses_label || 'Bonuses'}</p>
+                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className="space-y-2">
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
                     const hasBonus = i < pkg.bonuses.length;
                     const bonusLabel = hasBonus ? bonus : (previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i] || '');
                     if (!hasBonus && !showExcludedDeliverables) {
-                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                      return <div key={i} className={`flex items-start gap-1.5 min-h-[28px]`} aria-hidden />;
                     }
                     return (
                       <div key={i} className="flex items-start gap-1.5">
                         {hasBonus ? (
-                          <Plus className={`flex-shrink-0 mt-0.5 text-green-500 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                          <Plus className={`flex-shrink-0 mt-0.5 text-green-500 w-5 h-5`} />
                         ) : (
-                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 w-5 h-5`} />
                         )}
-                        <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-400'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonusLabel}</span>
+                        <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-400'} text-sm`}>{bonusLabel}</span>
                       </div>
                     );
                   })}
@@ -3951,7 +3963,7 @@ export default function Results() {
             href={finalLink || '#'}
             target="_blank"
             rel="noopener noreferrer"
-            className={`w-full font-semibold rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:opacity-90 ${previewPackages.length === 4 ? 'h-10 text-sm' : 'h-12'}`}
+            className={`w-full font-semibold rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:opacity-90 h-12`}
             style={{
               background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)`,
               textDecoration: 'none'
@@ -3987,11 +3999,11 @@ export default function Results() {
     const deliverableTemplate = Array.from({ length: maxDeliverables }, (_, idx) =>
       previewPackages.find(p => !p.isCustomOffer && p.deliverables[idx])?.deliverables[idx] || null
     );
-    const rowGap = previewPackages.length === 4 ? 4 : 12;
-    const deliverablesMinHeight = previewPackages.length === 4 ? maxDeliverables * 24 : maxDeliverables * 28;
+    const rowGap = 12;
+    const deliverablesMinHeight = maxDeliverables * 28;
     const deliverablesHeight = deliverablesMinHeight + Math.max(0, maxDeliverables - 1) * rowGap;
-    const bonusesHeight = maxBonuses > 0 ? (previewPackages.length === 4 ? maxBonuses * 24 : maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
-    const descHeight = previewPackages.length === 4 ? 48 : 64;
+    const bonusesHeight = maxBonuses > 0 ? (maxBonuses * 28) + Math.max(0, maxBonuses - 1) * rowGap : 0;
+    const descHeight = 64;
     const hasAnyOriginalPrice = previewPackages.some(p =>
       config[`original_price_${p.tier}${pricingMode === 'one-time' ? '' : '_retainer'}`] > 0
     );
@@ -4016,19 +4028,19 @@ export default function Results() {
             <motion.div
               key={index}
               {...getPreviewMotionProps(index)}
-              className={`relative rounded-3xl text-white shadow-2xl flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
+              className={`relative rounded-3xl text-white shadow-2xl flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 p-6`}
             >
-              <div className={`flex-grow flex flex-col items-center justify-center ${previewPackages.length === 4 ? 'py-6' : 'py-12'}`}>
+              <div className={`flex-grow flex flex-col items-center justify-center py-12`}>
                 <div className="text-center mb-4">
                   <div 
-                    className={`inline-block px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md mb-3 ${previewPackages.length === 4 ? 'text-base' : 'text-2xl'}`}
+                    className={`inline-block px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md mb-3 text-2xl`}
                   >
                     {pkg.name}
                   </div>
-                  <h3 className={`font-bold text-white mb-2 ${previewPackages.length === 4 ? 'text-lg' : 'text-3xl'}`}>
+                  <h3 className={`font-bold text-white mb-2 text-3xl`}>
                     {config.package_descriptions?.[modeKey]?.[pkg.tier] || 'Need Something Different?'}
                   </h3>
-                  <p className={`text-white/80 mb-4 mx-auto ${previewPackages.length === 4 ? 'text-xs max-w-[180px]' : 'text-base max-w-xs'}`}>
+                  <p className={`text-white/80 mb-4 mx-auto text-base max-w-xs`}>
                     {config.package_descriptions?.[modeKey]?.[pkg.tier + '_subtitle'] || "Let's create a custom package tailored specifically to your needs"}
                   </p>
                 </div>
@@ -4037,7 +4049,7 @@ export default function Results() {
                   href={finalLink || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`w-full font-semibold rounded-full bg-white text-gray-900 hover:bg-gray-100 flex items-center justify-center transition-all ${previewPackages.length === 4 ? 'h-10 text-sm' : 'h-12'}`}
+                  className={`w-full font-semibold rounded-full bg-white text-gray-900 hover:bg-gray-100 flex items-center justify-center transition-all h-12`}
                   style={{ textDecoration: 'none' }}
                   onClick={(e) => {
                     if (!finalLink) {
@@ -4069,18 +4081,18 @@ export default function Results() {
             pkg.popular
               ? ''
               : 'bg-gradient-to-br from-gray-800 to-gray-900'
-          } ${previewPackages.length === 4 ? 'p-4' : 'p-6'}`}
-          style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: previewPackages.length === 4 ? '30px 16px' : '38px 24px' } : {}}
+          } p-6`}
+          style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: '38px 24px' } : {}}
         >
           {pkg.popular && (
-            <div className={`absolute -top-2 right-3 bg-yellow-400 rounded-full flex items-center justify-center text-gray-900 font-bold shadow-lg ${previewPackages.length === 4 ? 'w-12 h-12 text-[10px]' : 'w-16 h-16 text-xs'}`}>
+            <div className={`absolute -top-2 right-3 bg-yellow-400 rounded-full flex items-center justify-center text-gray-900 font-bold shadow-lg w-16 h-16 text-xs`}>
               <span className="text-center leading-tight">{popularBadgeText}</span>
             </div>
           )}
 
           <div className="flex-grow flex flex-col">
               <div className="text-center mb-3">
-                <div className={`inline-block px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md ${previewPackages.length === 4 ? 'text-sm' : 'text-lg'}`}>
+                <div className={`inline-block px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md text-lg`}>
                   {pkg.name}
                 </div>
               </div>
@@ -4098,15 +4110,15 @@ export default function Results() {
                 <div>
                   {discountActive && config.commitment_discount_enabled && (config.commitment_discount_percent || 0) > 0 && (
                     <div className="text-center mb-0.5">
-                      <span className={`text-white/50 line-through ${previewPackages.length === 4 ? 'text-sm' : 'text-lg'}`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</span>
+                      <span className={`text-white/50 line-through text-lg`}>{currencySymbol}{(pkg.price || 0).toLocaleString()}</span>
                       <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/20 text-white">{config.commitment_discount_percent}% off</span>
                     </div>
                   )}
                   <div className="flex items-baseline gap-1 justify-center">
-                    <div className={`font-bold ${previewPackages.length === 4 ? 'text-xl' : 'text-3xl'}`}>
+                    <div className={`font-bold text-3xl`}>
                       {currencySymbol}{(() => { if (discountActive && config.commitment_discount_enabled) { const ok = `${pkg.tier}_${pricingMode === 'one-time' ? 'onetime' : 'retainer'}`; return (config.commitment_discount_prices?.[ok] || calcDiscountPrice(pkg.price, config.commitment_discount_percent)).toLocaleString(); } return (pkg.price || 0).toLocaleString(); })()}
                     </div>
-                    <span className={`text-white/70 ${previewPackages.length === 4 ? 'text-xs' : 'text-base'}`}>
+                    <span className={`text-white/70 text-base`}>
                       / {pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'ongoing')}
                     </span>
                   </div>
@@ -4116,20 +4128,20 @@ export default function Results() {
                 </div>
               </div>
               {pricingMode === 'one-time' && (
-                <p className={`text-white font-bold mb-4 text-center ${previewPackages.length === 4 ? 'text-base' : 'text-2xl'}`}>
+                <p className={`text-white font-bold mb-4 text-center text-2xl`}>
                   {pkg.duration ? pkg.duration : '2-4 weeks to delivery'}
                 </p>
               )}
 
               <div
                 className={`rounded-xl mb-4 overflow-hidden ${
-                  previewPackages.length === 4 ? 'p-2' : 'p-4'
+                  'p-4'
                 }`}
                 style={{ height: `${descHeight}px`, minHeight: `${descHeight}px`, backgroundColor: pkg.description != null ? 'rgba(255, 255, 255, 0.15)' : 'transparent' }}
               >
                 {pkg.description != null && (
                   <p
-                    className={`text-white ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}
+                    className={`text-white text-sm`}
                     style={{
                       display: '-webkit-box',
                       WebkitLineClamp: 2,
@@ -4142,9 +4154,9 @@ export default function Results() {
                 )}
               </div>
 
-              <div className={`mb-4 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
-                <p className={`font-semibold text-white/70 uppercase ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{config.deliverables_label || 'Deliverables'}</p>
-                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
+              <div className={`mb-4 space-y-2`}>
+                <p className={`font-semibold text-white/70 uppercase text-sm`}>{config.deliverables_label || 'Deliverables'}</p>
+                <div style={{ height: `${deliverablesHeight}px`, minHeight: `${deliverablesHeight}px`, overflowY: 'auto' }} className="space-y-2">
                   {deliverableTemplate.map((templateDeliverable, i) => {
                     const deliverable = pkg.deliverables[i];
                     const isIncluded = i < pkg.deliverables.length;
@@ -4155,17 +4167,17 @@ export default function Results() {
                       : (isIncluded ? (typeof deliverable === 'string' ? deliverable : deliverable?.type || '') : '');
 
                     if (!isIncluded && !showExcludedDeliverables) {
-                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                      return <div key={i} className={`flex items-start gap-1.5 min-h-[28px]`} aria-hidden />;
                     }
 
                     return (
                       <div key={i} className="flex items-start gap-1.5">
                         {isIncluded ? (
-                          <Check className={`flex-shrink-0 mt-0.5 text-white ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                          <Check className={`flex-shrink-0 mt-0.5 text-white w-5 h-5`} />
                         ) : (
-                          <X className={`flex-shrink-0 mt-0.5 text-white/30 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                          <X className={`flex-shrink-0 mt-0.5 text-white/30 w-5 h-5`} />
                         )}
-                        <span className={`${isIncluded ? 'text-white' : 'text-white/40'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>
+                        <span className={`${isIncluded ? 'text-white' : 'text-white/40'} text-sm`}>
                           {label}
                         </span>
                       </div>
@@ -4175,24 +4187,24 @@ export default function Results() {
               </div>
 
             {config.show_bonuses !== false && (maxBonuses > 0 || pkg.bonuses.length > 0) && (
-              <div className={`pt-4 border-t border-white/20 mb-10 ${previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}`}>
-                <p className={`font-bold uppercase tracking-wider ${previewPackages.length === 4 ? 'text-[10px]' : 'text-xs'}`}>{config.bonuses_label || 'Bonuses'}</p>
-                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className={previewPackages.length === 4 ? 'space-y-1' : 'space-y-2'}>
+              <div className={`pt-4 border-t border-white/20 mb-10 space-y-2`}>
+                <p className={`font-bold uppercase tracking-wider text-xs`}>{config.bonuses_label || 'Bonuses'}</p>
+                <div style={{ height: `${bonusesHeight}px`, minHeight: `${bonusesHeight}px`, overflowY: 'auto' }} className="space-y-2">
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
                     const hasBonus = i < pkg.bonuses.length;
                     const bonusLabel = hasBonus ? bonus : (previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i] || '');
                     if (!hasBonus && !showExcludedDeliverables) {
-                      return <div key={i} className={`flex items-start gap-1.5 ${previewPackages.length === 4 ? 'min-h-[24px]' : 'min-h-[28px]'}`} aria-hidden />;
+                      return <div key={i} className={`flex items-start gap-1.5 min-h-[28px]`} aria-hidden />;
                     }
                     return (
                       <div key={i} className="flex items-start gap-1.5">
                         {hasBonus ? (
-                          <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                          <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 w-5 h-5`} />
                         ) : (
-                          <X className={`flex-shrink-0 mt-0.5 text-white/30 ${previewPackages.length === 4 ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} />
+                          <X className={`flex-shrink-0 mt-0.5 text-white/30 w-5 h-5`} />
                         )}
-                        <span className={`${hasBonus ? 'text-white' : 'text-white/40'} ${previewPackages.length === 4 ? 'text-xs' : 'text-sm'}`}>{bonusLabel}</span>
+                        <span className={`${hasBonus ? 'text-white' : 'text-white/40'} text-sm`}>{bonusLabel}</span>
                       </div>
                     );
                   })}
@@ -4206,7 +4218,7 @@ export default function Results() {
             href={finalLink || '#'}
             target="_blank"
             rel="noopener noreferrer"
-            className={`w-full font-semibold rounded-full bg-white text-gray-900 hover:bg-gray-100 flex items-center justify-center transition-all ${previewPackages.length === 4 ? 'h-10 text-sm' : 'h-12'}`}
+            className={`w-full font-semibold rounded-full bg-white text-gray-900 hover:bg-gray-100 flex items-center justify-center transition-all h-12`}
             style={{ textDecoration: 'none' }}
             onClick={(e) => {
               if (!finalLink) {
@@ -4308,7 +4320,7 @@ export default function Results() {
             </div>
           </div>
         )}
-        <div className="max-w-7xl mx-auto px-4 md:px-6" style={{ zoom: 0.8 }}>
+        <div className="max-w-7xl mx-auto px-4 md:px-6" style={{ zoom: 0.85 }}>
           <div ref={exportRef}>
           <div className="text-center">
             {config.logo_url && (
@@ -4774,7 +4786,7 @@ export default function Results() {
           )}
         </AnimatePresence>
 
-        <div style={{ zoom: 0.8 }}>
+        <div className="max-w-7xl mx-auto px-4 md:px-6" style={{ zoom: 0.85 }}>
         {/* Design theme switcher */}
         <div className="flex items-center justify-center gap-1 mb-3">
           <button
@@ -5043,13 +5055,36 @@ export default function Results() {
               <div className="flex-1" ref={exportRef}>{renderCurrentDesign()}</div>
 
               {packages.length < 4 && (
-                <button
-                  onClick={handleAddPackage}
-                  className="flex-shrink-0 -ml-1 w-6 h-16 flex items-center justify-center rounded-r-full bg-white shadow-md hover:shadow-lg hover:w-8 transition-all"
-                  title="Add another package"
-                >
-                  <Plus className="w-5 h-5" style={{ color: brandColor }} />
-                </button>
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => setShowAddPackageMenu(!showAddPackageMenu)}
+                    className="flex-shrink-0 -ml-1 w-6 h-16 flex items-center justify-center rounded-r-full bg-white shadow-md hover:shadow-lg hover:w-8 transition-all"
+                    title="Add another package"
+                  >
+                    <Plus className="w-5 h-5" style={{ color: brandColor }} />
+                  </button>
+                  {showAddPackageMenu && (
+                    <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowAddPackageMenu(false)} />
+                    <div className="absolute right-8 top-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50 w-48">
+                      <button
+                        onClick={() => handleAddPackage(false)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <Package className="w-4 h-4" style={{ color: brandColor }} />
+                        Add Package
+                      </button>
+                      <button
+                        onClick={() => handleAddPackage(true)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <Sparkles className="w-4 h-4" style={{ color: brandColor }} />
+                        Custom Offer
+                      </button>
+                    </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </motion.div>

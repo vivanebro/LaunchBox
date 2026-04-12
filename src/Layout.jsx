@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Settings, ChevronDown, ChevronRight, LayoutTemplate, Package, Plus, MessageSquare, FileSignature, Folder, ClipboardList } from 'lucide-react';
+import { Home, Settings, ChevronDown, ChevronRight, ChevronLeft, LayoutTemplate, Package, Plus, MessageSquare, FileSignature, Folder, ClipboardList, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient, { supabase } from '@/lib/supabaseClient';
 import HelpButton from '@/components/HelpButton';
@@ -70,6 +70,7 @@ export default function Layout({ children, currentPageName }) {
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [packageBuilderExpanded, setPackageBuilderExpanded] = React.useState(false);
   const [contractsExpanded, setContractsExpanded] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [isMobileView, setIsMobileView] = React.useState(false);
   const [brandColor] = React.useState('#ff0044');
   const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
@@ -255,25 +256,51 @@ export default function Layout({ children, currentPageName }) {
   return (
     <ErrorBoundary>
       <div className="min-h-screen flex" style={{ backgroundColor: '#F5F5F7' }}>
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0">
-          <div className="p-6">
-            <Link to={createPageUrl('Dashboard')} className="flex items-center relative">
-              <img 
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68e6df240580e3bf55058574/655c15688_LaunchBoxlogo_E3copy.png"
-                alt="LaunchBox"
-                className="h-12 w-auto object-contain"
-              />
-              <span className="ml-2 text-[10px] font-medium text-gray-400 border border-gray-300 px-1.5 py-0.5 rounded">
-                BETA
-              </span>
+        <aside className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0 transition-all duration-200`}>
+          <div className={`${sidebarCollapsed ? 'px-2 py-4' : 'px-4 py-4'} flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+            <Link to={createPageUrl('Dashboard')} className="flex items-center overflow-hidden flex-shrink-0">
+              {sidebarCollapsed ? (
+                <div className="w-8 h-10 overflow-hidden flex-shrink-0">
+                  <img
+                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68e6df240580e3bf55058574/655c15688_LaunchBoxlogo_E3copy.png"
+                    alt="LaunchBox"
+                    className="h-10 w-auto object-contain object-left"
+                    style={{ maxWidth: 'none' }}
+                  />
+                </div>
+              ) : (
+                <img
+                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68e6df240580e3bf55058574/655c15688_LaunchBoxlogo_E3copy.png"
+                  alt="LaunchBox"
+                  className="h-12 w-auto object-contain"
+                />
+              )}
             </Link>
+            {!sidebarCollapsed && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSidebarCollapsed(true); }}
+                className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          <nav className="flex-1 px-4 flex flex-col">
+          <nav className={`flex-1 ${sidebarCollapsed ? 'px-2' : 'px-4'} flex flex-col`}>
           <div className="space-y-2 flex-1">
-            <Link 
+            {sidebarCollapsed && (
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                className="w-full flex items-center justify-center py-3 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all"
+                title="Expand sidebar"
+              >
+                <PanelLeftOpen className="w-5 h-5" />
+              </button>
+            )}
+            <Link
               to={createPageUrl('Dashboard')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-xl font-medium text-sm transition-all ${
                 currentPageName === 'Dashboard'
                   ? 'text-white shadow-lg'
                   : 'text-gray-600 hover:bg-gray-50'
@@ -281,30 +308,32 @@ export default function Layout({ children, currentPageName }) {
               style={currentPageName === 'Dashboard' ? {
                 background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)'
               } : {}}
+              title={sidebarCollapsed ? 'Dashboard' : undefined}
             >
-              <Home className="w-5 h-5" />
-              Dashboard
+              <Home className="w-5 h-5 flex-shrink-0" />
+              {!sidebarCollapsed && 'Dashboard'}
             </Link>
 
             <div>
               <button
-                onClick={() => setPackageBuilderExpanded(!packageBuilderExpanded)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+                onClick={() => !sidebarCollapsed && setPackageBuilderExpanded(!packageBuilderExpanded)}
+                className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'} py-3 rounded-xl font-medium text-sm transition-all ${
                   ['PackageBuilder', 'Templates', 'MyPackages', 'QuizManager'].includes(currentPageName)
                     ? 'text-[#ff0044] bg-red-50 font-medium'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
+                title={sidebarCollapsed ? 'Package Builder' : undefined}
               >
-                <div className="flex items-center gap-3">
-                  <Package className="w-5 h-5" />
-                  Package Builder
+                <div className={`flex items-center ${sidebarCollapsed ? '' : 'gap-3'}`}>
+                  <Package className="w-5 h-5 flex-shrink-0" />
+                  {!sidebarCollapsed && 'Package Builder'}
                 </div>
-                {packageBuilderExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {!sidebarCollapsed && (packageBuilderExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
               </button>
 
-              {packageBuilderExpanded && (
+              {packageBuilderExpanded && !sidebarCollapsed && (
                 <div className="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-4">
-                  <Link 
+                  <Link
                     to={createPageUrl('PackageBuilder')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
                       currentPageName === 'PackageBuilder'
@@ -316,7 +345,7 @@ export default function Layout({ children, currentPageName }) {
                     Build from Scratch
                   </Link>
 
-                  <Link 
+                  <Link
                     to={createPageUrl('MyPackages')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
                       currentPageName === 'MyPackages'
@@ -359,23 +388,24 @@ export default function Layout({ children, currentPageName }) {
 
             <div>
               <button
-                onClick={() => setContractsExpanded(!contractsExpanded)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+                onClick={() => !sidebarCollapsed && setContractsExpanded(!contractsExpanded)}
+                className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'} py-3 rounded-xl font-medium text-sm transition-all ${
                   ['Contracts', 'ContractTemplates'].includes(currentPageName)
                     ? 'text-[#ff0044] bg-red-50 font-medium'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
+                title={sidebarCollapsed ? 'Contracts' : undefined}
               >
-                <div className="flex items-center gap-3">
-                  <FileSignature className="w-5 h-5" />
-                  Contracts
+                <div className={`flex items-center ${sidebarCollapsed ? '' : 'gap-3'}`}>
+                  <FileSignature className="w-5 h-5 flex-shrink-0" />
+                  {!sidebarCollapsed && 'Contracts'}
                 </div>
-                {contractsExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {!sidebarCollapsed && (contractsExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
               </button>
 
-              {contractsExpanded && (
+              {contractsExpanded && !sidebarCollapsed && (
                 <div className="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-4">
-                  <Link 
+                  <Link
                     to={createPageUrl('Contracts')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
                       currentPageName === 'Contracts'
@@ -387,7 +417,7 @@ export default function Layout({ children, currentPageName }) {
                     My Contracts
                   </Link>
 
-                  <Link 
+                  <Link
                     to={createPageUrl('ContractTemplates')}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
                       currentPageName === 'ContractTemplates'
@@ -432,9 +462,14 @@ export default function Layout({ children, currentPageName }) {
           </div>
 
           <div className="space-y-1 border-t border-gray-100 pt-2 pb-2">
+            {!sidebarCollapsed && (
+              <div className="px-4 pb-1">
+                <span className="text-[10px] font-medium text-gray-400 border border-gray-200 px-1.5 py-0.5 rounded">BETA</span>
+              </div>
+            )}
             <Link
               to={createPageUrl('Settings')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+              className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-xl font-medium text-sm transition-all ${
                 currentPageName === 'Settings'
                   ? 'text-white shadow-lg'
                   : 'text-gray-600 hover:bg-gray-50'
@@ -442,15 +477,16 @@ export default function Layout({ children, currentPageName }) {
               style={currentPageName === 'Settings' ? {
                 background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)'
               } : {}}
+              title={sidebarCollapsed ? 'Settings' : undefined}
             >
-              <Settings className="w-5 h-5" />
-              Settings
+              <Settings className="w-5 h-5 flex-shrink-0" />
+              {!sidebarCollapsed && 'Settings'}
             </Link>
 
             {isAdmin && (
               <Link
                 to={createPageUrl('HelpRequests')}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+                className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-xl font-medium text-sm transition-all ${
                   currentPageName === 'HelpRequests'
                     ? 'text-white shadow-lg'
                     : 'text-gray-600 hover:bg-gray-50'
@@ -458,9 +494,10 @@ export default function Layout({ children, currentPageName }) {
                 style={currentPageName === 'HelpRequests' ? {
                   background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)'
                 } : {}}
+                title={sidebarCollapsed ? 'Help Requests' : undefined}
               >
-                <MessageSquare className="w-5 h-5" />
-                Help Requests
+                <MessageSquare className="w-5 h-5 flex-shrink-0" />
+                {!sidebarCollapsed && 'Help Requests'}
               </Link>
             )}
           </div>
