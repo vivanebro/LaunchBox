@@ -48,6 +48,9 @@ const TABLE_COLUMNS = {
     'manual_status',
     'manual_status_updated_at',
     'folder_id',
+    'custom_offer_tiers',
+    'addons',
+    'addons_label',
   ]),
   folders: new Set([
     'id', 'name', 'parent_id', 'created_by', 'is_example', 'created_date', 'updated_date',

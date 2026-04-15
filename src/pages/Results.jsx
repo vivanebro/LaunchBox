@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -277,6 +278,7 @@ export default function Results() {
   const [exportingPdf, setExportingPdf] = React.useState(false);
   const [showExportDropdown, setShowExportDropdown] = React.useState(false);
   const [showSettingsSidebar, setShowSettingsSidebar] = React.useState(false);
+  const [selectedAddonIds, setSelectedAddonIds] = useState([]);
   const [discountActive, setDiscountActive] = React.useState(false);
   const [showDiscountConfig, setShowDiscountConfig] = React.useState(false);
   const [showPdfSubmenu, setShowPdfSubmenu] = React.useState(false);
@@ -527,8 +529,8 @@ export default function Results() {
         if (!loadedConfig.headline) {
           loadedConfig.headline = 'Simple, transparent pricing';
         }
-        if (!loadedConfig.sub_headline) {
-          loadedConfig.sub_headline = 'No surprise fees.';
+        if (!loadedConfig.sub_headline || loadedConfig.sub_headline === 'No surprise fees.') {
+          loadedConfig.sub_headline = 'No surprises. No hidden fees.';
         }
         if ((!loadedConfig.duration_min || !loadedConfig.duration_max || !loadedConfig.duration_unit) && loadedConfig.project_duration) {
           const match = loadedConfig.project_duration.match(/(\d+)(?:-(\d+))?\s*(\w+)/);
@@ -626,15 +628,23 @@ export default function Results() {
               starter: oldNames.starter || 'Starter',
               growth: oldNames.growth || 'Growth',
               premium: oldNames.premium || 'Premium',
-              elite: oldNames.elite || 'Elite'
+              elite: oldNames.elite || 'Enterprise'
             },
             retainer: {
               starter: oldNames.starter || 'Starter',
               growth: oldNames.growth || 'Growth',
               premium: oldNames.premium || 'Premium',
-              elite: oldNames.elite || 'Elite'
+              elite: oldNames.elite || 'Enterprise'
             }
           };
+        }
+
+        // One-time migration: old default 'Elite' → 'Enterprise'
+        if (loadedConfig.package_names?.onetime?.elite === 'Elite') {
+          loadedConfig.package_names.onetime.elite = 'Enterprise';
+        }
+        if (loadedConfig.package_names?.retainer?.elite === 'Elite') {
+          loadedConfig.package_names.retainer.elite = 'Enterprise';
         }
 
         // Initialize active packages if not set
@@ -668,8 +678,8 @@ export default function Results() {
         if (loadedConfig.package_names) {
           if (!loadedConfig.package_names.onetime) loadedConfig.package_names.onetime = {};
           if (!loadedConfig.package_names.retainer) loadedConfig.package_names.retainer = {};
-          if (!loadedConfig.package_names.onetime.elite) loadedConfig.package_names.onetime.elite = 'Elite';
-          if (!loadedConfig.package_names.retainer.elite) loadedConfig.package_names.retainer.elite = 'Elite';
+          if (!loadedConfig.package_names.onetime.elite) loadedConfig.package_names.onetime.elite = 'Enterprise';
+          if (!loadedConfig.package_names.retainer.elite) loadedConfig.package_names.retainer.elite = 'Enterprise';
         }
 
         // Initialize elite descriptions
@@ -768,7 +778,7 @@ export default function Results() {
         setConfig({
             business_name: 'My Studio',
             headline: 'Simple, transparent pricing',
-            sub_headline: 'No surprise fees.',
+            sub_headline: 'No surprises. No hidden fees.',
             package_descriptions: {
               onetime: {
                 starter: 'For individuals just starting out who need essential features',
@@ -1435,7 +1445,9 @@ export default function Results() {
     const currentDeliverables = c.package_data[modeKey][tier].deliverables;
     if (index < currentDeliverables.length) {
       const updatedDeliverables = [...currentDeliverables];
-      updatedDeliverables[index] = newValue;
+      const existing = currentDeliverables[index];
+      const existingTooltip = (existing && typeof existing === 'object') ? existing.tooltip : undefined;
+      updatedDeliverables[index] = existingTooltip ? { type: newValue, tooltip: existingTooltip } : newValue;
       const updatedPackageData = {
         ...c.package_data,
         [modeKey]: {
@@ -1489,6 +1501,98 @@ export default function Results() {
     updateConfig('package_data', updatedPackageData);
   };
 
+  const getTooltip = (item) => {
+    if (!item || typeof item === 'string') return '';
+    return item.tooltip || '';
+  };
+
+  const getItemText = (item) => {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    return item.type || item.text || '';
+  };
+
+  const getExampleUrl = (tier) => {
+    const modeKey = getCurrentModeKey();
+    return config.button_links?.[modeKey]?.[`${tier}_example_url`] || '';
+  };
+  const getExampleLabel = (tier) => {
+    const modeKey = getCurrentModeKey();
+    return config.button_links?.[modeKey]?.[`${tier}_example_label`] || '';
+  };
+  const MAX_ADDONS = 3;
+  const getAddons = () => Array.isArray(config?.addons) ? config.addons : [];
+  const addAddon = () => {
+    const list = getAddons();
+    if (list.length >= MAX_ADDONS) return;
+    const newAddon = { id: `addon_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, name: 'New add-on', price: 0, tooltip: '' };
+    updateConfig('addons', [...list, newAddon]);
+  };
+  const updateAddon = (id, patch) => {
+    const list = getAddons();
+    updateConfig('addons', list.map(a => a.id === id ? { ...a, ...patch } : a));
+  };
+  const deleteAddon = (id) => {
+    const list = getAddons();
+    updateConfig('addons', list.filter(a => a.id !== id));
+  };
+
+  const updateExampleLink = (tier, url, label) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const existingMode = c.button_links?.[modeKey] || {};
+    const next = { ...existingMode };
+    const cleanUrl = (url || '').trim();
+    if (cleanUrl) next[`${tier}_example_url`] = cleanUrl;
+    else delete next[`${tier}_example_url`];
+    const cleanLabel = (label || '').trim();
+    if (cleanLabel) next[`${tier}_example_label`] = cleanLabel;
+    else delete next[`${tier}_example_label`];
+    updateConfig('button_links', { ...(c.button_links || {}), [modeKey]: next });
+  };
+
+  const updateDeliverableTooltip = (tier, index, tooltipText) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const currentDeliverables = c.package_data?.[modeKey]?.[tier]?.deliverables || [];
+    if (index < 0 || index >= currentDeliverables.length) return;
+    const current = currentDeliverables[index];
+    const asObj = typeof current === 'string' ? { type: current } : { ...current };
+    const trimmed = (tooltipText || '').trim();
+    if (trimmed) asObj.tooltip = trimmed;
+    else delete asObj.tooltip;
+    const updatedDeliverables = [...currentDeliverables];
+    updatedDeliverables[index] = asObj;
+    updateConfig('package_data', {
+      ...c.package_data,
+      [modeKey]: {
+        ...c.package_data[modeKey],
+        [tier]: { ...c.package_data[modeKey][tier], deliverables: updatedDeliverables }
+      }
+    });
+  };
+
+  const updateBonusTooltip = (tier, index, tooltipText) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const currentBonuses = c.package_data?.[modeKey]?.[tier]?.bonuses || [];
+    if (index < 0 || index >= currentBonuses.length) return;
+    const current = currentBonuses[index];
+    const asObj = typeof current === 'string' ? { text: current } : { ...current };
+    const trimmed = (tooltipText || '').trim();
+    if (trimmed) asObj.tooltip = trimmed;
+    else delete asObj.tooltip;
+    const updatedBonuses = [...currentBonuses];
+    updatedBonuses[index] = asObj;
+    updateConfig('package_data', {
+      ...c.package_data,
+      [modeKey]: {
+        ...c.package_data[modeKey],
+        [tier]: { ...c.package_data[modeKey][tier], bonuses: updatedBonuses }
+      }
+    });
+  };
+
   const addBonus = (tier) => {
     const newBonus = 'New bonus';
     const modeKey = getCurrentModeKey();
@@ -1512,7 +1616,9 @@ export default function Results() {
     const currentBonuses = c.package_data[modeKey][tier].bonuses;
     if (index < currentBonuses.length) {
       const updatedBonuses = [...currentBonuses];
-      updatedBonuses[index] = value;
+      const existing = currentBonuses[index];
+      const existingTooltip = (existing && typeof existing === 'object') ? existing.tooltip : undefined;
+      updatedBonuses[index] = existingTooltip ? { text: value, tooltip: existingTooltip } : value;
       const updatedPackageData = {
         ...c.package_data,
         [modeKey]: {
@@ -1650,13 +1756,13 @@ export default function Results() {
           starter: latestConfig.package_names?.onetime?.starter || 'Starter',
           growth: latestConfig.package_names?.onetime?.growth || 'Growth',
           premium: latestConfig.package_names?.onetime?.premium || 'Premium',
-          elite: latestConfig.package_names?.onetime?.elite || 'Elite'
+          elite: latestConfig.package_names?.onetime?.elite || 'Enterprise'
         },
         retainer: {
           starter: latestConfig.package_names?.retainer?.starter || 'Starter',
           growth: latestConfig.package_names?.retainer?.growth || 'Growth',
           premium: latestConfig.package_names?.retainer?.premium || 'Premium',
-          elite: latestConfig.package_names?.retainer?.elite || 'Elite'
+          elite: latestConfig.package_names?.retainer?.elite || 'Enterprise'
         }
       };
 
@@ -1932,7 +2038,7 @@ export default function Results() {
         duration: config.package_durations?.[modeKey]?.premium || getDurationForTier('premium')
       },
       elite: {
-        name: config.package_names?.[modeKey]?.elite || 'Elite',
+        name: config.package_names?.[modeKey]?.elite || 'Enterprise',
         price: pricingMode === 'one-time' ? (config.price_elite || 0) : (config.price_elite_retainer || 0),
         description: getPackageDescription('elite', 'For enterprise clients that need the ultimate solution'),
         duration: config.package_durations?.[modeKey]?.elite || getDurationForTier('elite')
@@ -2006,6 +2112,21 @@ export default function Results() {
         }
       }
       updates.cost_data = newCostData;
+    }
+
+    // Remove stale example link keys for deleted package
+    const buttonLinks = currentConfig.button_links;
+    if (buttonLinks && typeof buttonLinks === 'object') {
+      const newButtonLinks = { ...buttonLinks };
+      for (const key of ['onetime', 'retainer']) {
+        if (newButtonLinks[key] && typeof newButtonLinks[key] === 'object') {
+          const modeCopy = { ...newButtonLinks[key] };
+          delete modeCopy[`${tierToDelete}_example_url`];
+          delete modeCopy[`${tierToDelete}_example_label`];
+          newButtonLinks[key] = modeCopy;
+        }
+      }
+      updates.button_links = newButtonLinks;
     }
 
     updateConfigMultiple(updates);
@@ -2297,7 +2418,453 @@ export default function Results() {
     );
   };
 
-  const EditableDeliverableItem = ({ deliverable, onSave, onDuplicate, onDelete, darkMode, brandColor, dragHandleProps }) => {
+  const TooltipEditor = ({ tooltip, onSave, darkMode, brandColor }) => {
+    const [open, setOpen] = useState(false);
+    const [val, setVal] = useState(tooltip || '');
+    const ref = useRef(null);
+    useEffect(() => { setVal(tooltip || ''); }, [tooltip]);
+    useEffect(() => {
+      if (!open) return;
+      const onOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) { onSave(val); setOpen(false); } };
+      document.addEventListener('mousedown', onOutside);
+      return () => document.removeEventListener('mousedown', onOutside);
+    }, [open, val]);
+    const hasTip = !!(tooltip && tooltip.trim());
+    return (
+      <div className="relative" ref={ref}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-5 w-5 transition-opacity ${hasTip ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} ${darkMode ? 'text-white/70 hover:text-white hover:bg-white/10' : 'hover:bg-gray-100'}`}
+          style={hasTip && !darkMode ? { color: brandColor } : undefined}
+          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+          title={hasTip ? 'Edit tooltip' : 'Add tooltip'}
+        >
+          <AlertCircle className="w-3 h-3" />
+        </Button>
+        {open && (
+          <div
+            className="absolute right-0 top-6 z-50 w-64 bg-white rounded-lg shadow-xl border border-gray-200 p-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <textarea
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setVal(tooltip || ''); setOpen(false); } }}
+              className="w-full text-sm text-gray-800 border border-gray-200 rounded p-2 focus:outline-none focus:ring-1"
+              style={{ borderColor: brandColor }}
+              rows={3}
+              placeholder="Explain this item to your client..."
+              autoFocus
+            />
+            <div className="flex items-center justify-between mt-2">
+              {hasTip ? (
+                <button
+                  type="button"
+                  onClick={() => { onSave(''); setOpen(false); }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  Remove
+                </button>
+              ) : <span />}
+              <button
+                type="button"
+                onClick={() => { onSave(val); setOpen(false); }}
+                className="text-xs font-semibold px-3 py-1 rounded text-white"
+                style={{ backgroundColor: brandColor }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const TooltipBadge = ({ tooltip, brandColor, darkMode }) => {
+    const [open, setOpen] = useState(false);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+    const btnRef = useRef(null);
+    const updateCoords = () => {
+      if (!btnRef.current) return;
+      const r = btnRef.current.getBoundingClientRect();
+      setCoords({ top: r.top + window.scrollY, left: r.left + r.width / 2 + window.scrollX });
+    };
+    useEffect(() => {
+      if (!open) return;
+      updateCoords();
+      window.addEventListener('scroll', updateCoords, true);
+      window.addEventListener('resize', updateCoords);
+      return () => {
+        window.removeEventListener('scroll', updateCoords, true);
+        window.removeEventListener('resize', updateCoords);
+      };
+    }, [open]);
+    if (!tooltip) return null;
+    return (
+      <span className="relative inline-flex items-center">
+        <button
+          type="button"
+          ref={btnRef}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); setOpen(v => !v); }}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
+          aria-label="More info"
+        >
+          <AlertCircle className="w-3.5 h-3.5" style={{ color: darkMode ? 'rgba(255,255,255,0.7)' : brandColor }} />
+        </button>
+        {open && typeof document !== 'undefined' && createPortal(
+          <div
+            role="tooltip"
+            style={{ position: 'absolute', top: coords.top - 8, left: clampHorizontal(coords.left - window.scrollX, 224) + window.scrollX, transform: 'translate(-50%, -100%)', pointerEvents: 'none', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '224px' }}
+            className={`z-[9999] px-3 py-2 rounded-lg shadow-xl text-xs leading-snug ${darkMode ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
+          >
+            {tooltip}
+          </div>,
+          document.body
+        )}
+      </span>
+    );
+  };
+
+  const clampHorizontal = (centerX, boxWidth, margin = 12) => {
+    const viewportW = window.innerWidth;
+    const sidebarW = showSettingsSidebar ? 320 : 0;
+    const minLeft = margin + boxWidth / 2;
+    const maxLeft = viewportW - sidebarW - margin - boxWidth / 2;
+    return Math.max(minLeft, Math.min(centerX, maxLeft));
+  };
+
+  const sanitizeExternalUrl = (u) => {
+    if (!u) return '';
+    const t = u.trim();
+    const lower = t.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) return t;
+    if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:') || lower.startsWith('file:')) return '';
+    return `https://${t}`;
+  };
+
+  const ExampleLinkButton = ({ tier, isEditor, darkMode, brandColor: pillAccentColor }) => {
+    const brandColor = pillAccentColor;
+    const popoverAccent = config?.brand_color || '#ff0044';
+    const url = getExampleUrl(tier);
+    const label = getExampleLabel(tier) || 'See examples';
+    const [showEditor, setShowEditor] = useState(false);
+    const [showHint, setShowHint] = useState(false);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+    const [editUrl, setEditUrl] = useState(url);
+    const [editLabel, setEditLabel] = useState(getExampleLabel(tier));
+    const btnRef = useRef(null);
+    const editorRef = useRef(null);
+    const hintBoxW = 224;
+    const editorBoxW = 288;
+
+    useEffect(() => { setEditUrl(url); setEditLabel(getExampleLabel(tier)); }, [url, tier]);
+
+    const updateCoords = () => {
+      if (!btnRef.current) return;
+      const r = btnRef.current.getBoundingClientRect();
+      setCoords({ top: r.top + window.scrollY, left: r.left + r.width / 2 + window.scrollX });
+    };
+    useEffect(() => {
+      if (!showHint && !showEditor) return;
+      updateCoords();
+      window.addEventListener('scroll', updateCoords, true);
+      window.addEventListener('resize', updateCoords);
+      return () => {
+        window.removeEventListener('scroll', updateCoords, true);
+        window.removeEventListener('resize', updateCoords);
+      };
+    }, [showHint, showEditor]);
+
+    useEffect(() => {
+      if (!showEditor) return;
+      const onOutside = (e) => { if (editorRef.current && !editorRef.current.contains(e.target) && !btnRef.current.contains(e.target)) { setShowEditor(false); } };
+      const onKey = (e) => { if (e.key === 'Escape') { setShowEditor(false); } };
+      document.addEventListener('mousedown', onOutside);
+      document.addEventListener('keydown', onKey);
+      return () => {
+        document.removeEventListener('mousedown', onOutside);
+        document.removeEventListener('keydown', onKey);
+      };
+    }, [showEditor]);
+
+    const handleSave = () => {
+      updateExampleLink(tier, editUrl, editLabel);
+      setShowEditor(false);
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
+    };
+
+    if (!isEditor && !url) return null;
+
+    const arrowColor = darkMode ? 'rgba(255,255,255,0.9)' : brandColor;
+    const hasUrl = !!url;
+    const hintLeft = clampHorizontal(coords.left - window.scrollX, hintBoxW) + window.scrollX;
+    const editorLeft = clampHorizontal(coords.left - window.scrollX, editorBoxW) + window.scrollX;
+
+    const arrowEl = (
+      <button
+        type="button"
+        ref={btnRef}
+        onMouseEnter={() => hasUrl && setShowHint(true)}
+        onMouseLeave={() => setShowHint(false)}
+        onFocus={() => hasUrl && setShowHint(true)}
+        onBlur={() => setShowHint(false)}
+        onClick={(e) => {
+          e.stopPropagation(); e.preventDefault();
+          if (isEditor) { setShowEditor(true); setShowHint(false); }
+          else if (hasUrl) {
+            const safe = sanitizeExternalUrl(url);
+            if (safe) window.open(safe, '_blank', 'noopener,noreferrer');
+          }
+        }}
+        className={`ml-1 inline-flex items-center justify-center w-7 h-7 -my-1 rounded-full cursor-pointer transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-1 ${hasUrl ? 'opacity-70 group-hover/package:opacity-100' : 'opacity-0 group-hover/package:opacity-70'}`}
+        style={{ WebkitTapHighlightColor: 'transparent' }}
+        aria-label={isEditor ? (hasUrl ? 'Edit example link' : 'Add example link') : label}
+      >
+        {hasUrl ? (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={arrowColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17l10-10M9 7h8v8"/></svg>
+        ) : (
+          <LinkIcon className="w-3.5 h-3.5" style={{ color: arrowColor }} />
+        )}
+      </button>
+    );
+
+    return (
+      <>
+        {arrowEl}
+        {showHint && hasUrl && typeof document !== 'undefined' && createPortal(
+          <div
+            role="tooltip"
+            style={{ position: 'absolute', top: coords.top - 8, left: hintLeft, transform: 'translate(-50%, -100%)', pointerEvents: 'none', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: `${hintBoxW}px` }}
+            className={`z-[9999] px-3 py-1.5 rounded-lg shadow-xl text-xs leading-snug ${darkMode ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
+          >
+            {label}
+          </div>,
+          document.body
+        )}
+        {showEditor && isEditor && typeof document !== 'undefined' && createPortal(
+          <div
+            ref={editorRef}
+            style={{ position: 'absolute', top: coords.top + 14, left: editorLeft, transform: 'translate(-50%, 0)', width: `${editorBoxW}px` }}
+            className="z-[9999] bg-white rounded-lg shadow-2xl border border-gray-200 p-3"
+            onKeyDown={handleKeyDown}
+          >
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Example URL</label>
+            <input
+              type="text"
+              value={editUrl}
+              onChange={(e) => setEditUrl(e.target.value)}
+              placeholder="https://your-portfolio.com"
+              className="w-full text-sm border border-gray-200 rounded p-2 mb-3 focus:outline-none focus:ring-1 text-gray-900"
+              style={{ borderColor: popoverAccent }}
+              autoFocus
+            />
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Label (optional)</label>
+            <input
+              type="text"
+              value={editLabel}
+              onChange={(e) => setEditLabel(e.target.value)}
+              placeholder="See examples"
+              className="w-full text-sm border border-gray-200 rounded p-2 mb-3 focus:outline-none focus:ring-1 text-gray-900"
+              style={{ borderColor: popoverAccent }}
+            />
+            <div className="flex items-center justify-between">
+              {hasUrl ? (
+                <button type="button" onClick={() => { updateExampleLink(tier, '', ''); setShowEditor(false); }} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+              ) : <span />}
+              <button type="button" onClick={handleSave} className="text-xs font-semibold px-3 py-1 rounded text-white" style={{ backgroundColor: popoverAccent }}>Save</button>
+            </div>
+          </div>,
+          document.body
+        )}
+      </>
+    );
+  };
+
+  const AddonsSection = ({ isEditor }) => {
+    const addons = getAddons();
+    const addonsLabel = config?.addons_label || 'Add-ons';
+    const canAdd = addons.length < MAX_ADDONS;
+    const hasAddons = addons.length > 0;
+
+    if (!isEditor && !hasAddons) return null;
+
+    const selectedSet = new Set(selectedAddonIds);
+    const extrasTotal = addons.reduce((sum, a) => selectedSet.has(a.id) ? sum + (Number(a.price) || 0) : sum, 0);
+    const [pulse, setPulse] = [null, null];
+    const [totalPulse, setTotalPulse] = useState(false);
+
+    const toggleAddon = (id) => {
+      setSelectedAddonIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+      setTotalPulse(true);
+      setTimeout(() => setTotalPulse(false), 350);
+    };
+
+    const darkerBrand = darkerBrandColor;
+
+    return (
+      <div className="max-w-3xl mx-auto mb-12 mt-8 px-4">
+        {/* Connective divider */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: brandColor }}>+ Optional extras</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        {/* Title + subtitle */}
+        <div className="text-center mb-6">
+          <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
+            {isEditor ? (
+              <EditableText
+                value={addonsLabel}
+                onSave={(v) => updateConfig('addons_label', v)}
+                className="inline text-2xl md:text-3xl font-bold"
+                placeholder="Add-ons"
+                brandColor={brandColor}
+              />
+            ) : addonsLabel}
+          </h3>
+          {hasAddons && (
+            <p className="text-sm text-gray-500">Applies to any package you choose.</p>
+          )}
+        </div>
+
+        {/* Empty state for editor */}
+        {isEditor && !hasAddons && (
+          <div className="rounded-2xl border-2 border-dashed p-6 text-center" style={{ borderColor: `${brandColor}40` }}>
+            <p className="text-sm text-gray-600 mb-3">
+              Offer extras clients can toggle on — like rush delivery, extra revisions, or upgrades.
+            </p>
+            <button
+              type="button"
+              onClick={addAddon}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all"
+              style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrand} 100%)` }}
+            >
+              <Plus className="w-4 h-4" />
+              Add your first add-on
+            </button>
+          </div>
+        )}
+
+        {/* Addon rows */}
+        {hasAddons && (
+          <div className="space-y-3">
+            {addons.map((addon) => {
+              const isChecked = selectedSet.has(addon.id);
+              const price = Number(addon.price) || 0;
+              return (
+                <div
+                  key={addon.id}
+                  className={`relative flex items-center gap-3 rounded-2xl bg-white border transition-all group/addon ${isChecked ? 'shadow-md' : 'shadow-sm hover:shadow-md border-gray-200'} p-2 pl-3`}
+                  style={isChecked ? { borderColor: brandColor, borderWidth: '2px' } : undefined}
+                >
+                  {/* Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => !isEditor && toggleAddon(addon.id)}
+                    disabled={isEditor}
+                    className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${isChecked ? '' : 'bg-gray-100 hover:bg-gray-200'} ${isEditor ? 'cursor-default' : 'cursor-pointer'}`}
+                    style={isChecked ? { background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrand} 100%)` } : undefined}
+                    aria-label={isChecked ? `Remove ${addon.name}` : `Add ${addon.name}`}
+                  >
+                    {isChecked ? <Check className="w-5 h-5 text-white" /> : <Plus className="w-5 h-5 text-gray-400" />}
+                  </button>
+
+                  {/* Name */}
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <div className="text-sm md:text-base font-semibold text-gray-900 truncate">
+                      {isEditor ? (
+                        <EditableText
+                          value={addon.name}
+                          onSave={(v) => updateAddon(addon.id, { name: v })}
+                          className="inline text-sm md:text-base font-semibold"
+                          placeholder="Add-on name"
+                          brandColor={brandColor}
+                        />
+                      ) : addon.name}
+                    </div>
+                    <TooltipBadge tooltip={addon.tooltip} brandColor={brandColor} darkMode={false} />
+                  </div>
+
+                  {/* Price */}
+                  <div className="flex-shrink-0 text-right">
+                    <span className={`text-base md:text-lg font-bold transition-all ${isChecked ? '' : 'text-gray-700'}`} style={isChecked ? { color: brandColor } : undefined}>
+                      {isChecked ? '+ ' : ''}
+                      {isEditor ? (
+                        <EditablePrice
+                          value={price}
+                          onSave={(v) => updateAddon(addon.id, { price: v })}
+                          className="inline text-base md:text-lg font-bold"
+                          brandColor={brandColor}
+                        />
+                      ) : (
+                        <>{currencySymbol}{price.toLocaleString()}</>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Editor controls */}
+                  {isEditor && (
+                    <div className="flex-shrink-0 flex items-center gap-1 pr-1">
+                      <TooltipEditor
+                        tooltip={addon.tooltip}
+                        onSave={(t) => updateAddon(addon.id, { tooltip: t })}
+                        darkMode={false}
+                        brandColor={brandColor}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 opacity-0 group-hover/addon:opacity-100 transition-opacity text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => deleteAddon(addon.id)}
+                        title="Delete add-on"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Add more button */}
+            {isEditor && canAdd && (
+              <button
+                type="button"
+                onClick={addAddon}
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border-2 border-dashed text-sm font-medium hover:bg-gray-50 transition-colors"
+                style={{ borderColor: `${brandColor}40`, color: brandColor }}
+              >
+                <Plus className="w-4 h-4" />
+                Add another add-on ({addons.length}/{MAX_ADDONS})
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Running total */}
+        {!isEditor && extrasTotal > 0 && (
+          <div className="mt-5 flex justify-center">
+            <div
+              className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-white font-bold shadow-lg transition-transform ${totalPulse ? 'scale-110' : 'scale-100'}`}
+              style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrand} 100%)` }}
+            >
+              <span className="text-sm opacity-90">Adding to your deal</span>
+              <span className="text-base">+{currencySymbol}{extrasTotal.toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const EditableDeliverableItem = ({ deliverable, onSave, onDuplicate, onDelete, onSaveTooltip, darkMode, brandColor, dragHandleProps }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(typeof deliverable === 'string' ? deliverable : deliverable.type || '');
     const [isHovered, setIsHovered] = useState(false);
@@ -2396,7 +2963,10 @@ export default function Results() {
           <GripVertical className="w-4 h-4 text-gray-400" />
         </div>
         <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${getIconClasses()}`} style={getIconInlineStyle()} />
-        <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-700'}`}>{displayText}</span>
+        <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-700'}`}>
+          {displayText}
+          <TooltipBadge tooltip={getTooltip(deliverable)} brandColor={brandColor} darkMode={darkMode} />
+        </span>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -2410,6 +2980,12 @@ export default function Results() {
           >
             <Copy className="w-3 h-3" />
           </Button>
+          <TooltipEditor
+            tooltip={getTooltip(deliverable)}
+            onSave={(t) => onSaveTooltip && onSaveTooltip(t)}
+            darkMode={darkMode}
+            brandColor={brandColor}
+          />
           <Button
             variant="ghost"
             size="icon"
@@ -2426,7 +3002,7 @@ export default function Results() {
     );
   };
 
-  const EditableListItem = ({ value, onSave, onDelete, icon: Icon, iconClassName, darkMode, brandColor, dragHandleProps }) => {
+  const EditableListItem = ({ value, onSave, onDelete, onSaveTooltip, tooltip, icon: Icon, iconClassName, darkMode, brandColor, dragHandleProps }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(value);
     const [isHovered, setIsHovered] = useState(false);
@@ -2526,9 +3102,20 @@ export default function Results() {
           <GripVertical className="w-4 h-4 text-gray-400" />
         </div>
         <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${getIconClasses()}`} style={getIconInlineStyle()} />
-        <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-700'}`}>{value}</span>
+        <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-700'}`}>
+          {value}
+          <TooltipBadge tooltip={tooltip} brandColor={brandColor} darkMode={darkMode} />
+        </span>
         <div className="flex items-center gap-1">
           <Edit2 className={`w-3 h-3 opacity-0 group-hover:opacity-100 mt-0.5 transition-opacity ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
+          {onSaveTooltip && (
+            <TooltipEditor
+              tooltip={tooltip}
+              onSave={(t) => onSaveTooltip(t)}
+              darkMode={darkMode}
+              brandColor={brandColor}
+            />
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -2680,7 +3267,7 @@ export default function Results() {
             </span>
           </div>
         ) : (
-          <div className="absolute -bottom-5 left-0 right-0 text-center opacity-0 group-hover/button:opacity-100 transition-opacity">
+          <div className="absolute top-full mt-2 left-0 right-0 text-center opacity-0 group-hover/button:opacity-100 transition-opacity pointer-events-none">
             <span className="text-xs text-gray-400">Choose what happens when clients click this</span>
           </div>
         )}
@@ -2743,19 +3330,19 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`flex justify-center gap-5 items-start ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-5 ${packages.length === 4 ? 'grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
         const originalPrice = config[originalPriceKey];
 
         return (
-          <div key={index} className="flex-1 overflow-visible" style={{ zIndex: pkg.popular ? 10 : 1 }}>
+          <div key={index} className="overflow-visible flex flex-col h-full" style={{ zIndex: pkg.popular ? 10 : 1 }}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className={`relative bg-white rounded-3xl border-2 flex flex-col group/package transition-all duration-[400ms] ease-out ${
+            className={`relative bg-white rounded-3xl border-2 flex flex-col flex-grow group/package transition-all duration-[400ms] ease-out ${
               pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
             } p-8`}
             style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: '46px 32px' } : {}}
@@ -2773,35 +3360,36 @@ export default function Results() {
               </button>
             )}
             {pkg.isCustomOffer ? (
-              <div className="flex-grow flex flex-col items-center justify-center py-12">
-                <div className="text-center mb-8">
-                  <div 
-                    className={`inline-block px-8 py-3 rounded-full text-white font-bold shadow-md mb-6 text-2xl`}
-                    style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
-                  >
-                    <EditableText
-                      value={pkg.name}
-                      onSave={(newValue) => updatePackageName(tierName, newValue)}
-                      className={`inline font-bold text-2xl`}
-                      placeholder="Custom Offer"
-                      darkMode={true}
-                      brandColor="#fff"
-                    />
-                  </div>
-                  <h3 className={`font-bold text-gray-900 mb-4 text-3xl`}>
+              <div className="flex-grow flex flex-col items-center">
+                <div
+                  className={`inline-flex items-center px-6 py-2 rounded-full text-white font-bold shadow-md mb-6 text-lg`}
+                  style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                >
+                  <EditableText
+                    value={pkg.name}
+                    onSave={(newValue) => updatePackageName(tierName, newValue)}
+                    className={`inline font-bold text-lg`}
+                    placeholder="Custom Offer"
+                    darkMode={true}
+                    brandColor="#fff"
+                  />
+                  <ExampleLinkButton tier={tierName} isEditor={true} darkMode={true} brandColor="#ffffff" />
+                </div>
+                <div className="flex-grow flex flex-col justify-center text-center">
+                  <h3 className={`font-bold text-gray-900 mb-3 text-xl`}>
                     <EditableText
                       value={config.package_descriptions?.[modeKey]?.[tierName] || 'Need Something Different?'}
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                      className={`inline font-bold text-3xl`}
+                      className={`inline font-bold text-xl`}
                       placeholder="Need Something Different?"
                       brandColor={brandColor}
                     />
                   </h3>
-                  <p className="text-gray-600 text-base mb-8 max-w-xs mx-auto">
+                  <p className="text-gray-600 text-sm mb-8 max-w-xs mx-auto">
                     <EditableText
                       value={config.package_descriptions?.[modeKey]?.[tierName + '_subtitle'] || "Let's create a custom package tailored specifically to your needs"}
                       onSave={(newValue) => updatePackageDescription(tierName + '_subtitle', newValue)}
-                      className="inline text-base"
+                      className="inline text-sm"
                       multiline={true}
                       placeholder="Let's create a custom package tailored specifically to your needs"
                       brandColor={brandColor}
@@ -2809,7 +3397,7 @@ export default function Results() {
                   </p>
                 </div>
                 {showPackageButtonsInEditMode && (
-                  <div className="w-full">
+                  <div className="w-full mt-auto">
                     <EditableButton
                       tier={tierName}
                       brandColor={brandColor}
@@ -2862,7 +3450,7 @@ export default function Results() {
               <div className="">
                 <div className="text-center mb-1">
                   <div
-                    className={`inline-block px-6 py-2 rounded-full text-white font-bold shadow-md text-lg`}
+                    className={`inline-flex items-center px-6 py-2 rounded-full text-white font-bold shadow-md text-lg`}
                     style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                   >
                     <EditableText
@@ -2873,6 +3461,7 @@ export default function Results() {
                       darkMode={true}
                       brandColor="#fff"
                     />
+                    <ExampleLinkButton tier={tierName} isEditor={true} darkMode={true} brandColor="#ffffff" />
                   </div>
                 </div>
 
@@ -3095,6 +3684,7 @@ export default function Results() {
                                    onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
                                    onDuplicate={() => duplicateDeliverable(tierName, idx)}
                                    onDelete={() => deleteDeliverable(tierName, idx)}
+                                   onSaveTooltip={(t) => updateDeliverableTooltip(tierName, idx, t)}
                                    darkMode={false}
                                    brandColor={brandColor}
                                    dragHandleProps={provided.dragHandleProps}
@@ -3169,9 +3759,11 @@ export default function Results() {
                             {(provided) => (
                               <div ref={provided.innerRef} {...provided.draggableProps}>
                                 <EditableListItem
-                                  value={bonus}
+                                  value={getItemText(bonus)}
+                                  tooltip={getTooltip(bonus)}
                                   onSave={(newValue) => updateBonus(tierName, idx, newValue)}
                                   onDelete={() => deleteBonus(tierName, idx)}
+                                  onSaveTooltip={(t) => updateBonusTooltip(tierName, idx, t)}
                                   icon={Plus}
                                   iconClassName="text-green-500"
                                   brandColor={brandColor}
@@ -3242,19 +3834,19 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`flex justify-center gap-5 items-start ${packages.length === 4 ? 'md:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-5 ${packages.length === 4 ? 'grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
         const originalPrice = config[originalPriceKey];
 
         return (
-          <div key={index} className="flex-1 overflow-visible" style={{ zIndex: pkg.popular ? 10 : 1 }}>
+          <div key={index} className="overflow-visible flex flex-col h-full" style={{ zIndex: pkg.popular ? 10 : 1 }}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className={`relative rounded-3xl text-white shadow-2xl flex flex-col group/package transition-all duration-[400ms] ease-out ${
+            className={`relative rounded-3xl text-white shadow-2xl flex flex-col flex-grow group/package transition-all duration-[400ms] ease-out ${
               pkg.popular
                 ? ''
                 : 'bg-gradient-to-br from-gray-800 to-gray-900'
@@ -3274,35 +3866,36 @@ export default function Results() {
               </button>
             )}
             {pkg.isCustomOffer ? (
-              <div className="flex-grow flex flex-col items-center justify-center py-12">
-                <div className="text-center mb-8">
-                  <div 
-                    className={`inline-block px-8 py-3 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md mb-6 text-2xl`}
-                  >
-                    <EditableText
-                      value={pkg.name}
-                      onSave={(newValue) => updatePackageName(tierName, newValue)}
-                      className={`inline font-bold text-2xl`}
-                      placeholder="Custom Offer"
-                      darkMode={true}
-                      brandColor="#fff"
-                    />
-                  </div>
-                  <h3 className={`font-bold text-white mb-4 text-3xl`}>
+              <div className="flex-grow flex flex-col items-center">
+                <div
+                  className={`inline-flex items-center px-6 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md mb-6 text-lg`}
+                >
+                  <EditableText
+                    value={pkg.name}
+                    onSave={(newValue) => updatePackageName(tierName, newValue)}
+                    className={`inline font-bold text-lg`}
+                    placeholder="Custom Offer"
+                    darkMode={true}
+                    brandColor="#fff"
+                  />
+                  <ExampleLinkButton tier={tierName} isEditor={true} darkMode={true} brandColor="#ffffff" />
+                </div>
+                <div className="flex-grow flex flex-col justify-center text-center">
+                  <h3 className={`font-bold text-white mb-3 text-xl`}>
                     <EditableText
                       value={config.package_descriptions?.[modeKey]?.[tierName] || 'Need Something Different?'}
                       onSave={(newValue) => updatePackageDescription(tierName, newValue)}
-                      className={`inline font-bold text-3xl`}
+                      className={`inline font-bold text-xl`}
                       placeholder="Need Something Different?"
                       darkMode={true}
                       brandColor={brandColor}
                     />
                   </h3>
-                  <p className="text-white/80 text-base mb-8 max-w-xs mx-auto">
+                  <p className="text-white/80 text-sm mb-8 max-w-xs mx-auto">
                     <EditableText
                       value={config.package_descriptions?.[modeKey]?.[tierName + '_subtitle'] || "Let's create a custom package tailored specifically to your needs"}
                       onSave={(newValue) => updatePackageDescription(tierName + '_subtitle', newValue)}
-                      className="inline text-base"
+                      className="inline text-sm"
                       multiline={true}
                       placeholder="Let's create a custom package tailored specifically to your needs"
                       darkMode={true}
@@ -3311,7 +3904,7 @@ export default function Results() {
                   </p>
                 </div>
                 {showPackageButtonsInEditMode && (
-                  <div className="w-full">
+                  <div className="w-full mt-auto">
                     <EditableButton
                       tier={tierName}
                       brandColor={brandColor}
@@ -3360,7 +3953,7 @@ export default function Results() {
             <div className="flex-grow flex flex-col">
               <div className="">
                 <div className="text-center mb-4">
-                  <div className={`inline-block px-6 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md text-lg`}>
+                  <div className={`inline-flex items-center px-6 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md text-lg`}>
                     <EditableText
                       value={pkg.name}
                       onSave={(newValue) => updatePackageName(tierName, newValue)}
@@ -3369,6 +3962,7 @@ export default function Results() {
                       darkMode={true}
                       brandColor="#fff"
                     />
+                    <ExampleLinkButton tier={tierName} isEditor={true} darkMode={true} brandColor="#ffffff" />
                   </div>
                 </div>
 
@@ -3596,6 +4190,7 @@ export default function Results() {
                                    onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
                                    onDuplicate={() => duplicateDeliverable(tierName, idx)}
                                    onDelete={() => deleteDeliverable(tierName, idx)}
+                                   onSaveTooltip={(t) => updateDeliverableTooltip(tierName, idx, t)}
                                    darkMode={true}
                                    brandColor={brandColor}
                                    dragHandleProps={provided.dragHandleProps}
@@ -3668,9 +4263,11 @@ export default function Results() {
                             {(provided) => (
                               <div ref={provided.innerRef} {...provided.draggableProps}>
                                 <EditableListItem
-                                  value={bonus}
+                                  value={getItemText(bonus)}
+                                  tooltip={getTooltip(bonus)}
                                   onSave={(newValue) => updateBonus(tierName, idx, newValue)}
                                   onDelete={() => deleteBonus(tierName, idx)}
+                                  onSaveTooltip={(t) => updateBonusTooltip(tierName, idx, t)}
                                   icon={Plus}
                                   iconClassName="text-yellow-400"
                                   darkMode={true}
@@ -3743,7 +4340,7 @@ export default function Results() {
     );
 
     return (
-              <div className={`flex justify-center gap-5 items-start ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+              <div className={`grid gap-5 ${previewPackages.length === 4 ? 'grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-3'}`}>
                 {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
@@ -3764,18 +4361,19 @@ export default function Results() {
               {...getPreviewMotionProps(index)}
               className={`relative bg-white rounded-3xl border-2 border-gray-200 shadow-lg flex flex-col p-6`}
             >
-              <div className={`flex-grow flex flex-col items-center justify-center py-12`}>
-                <div className="text-center mb-4">
-                  <div 
-                    className={`inline-block px-4 py-2 rounded-full text-white font-bold shadow-md mb-3 text-2xl`}
-                    style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
-                  >
-                    {pkg.name}
-                  </div>
-                  <h3 className={`font-bold text-gray-900 mb-2 text-3xl`}>
+              <div className={`flex-grow flex flex-col items-center`}>
+                <div
+                  className={`inline-flex items-center px-6 py-2 rounded-full text-white font-bold shadow-md mb-3 text-lg`}
+                  style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
+                >
+                  {pkg.name}
+                  <ExampleLinkButton tier={pkg.tier} isEditor={false} darkMode={true} brandColor="#ffffff" />
+                </div>
+                <div className="flex-grow flex flex-col justify-center text-center">
+                  <h3 className={`font-bold text-gray-900 mb-2 text-xl`}>
                     {config.package_descriptions?.[modeKey]?.[pkg.tier] || 'Need Something Different?'}
                   </h3>
-                  <p className={`text-gray-600 mb-4 mx-auto text-base max-w-xs`}>
+                  <p className={`text-gray-600 mb-4 mx-auto text-sm max-w-xs`}>
                     {config.package_descriptions?.[modeKey]?.[pkg.tier + '_subtitle'] || "Let's create a custom package tailored specifically to your needs"}
                   </p>
                 </div>
@@ -3784,7 +4382,7 @@ export default function Results() {
                   href={finalLink || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`w-full font-semibold rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:opacity-90 h-12`}
+                  className={`w-full font-semibold rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:opacity-90 h-12 mt-auto`}
                   style={{
                     background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)`,
                     textDecoration: 'none'
@@ -3831,11 +4429,12 @@ export default function Results() {
 
           <div className="flex-grow flex flex-col">
               <div className="text-center mb-3">
-                <div 
-                  className={`inline-block px-4 py-1.5 rounded-full text-white font-bold shadow-md text-lg`}
+                <div
+                  className={`inline-flex items-center px-4 py-1.5 rounded-full text-white font-bold shadow-md text-lg group/package`}
                   style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
                 >
                   {pkg.name}
+                  <ExampleLinkButton tier={pkg.tier} isEditor={false} darkMode={true} brandColor="#ffffff" />
                 </div>
               </div>
 
@@ -3903,10 +4502,8 @@ export default function Results() {
                     const deliverable = pkg.deliverables[i];
                     const isIncluded = i < pkg.deliverables.length;
                     const label = showExcludedDeliverables
-                      ? (typeof (deliverable || templateDeliverable) === 'string'
-                          ? (deliverable || templateDeliverable)
-                          : (deliverable || templateDeliverable)?.type || '')
-                      : (isIncluded ? (typeof deliverable === 'string' ? deliverable : deliverable?.type || '') : '');
+                      ? getItemText(deliverable || templateDeliverable)
+                      : (isIncluded ? getItemText(deliverable) : '');
 
                     if (!isIncluded && !showExcludedDeliverables) {
                       return <div key={i} className={`flex items-start gap-1.5 min-h-[28px]`} aria-hidden />;
@@ -3924,6 +4521,7 @@ export default function Results() {
                         )}
                         <span className={`${isIncluded ? 'text-gray-700' : 'text-gray-400'} text-sm`}>
                           {label}
+                          {isIncluded && <TooltipBadge tooltip={getTooltip(deliverable)} brandColor={brandColor} darkMode={false} />}
                         </span>
                       </div>
                     );
@@ -3938,7 +4536,7 @@ export default function Results() {
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
                     const hasBonus = i < pkg.bonuses.length;
-                    const bonusLabel = hasBonus ? bonus : (previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i] || '');
+                    const bonusLabel = hasBonus ? getItemText(bonus) : getItemText(previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i]);
                     if (!hasBonus && !showExcludedDeliverables) {
                       return <div key={i} className={`flex items-start gap-1.5 min-h-[28px]`} aria-hidden />;
                     }
@@ -3949,7 +4547,10 @@ export default function Results() {
                         ) : (
                           <X className={`flex-shrink-0 mt-0.5 text-gray-300 w-5 h-5`} />
                         )}
-                        <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-400'} text-sm`}>{bonusLabel}</span>
+                        <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-400'} text-sm`}>
+                          {bonusLabel}
+                          {hasBonus && <TooltipBadge tooltip={getTooltip(bonus)} brandColor={brandColor} darkMode={false} />}
+                        </span>
                       </div>
                     );
                   })}
@@ -4009,7 +4610,7 @@ export default function Results() {
     );
 
     return (
-    <div className={`flex justify-center gap-5 items-start ${previewPackages.length === 4 ? 'md:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'md:grid-cols-2 max-w-4xl mx-auto' : 'md:grid-cols-3'}`}>
+    <div className={`grid gap-5 ${previewPackages.length === 4 ? 'grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-3'}`}>
       {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
@@ -4028,19 +4629,20 @@ export default function Results() {
             <motion.div
               key={index}
               {...getPreviewMotionProps(index)}
-              className={`relative rounded-3xl text-white shadow-2xl flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 p-6`}
+              className={`relative rounded-3xl text-white shadow-2xl flex flex-col bg-gradient-to-br from-gray-800 to-gray-900 p-6 group/package`}
             >
-              <div className={`flex-grow flex flex-col items-center justify-center py-12`}>
-                <div className="text-center mb-4">
-                  <div 
-                    className={`inline-block px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md mb-3 text-2xl`}
-                  >
-                    {pkg.name}
-                  </div>
-                  <h3 className={`font-bold text-white mb-2 text-3xl`}>
+              <div className={`flex-grow flex flex-col items-center`}>
+                <div
+                  className={`inline-flex items-center px-6 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md mb-3 text-lg`}
+                >
+                  {pkg.name}
+                  <ExampleLinkButton tier={pkg.tier} isEditor={false} darkMode={true} brandColor={brandColor} />
+                </div>
+                <div className="flex-grow flex flex-col justify-center text-center">
+                  <h3 className={`font-bold text-white mb-2 text-xl`}>
                     {config.package_descriptions?.[modeKey]?.[pkg.tier] || 'Need Something Different?'}
                   </h3>
-                  <p className={`text-white/80 mb-4 mx-auto text-base max-w-xs`}>
+                  <p className={`text-white/80 mb-4 mx-auto text-sm max-w-xs`}>
                     {config.package_descriptions?.[modeKey]?.[pkg.tier + '_subtitle'] || "Let's create a custom package tailored specifically to your needs"}
                   </p>
                 </div>
@@ -4049,7 +4651,7 @@ export default function Results() {
                   href={finalLink || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`w-full font-semibold rounded-full bg-white text-gray-900 hover:bg-gray-100 flex items-center justify-center transition-all h-12`}
+                  className={`w-full font-semibold rounded-full bg-white text-gray-900 hover:bg-gray-100 flex items-center justify-center transition-all h-12 mt-auto`}
                   style={{ textDecoration: 'none' }}
                   onClick={(e) => {
                     if (!finalLink) {
@@ -4092,8 +4694,9 @@ export default function Results() {
 
           <div className="flex-grow flex flex-col">
               <div className="text-center mb-3">
-                <div className={`inline-block px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md text-lg`}>
+                <div className={`inline-flex items-center px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold shadow-md text-lg group/package`}>
                   {pkg.name}
+                  <ExampleLinkButton tier={pkg.tier} isEditor={false} darkMode={true} brandColor={brandColor} />
                 </div>
               </div>
 
@@ -4161,10 +4764,8 @@ export default function Results() {
                     const deliverable = pkg.deliverables[i];
                     const isIncluded = i < pkg.deliverables.length;
                     const label = showExcludedDeliverables
-                      ? (typeof (deliverable || templateDeliverable) === 'string'
-                          ? (deliverable || templateDeliverable)
-                          : (deliverable || templateDeliverable)?.type || '')
-                      : (isIncluded ? (typeof deliverable === 'string' ? deliverable : deliverable?.type || '') : '');
+                      ? getItemText(deliverable || templateDeliverable)
+                      : (isIncluded ? getItemText(deliverable) : '');
 
                     if (!isIncluded && !showExcludedDeliverables) {
                       return <div key={i} className={`flex items-start gap-1.5 min-h-[28px]`} aria-hidden />;
@@ -4179,6 +4780,7 @@ export default function Results() {
                         )}
                         <span className={`${isIncluded ? 'text-white' : 'text-white/40'} text-sm`}>
                           {label}
+                          {isIncluded && <TooltipBadge tooltip={getTooltip(deliverable)} brandColor={brandColor} darkMode={true} />}
                         </span>
                       </div>
                     );
@@ -4193,7 +4795,7 @@ export default function Results() {
                   {Array.from({ length: maxBonuses }, (_, i) => {
                     const bonus = pkg.bonuses[i];
                     const hasBonus = i < pkg.bonuses.length;
-                    const bonusLabel = hasBonus ? bonus : (previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i] || '');
+                    const bonusLabel = hasBonus ? getItemText(bonus) : getItemText(previewPackages.find(p => !p.isCustomOffer && p.bonuses[i])?.bonuses[i]);
                     if (!hasBonus && !showExcludedDeliverables) {
                       return <div key={i} className={`flex items-start gap-1.5 min-h-[28px]`} aria-hidden />;
                     }
@@ -4204,7 +4806,10 @@ export default function Results() {
                         ) : (
                           <X className={`flex-shrink-0 mt-0.5 text-white/30 w-5 h-5`} />
                         )}
-                        <span className={`${hasBonus ? 'text-white' : 'text-white/40'} text-sm`}>{bonusLabel}</span>
+                        <span className={`${hasBonus ? 'text-white' : 'text-white/40'} text-sm`}>
+                          {bonusLabel}
+                          {hasBonus && <TooltipBadge tooltip={getTooltip(bonus)} brandColor={brandColor} darkMode={true} />}
+                        </span>
                       </div>
                     );
                   })}
@@ -4331,11 +4936,11 @@ export default function Results() {
                 style={{ height: `${config.logo_height || 80}px` }}
               />
             )}
-            <h1 className="text-2xl md:text-4xl font-bold mb-3 md:mb-4 text-gray-900 px-2">
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 md:mb-5 text-gray-900 px-2">
               {config.headline || 'Simple, transparent pricing'}
             </h1>
-            <p className="text-base md:text-xl text-gray-600 px-2">
-              {config.sub_headline || 'No surprise fees.'}
+            <p className="text-lg md:text-2xl text-gray-600 px-2">
+              {config.sub_headline || 'No surprises. No hidden fees.'}
             </p>
           </div>
 
@@ -4388,6 +4993,8 @@ export default function Results() {
           <div className="mt-8 md:mt-12">
             {renderCurrentPreviewDesign()}
           </div>
+
+          <AddonsSection isEditor={false} />
 
           <div className="text-center space-y-4 mt-8 md:mt-12">
             {config.guarantee && (
@@ -4818,7 +5425,7 @@ export default function Results() {
               style={{ height: `${config.logo_height || 80}px` }}
             />
           )}
-          <h1 className="text-5xl font-bold mb-3 text-gray-900">
+          <h1 className="text-6xl font-bold mb-4 text-gray-900">
             <EditableText
               value={config.headline}
               onSave={(newValue) => updateConfig('headline', newValue)}
@@ -4827,12 +5434,12 @@ export default function Results() {
               brandColor={brandColor}
             />
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-2xl text-gray-600">
             <EditableText
               value={config.sub_headline}
               onSave={(newValue) => updateConfig('sub_headline', newValue)}
               className="inline"
-              placeholder="No surprise fees."
+              placeholder="No surprises. No hidden fees."
               brandColor={brandColor}
             />
           </p>
@@ -5089,6 +5696,8 @@ export default function Results() {
             </div>
           </motion.div>
         </AnimatePresence>
+
+        <AddonsSection isEditor={true} />
 
         <div
           className="text-center space-y-4 mb-12"
@@ -6207,13 +6816,13 @@ export default function Results() {
                             starter: latestConfig.package_names?.onetime?.starter || 'Starter',
                             growth: latestConfig.package_names?.onetime?.growth || 'Growth',
                             premium: latestConfig.package_names?.onetime?.premium || 'Premium',
-                            elite: latestConfig.package_names?.onetime?.elite || 'Elite'
+                            elite: latestConfig.package_names?.onetime?.elite || 'Enterprise'
                           },
                           retainer: {
                             starter: latestConfig.package_names?.retainer?.starter || 'Starter',
                             growth: latestConfig.package_names?.retainer?.growth || 'Growth',
                             premium: latestConfig.package_names?.retainer?.premium || 'Premium',
-                            elite: latestConfig.package_names?.retainer?.elite || 'Elite'
+                            elite: latestConfig.package_names?.retainer?.elite || 'Enterprise'
                           }
                         };
 
