@@ -1,13 +1,13 @@
-import { createClient } from '@base44/sdk';
-import { appParams } from '@/lib/app-params';
+const noop = () => {};
+const asyncNoop = () => Promise.resolve(null);
 
-const { appId, serverUrl, token, functionsVersion } = appParams;
+const handler = {
+  get: (_t, prop) => {
+    if (prop === 'then') return undefined;
+    if (prop === Symbol.toPrimitive) return () => '';
+    return new Proxy(asyncNoop, handler);
+  },
+  apply: () => Promise.resolve(null),
+};
 
-//Create a client with authentication required
-export const base44 = createClient({
-  appId,
-  serverUrl,
-  token,
-  functionsVersion,
-  requiresAuth: false
-});
+export const base44 = new Proxy(noop, handler);

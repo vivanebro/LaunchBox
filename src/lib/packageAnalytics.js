@@ -93,6 +93,21 @@ export const logButtonClick = async (viewId, tier, tierLabel, modeLabel, package
   } catch (e) { console.error('Analytics: failed to log button click', e); }
 };
 
+export const logAddonSelect = async (viewId, packageId, addonId, addonLabel, modeLabel) => {
+  if (!viewId || !packageId || !addonId) return;
+  try {
+    await supabase.from('package_clicks').insert([{
+      package_id: packageId,
+      view_id: viewId,
+      tier: 'addon',
+      tier_label: null,
+      pricing_mode_label: modeLabel,
+      addon_id: addonId,
+      addon_label: addonLabel,
+    }]);
+  } catch (e) { console.error('Analytics: failed to log addon select', e); }
+};
+
 function clickTimestamp(click, viewsById) {
   if (click?.created_at) return click.created_at;
   const v = viewsById.get(click.view_id);

@@ -11,7 +11,7 @@ import { toPng } from 'html-to-image';
 import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
-import { logPackageView, startTimeTracking, logButtonClick } from '@/lib/packageAnalytics';
+import { logPackageView, startTimeTracking, logButtonClick, logAddonSelect } from '@/lib/packageAnalytics';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
@@ -2435,7 +2435,7 @@ export default function Results() {
         <Button
           variant="ghost"
           size="icon"
-          className={`h-5 w-5 transition-opacity ${hasTip ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} ${darkMode ? 'text-white/70 hover:text-white hover:bg-white/10' : 'hover:bg-gray-100'}`}
+          className={`h-5 w-5 transition-opacity ${hasTip ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'} ${darkMode ? 'text-white/70 hover:text-white hover:bg-white/10' : 'hover:bg-gray-100'}`}
           style={hasTip && !darkMode ? { color: brandColor } : undefined}
           onClick={(e) => { e.stopPropagation(); setOpen(true); }}
           title={hasTip ? 'Edit tooltip' : 'Add tooltip'}
@@ -2622,7 +2622,7 @@ export default function Results() {
             if (safe) window.open(safe, '_blank', 'noopener,noreferrer');
           }
         }}
-        className={`ml-1 inline-flex items-center justify-center w-7 h-7 -my-1 rounded-full cursor-pointer transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-1 ${hasUrl ? 'opacity-70 group-hover/package:opacity-100' : 'opacity-0 group-hover/package:opacity-70'}`}
+        className={`ml-1 inline-flex items-center justify-center w-7 h-7 -my-1 rounded-full cursor-pointer transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-1 ${hasUrl ? 'opacity-70 group-hover/package:opacity-100' : 'opacity-30 group-hover/package:opacity-100'}`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
         aria-label={isEditor ? (hasUrl ? 'Edit example link' : 'Add example link') : label}
       >
@@ -2696,13 +2696,21 @@ export default function Results() {
 
     const selectedSet = new Set(selectedAddonIds);
     const extrasTotal = addons.reduce((sum, a) => selectedSet.has(a.id) ? sum + (Number(a.price) || 0) : sum, 0);
-    const [pulse, setPulse] = [null, null];
     const [totalPulse, setTotalPulse] = useState(false);
 
     const toggleAddon = (id) => {
+      const wasSelected = selectedSet.has(id);
       setSelectedAddonIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
       setTotalPulse(true);
       setTimeout(() => setTotalPulse(false), 350);
+      if (!wasSelected && !isEditor && packageId) {
+        const addon = addons.find(a => a.id === id);
+        const label = addon?.text || addon?.type || '';
+        const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'One-Time') : (config.pricing_label_retainer || 'Ongoing');
+        const doLog = (viewId) => { if (viewId) logAddonSelect(viewId, packageId, id, label, modeLabel); };
+        if (window.__analyticsViewId) doLog(window.__analyticsViewId);
+        else if (window.__analyticsPending) window.__analyticsPending.then(doLog);
+      }
     };
 
     const darkerBrand = darkerBrandColor;
@@ -3330,7 +3338,7 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-5 ${packages.length === 4 ? 'grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-3'}`}>
+    <div className={`grid gap-5 ${packages.length === 4 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-1 md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
@@ -3834,7 +3842,7 @@ export default function Results() {
     
     return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className={`grid gap-5 ${packages.length === 4 ? 'grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-3'}`}>
+    <div className={`grid gap-5 ${packages.length === 4 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : packages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : packages.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-1 md:grid-cols-3'}`}>
       {packages.map((pkg, index) => {
         const tierName = pkg.tier;
         const originalPriceKey = `original_price_${tierName}${pricingMode === 'one-time' ? '' : '_retainer'}`;
@@ -4340,7 +4348,7 @@ export default function Results() {
     );
 
     return (
-              <div className={`grid gap-5 ${previewPackages.length === 4 ? 'grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-3'}`}>
+              <div className={`grid gap-5 ${previewPackages.length === 4 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-1 md:grid-cols-3'}`}>
                 {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
@@ -4610,7 +4618,7 @@ export default function Results() {
     );
 
     return (
-    <div className={`grid gap-5 ${previewPackages.length === 4 ? 'grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-3'}`}>
+    <div className={`grid gap-5 ${previewPackages.length === 4 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : previewPackages.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : previewPackages.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-1 md:grid-cols-3'}`}>
       {previewPackages.map((pkg, index) => {
         const modeKey = getCurrentModeKey();
         const buttonLink = config.button_links?.[modeKey]?.[pkg.tier];
@@ -5328,8 +5336,8 @@ export default function Results() {
   window.addEventListener('message', onMessage);
 })();
 </script>`;
-                  navigator.clipboard.writeText(embedCode);
-                  alert('Embed code copied to clipboard!');
+                  await navigator.clipboard.writeText(embedCode);
+                  toast({ title: 'Embed code copied!' });
                 }}
                 variant="outline"
                 className="h-9 px-4 font-semibold rounded-full border border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 text-sm"
