@@ -51,6 +51,8 @@ const TABLE_COLUMNS = {
     'custom_offer_tiers',
     'addons',
     'addons_label',
+    'marked_sent_count',
+    'last_marked_sent_at',
   ]),
   folders: new Set([
     'id', 'name', 'parent_id', 'created_by', 'is_example', 'created_date', 'updated_date',

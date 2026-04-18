@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature, AlertCircle, Sun, Moon, Package } from 'lucide-react';
+import { Plus, Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Loader2, Edit2, Save, X, ArrowLeft, Link as LinkIcon, Send, GripVertical, Download, Trash2, Undo2, Copy, Settings, FileSignature, AlertCircle, Sun, Moon, Package } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { toPng } from 'html-to-image';
@@ -29,6 +29,7 @@ import { extractMergeFieldKeys } from '@/components/contracts/MergeFieldExtensio
 import { toast } from '@/components/ui/use-toast';
 import AssignFolderMenu from '@/components/folders/AssignFolderMenu';
 import CopyLinkFolderPrompt from '@/components/folders/CopyLinkFolderPrompt';
+import { SendPackageDialog } from '@/components/packages/SendPackageDialog';
 import { takePendingFolderId } from '@/lib/folderUtils';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
@@ -247,6 +248,7 @@ export default function Results() {
   const [showLinksModal, setShowLinksModal] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
   const [showCopyLinkFolderPrompt, setShowCopyLinkFolderPrompt] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [configureModalTier, setConfigureModalTier] = useState(null);
   const [configureModalStep, setConfigureModalStep] = useState(1);
   const [configureModalOption, setConfigureModalOption] = useState('lock_your_spot');
@@ -5321,14 +5323,18 @@ export default function Results() {
                     currentUser
                   );
                   await navigator.clipboard.writeText(baseUrl + previewPath);
-                  toast({ title: 'Link copied!' });
                   setProfileUser(currentUser);
+                  setSendDialogOpen(true);
                 }}
+                title="Copy link and send to your client"
                 variant="outline"
                 className="h-9 px-4 font-semibold rounded-full border border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 text-sm"
               >
-                <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
-                Share
+                <Send className="w-3.5 h-3.5 mr-1.5" />
+                Send
+                {(config?.marked_sent_count || 0) > 0 && (
+                  <span className="ml-1.5 text-[11px] font-semibold tabular-nums text-gray-500">· {config.marked_sent_count}</span>
+                )}
               </Button>
             )}
             {packageId && (
@@ -6969,6 +6975,13 @@ export default function Results() {
         />
       )}
       */}
+
+      <SendPackageDialog
+        open={sendDialogOpen}
+        packageId={packageId}
+        onClose={() => setSendDialogOpen(false)}
+        onMarked={() => setConfig((c) => c ? { ...c, marked_sent_count: (c.marked_sent_count || 0) + 1 } : c)}
+      />
 
     </div>
   );

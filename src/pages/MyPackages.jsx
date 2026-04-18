@@ -11,6 +11,7 @@ import {
   Loader2,
   Eye,
   Share2,
+  Send,
   Copy,
   Check,
   X,
@@ -31,6 +32,7 @@ import {
 } from '@/lib/packageStatus';
 import { StatusDot, mapStatusToDotKind } from '@/components/packages/StatusDot';
 import { PackageAnalyticsPanel } from '@/components/packages/PackageAnalyticsPanel';
+import { SendPackageDialog } from '@/components/packages/SendPackageDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,6 +79,7 @@ export default function MyPackages() {
   const [confirmWonLost, setConfirmWonLost] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const [copyPromptPkg, setCopyPromptPkg] = useState(null);
+  const [sendDialog, setSendDialog] = useState({ open: false, pkgId: null });
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -172,17 +175,24 @@ export default function MyPackages() {
       const baseUrl = window.location.origin;
       const previewPath = await getPublicPreviewPath(pkg, currentUser);
       await navigator.clipboard.writeText(baseUrl + previewPath);
-      const t = toast({ title: pick(COPY_TOASTS) });
-      setTimeout(() => t.dismiss(), 2000);
-      if (!currentUser?.hide_copy_link_folder_prompt) {
-        setCopyPromptPkg(pkg);
-      }
+      setSendDialog({ open: true, pkgId: pkg.id });
     } catch (error) {
       console.error('Error copying link:', error);
       alert('Failed to copy link');
     }
     setCopying(null);
   };
+
+  const handleSendMarked = () => {
+    setPackages((prev) =>
+      prev.map((p) =>
+        p.id === sendDialog.pkgId
+          ? { ...p, marked_sent_count: (p.marked_sent_count || 0) + 1 }
+          : p
+      )
+    );
+  };
+
 
   const handleCopyEmbed = async (pkg) => {
     setCopying(`embed-${pkg.id}`);
@@ -595,13 +605,16 @@ export default function MyPackages() {
                                   onClick={() => handleCopyLink(pkg)}
                                   disabled={copying === pkg.id}
                                   variant="outline"
-                                  className="h-10 border-2 border-blue-200 text-blue-600 hover:bg-blue-50 rounded-full text-sm"
+                                  className="h-10 border-2 border-blue-200 text-blue-600 hover:bg-blue-50 rounded-full text-sm relative"
                                 >
-                                  {copying === pkg.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                                  {copying === pkg.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-4 h-4" />}
+                                  {(pkg.marked_sent_count || 0) > 0 && (
+                                    <span className="ml-1 text-[11px] font-semibold tabular-nums">· {pkg.marked_sent_count}</span>
+                                  )}
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Share</p>
+                                <p>Copy link and send to your client</p>
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>
@@ -678,6 +691,13 @@ export default function MyPackages() {
           pkg={panelPkg}
           analytics={panelAnalytics}
           isMobile={isMobile}
+        />
+
+        <SendPackageDialog
+          open={sendDialog.open}
+          packageId={sendDialog.pkgId}
+          onClose={() => setSendDialog({ open: false, pkgId: null })}
+          onMarked={handleSendMarked}
         />
 
         {/* Hidden for launch — folder system parked

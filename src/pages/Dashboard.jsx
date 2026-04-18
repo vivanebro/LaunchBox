@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Share2, Pencil, Sparkles } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { Plus, Send, Sparkles, Trophy, X as XIcon, MoreHorizontal, ChevronRight } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { StatusDot, mapStatusToDotKind } from '@/components/packages/StatusDot';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
@@ -13,6 +15,7 @@ import {
 } from '@/lib/packageStatus';
 import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
 import { toast } from '@/components/ui/use-toast';
+import { SendPackageDialog } from '@/components/packages/SendPackageDialog';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -21,9 +24,6 @@ import {
   Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
 
 const GREETINGS = [
@@ -77,15 +77,6 @@ function SectionSkeleton() {
   );
 }
 
-const STATUS_CHART_COLORS = {
-  won: '#0F6E56',
-  lost: '#6B7280',
-  converted: '#0F6E56',
-  hot: '#ff0044',
-  cooling: '#BA7517',
-  cold: '#9CA3AF',
-};
-
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [packages, setPackages] = useState([]);
@@ -93,6 +84,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [greeting, setGreeting] = useState('');
+  const [sendDialog, setSendDialog] = useState({ open: false, pkgId: null });
 
   useEffect(() => {
     setGreeting(pick(GREETINGS));
@@ -165,12 +157,23 @@ export default function Dashboard() {
   const weekAgg = aggregateDashboardWeekMetrics(analytics);
   const showWeekCompare = weekAgg.hasLastWeekData;
 
+  const pipeline = useMemo(() => {
+    const sent = packages.reduce((s, p) => s + (p.marked_sent_count || 0), 0);
+    const viewed = Object.values(analytics).reduce((s, a) => s + (a.views || 0), 0);
+    const clicked = Object.values(analytics).reduce((s, a) => s + (a.clicks || 0), 0);
+    const won = packages.filter((p) => p.manual_status === 'won').length;
+    const lost = packages.filter((p) => p.manual_status === 'lost').length;
+    return { sent, viewed, clicked, won, lost };
+  }, [packages, analytics]);
+
+  const pct = (num, den) => (den > 0 ? Math.round((num / den) * 100) : null);
+
   const activityRows = useMemo(() => {
     const rows = enriched.slice().sort((a, b) => b.activityMs - a.activityMs);
-    return rows.slice(0, 10);
+    return rows.slice(0, 5);
   }, [enriched]);
 
-  const activityOverflow = packages.length > 10;
+  const activityOverflow = packages.length > 5;
 
   const trendData = useMemo(() => {
     const viewsSeries = Array(7).fill(0);
@@ -190,26 +193,6 @@ export default function Dashboard() {
     });
   }, [analytics]);
 
-  const statusMixData = useMemo(() => {
-    const counts = { won: 0, lost: 0, converted: 0, hot: 0, cooling: 0, cold: 0 };
-    enriched.forEach(({ status }) => {
-      if (status.kind === 'won') counts.won += 1;
-      else if (status.kind === 'lost') counts.lost += 1;
-      else if (status.kind === 'converted') counts.converted += 1;
-      else if (status.kind === 'hot') counts.hot += 1;
-      else if (status.kind === 'cooling') counts.cooling += 1;
-      else counts.cold += 1;
-    });
-    return [
-      { name: 'Won', key: 'won', value: counts.won },
-      { name: 'Lost', key: 'lost', value: counts.lost },
-      { name: 'Clicked', key: 'converted', value: counts.converted },
-      { name: 'Hot', key: 'hot', value: counts.hot },
-      { name: 'Cooling', key: 'cooling', value: counts.cooling },
-      { name: 'Cold', key: 'cold', value: counts.cold },
-    ].filter((x) => x.value > 0);
-  }, [enriched]);
-
   const subtitle = useMemo(() => {
     if (zeroPackages) return "Let's get your first package out the door.";
     if (allZeroViews) return 'Share a package link and watch what happens.';
@@ -225,13 +208,57 @@ export default function Dashboard() {
     try {
       const baseUrl = window.location.origin;
       const previewPath = await getPublicPreviewPath(pkg, user);
-      await navigator.clipboard.writeText(baseUrl + previewPath);
-      const t = toast({ title: pick(COPY_TOASTS) });
-      setTimeout(() => t.dismiss(), 2000);
+      try {
+        await navigator.clipboard.writeText(baseUrl + previewPath);
+      } catch (copyErr) {
+        console.warn('Clipboard write failed, opening dialog anyway', copyErr);
+      }
+      setSendDialog({ open: true, pkgId: pkg.id });
     } catch (err) {
       console.error(err);
     }
   };
+
+  const setPackageStatus = async (pkgId, status) => {
+    const prevPackages = packages;
+    setPackages((prev) =>
+      prev.map((p) =>
+        p.id === pkgId ? { ...p, manual_status: status, manual_status_updated_at: new Date().toISOString() } : p
+      )
+    );
+    try {
+      await supabaseClient.entities.PackageConfig.update(pkgId, {
+        manual_status: status,
+        manual_status_updated_at: new Date().toISOString(),
+      });
+      if (status === 'won') {
+        confetti({ particleCount: 120, spread: 70, origin: { y: 0.65 } });
+        const t = toast({ title: 'Deal closed! 🎉' });
+        setTimeout(() => t.dismiss(), 2000);
+      } else if (status === 'lost') {
+        const t = toast({ title: 'Noted. On to the next one.' });
+        setTimeout(() => t.dismiss(), 2000);
+      } else {
+        const t = toast({ title: 'Status cleared.' });
+        setTimeout(() => t.dismiss(), 1500);
+      }
+    } catch (e) {
+      console.error(e);
+      setPackages(prevPackages);
+      alert('Could not update status');
+    }
+  };
+
+  const handleSendMarked = () => {
+    setPackages((prev) =>
+      prev.map((p) =>
+        p.id === sendDialog.pkgId
+          ? { ...p, marked_sent_count: (p.marked_sent_count || 0) + 1 }
+          : p
+      )
+    );
+  };
+
 
   const greetingText = formatGreeting(greeting, firstName);
 
@@ -286,15 +313,15 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen p-6 md:p-8" style={{ backgroundColor: '#F5F5F7' }}>
       <div className="max-w-5xl mx-auto">
-        {/* Header — always immediate */}
-        <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-10">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{greetingText}</h1>
-            <p className="text-gray-600">{subtitle}</p>
+        {/* Header — tight, charm not content */}
+        <header className="flex items-center justify-between gap-4 mb-12">
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-xl font-semibold text-gray-900 truncate">{greetingText}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
           </div>
           <Button
             onClick={() => { window.location.href = createPageUrl('PackageBuilder'); }}
-            className="rounded-full text-white px-6 h-11 font-semibold shadow-md shrink-0 self-start"
+            className="rounded-full text-white px-5 h-10 font-semibold shadow-md shrink-0"
             style={{ background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)' }}
           >
             <Plus className="w-4 h-4 mr-2 inline" />
@@ -371,118 +398,80 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* Metrics */}
-            <section className="mb-10">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">This week</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  {
-                    label: 'Views',
-                    value: weekAgg.viewsThisWeek,
-                    prev: weekAgg.viewsLastWeek,
-                  },
-                  {
-                    label: 'CTA clicks',
-                    value: weekAgg.clicksThisWeek,
-                    prev: weekAgg.clicksLastWeek,
-                  },
-                  {
-                    label: 'Click rate',
-                    value: `${weekAgg.clickRate}%`,
-                    sub: 'Views that led to a click',
-                    noCompare: true,
-                  },
-                ].map((m) => {
-                  const delta = !m.noCompare && showWeekCompare ? pctDelta(m.value, m.prev) : null;
-                  return (
-                    <div key={m.label} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                      <p className="text-sm text-gray-500 mb-1">{m.label}</p>
-                      <p className="text-3xl font-bold text-gray-900">{m.value}</p>
-                      {m.sub && <p className="text-xs text-gray-400 mt-1">{m.sub}</p>}
-                      {!m.noCompare && showWeekCompare && delta !== null && (
-                        <>
-                          <p className={`text-sm font-semibold mt-2 ${delta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                            {delta >= 0 ? '+' : ''}{delta}%
-                          </p>
-                          <p className="text-xs text-gray-400">vs {m.prev} last week</p>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-4">
-                <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">Views trend</p>
-                  <p className="text-xs text-gray-400 mb-3">Last 7 days</p>
-                  <div className="h-44">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={trendData}>
-                        <defs>
-                          <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#ff0044" stopOpacity={0.32} />
-                            <stop offset="100%" stopColor="#ff0044" stopOpacity={0.02} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={28} />
-                        <RechartsTooltip
-                          cursor={{ stroke: '#fecdd3', strokeWidth: 1 }}
-                          contentStyle={{ borderRadius: 12, border: '1px solid #fee2e2' }}
-                        />
-                        <Area type="monotone" dataKey="views" stroke="#ff0044" strokeWidth={2.5} fill="url(#viewsGradient)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">Status mix</p>
-                  <p className="text-xs text-gray-400 mb-3">All active packages</p>
-                  <div className="h-44 flex items-center justify-center">
-                    {statusMixData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={statusMixData}
-                            dataKey="value"
-                            nameKey="name"
-                            innerRadius={42}
-                            outerRadius={66}
-                            paddingAngle={2}
-                            strokeWidth={0}
-                          >
-                            {statusMixData.map((entry) => (
-                              <Cell key={entry.key} fill={STATUS_CHART_COLORS[entry.key]} />
-                            ))}
-                          </Pie>
-                          <RechartsTooltip contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb' }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <p className="text-sm text-gray-400">No status data yet</p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mt-1">
-                    {statusMixData.map((entry) => (
-                      <span key={entry.key} className="inline-flex items-center gap-1.5 text-gray-600">
-                        <span
-                          className="w-2 h-2 rounded-full inline-block"
-                          style={{ backgroundColor: STATUS_CHART_COLORS[entry.key] }}
-                        />
-                        {entry.name} ({entry.value})
-                      </span>
+            {/* Pipeline */}
+            {!zeroPackages && (
+              <section className="mb-10">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Pipeline</p>
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-1 md:gap-2">
+                    {[
+                      { label: 'Sent', value: pipeline.sent, conv: null },
+                      { label: 'Viewed', value: pipeline.viewed, conv: pct(pipeline.viewed, pipeline.sent) },
+                      { label: 'Clicked', value: pipeline.clicked, conv: pct(pipeline.clicked, pipeline.viewed) },
+                      { label: 'Won', value: pipeline.won, conv: pct(pipeline.won, pipeline.clicked) },
+                    ].map((step, i, arr) => (
+                      <React.Fragment key={step.label}>
+                        <div className="flex-1 text-center">
+                          <p className="text-xs text-gray-500 mb-1">{step.label}</p>
+                          <p className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">{step.value}</p>
+                        </div>
+                        {i < arr.length - 1 && (
+                          <div className="flex flex-col items-center shrink-0 w-10 md:w-14">
+                            <ChevronRight className="w-4 h-4 text-gray-300" />
+                            <span className="text-[10px] md:text-xs text-gray-400 font-medium tabular-nums mt-0.5">
+                              {arr[i + 1].conv !== null ? `${arr[i + 1].conv}%` : '—'}
+                            </span>
+                          </div>
+                        )}
+                      </React.Fragment>
                     ))}
                   </div>
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                    <span>Lost: <span className="font-semibold text-gray-700 tabular-nums">{pipeline.lost}</span></span>
+                    {pipeline.sent === 0 && (
+                      <span className="text-gray-400">Send a package to start your pipeline.</span>
+                    )}
+                  </div>
                 </div>
+              </section>
+            )}
+
+            {/* Trend — flat */}
+            <section className="mb-14">
+              <div className="flex items-end justify-between mb-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Views, last 7 days</p>
+                {showWeekCompare && (
+                  <p className="text-xs text-gray-500">
+                    Click rate <span className="font-semibold text-gray-900">{weekAgg.clickRate}%</span>
+                  </p>
+                )}
               </div>
+              <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData}>
+                      <defs>
+                        <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#ff0044" stopOpacity={0.32} />
+                          <stop offset="100%" stopColor="#ff0044" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={28} />
+                      <RechartsTooltip
+                        cursor={{ stroke: '#fecdd3', strokeWidth: 1 }}
+                        contentStyle={{ borderRadius: 12, border: '1px solid #fee2e2' }}
+                      />
+                      <Area type="monotone" dataKey="views" stroke="#ff0044" strokeWidth={2.5} fill="url(#viewsGradient)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
             </section>
 
-            {/* Activity */}
+            {/* Activity — flat */}
             <section>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Recent activity</p>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-100">
+              <div className="divide-y divide-gray-200/70">
                 {activityRows.map(({ pkg, a, status }) => {
                   const name = pkg.package_set_name || pkg.business_name || 'Untitled';
                   const dom = getDominantTierFromClicks(a.tierClicks, a.tierLabels);
@@ -497,7 +486,7 @@ export default function Dashboard() {
                       tabIndex={0}
                       onClick={() => handleOpenResults(pkg.id)}
                       onKeyDown={(e) => e.key === 'Enter' && handleOpenResults(pkg.id)}
-                      className="flex items-center gap-3 p-4 hover:bg-gray-50/80 cursor-pointer text-left"
+                      className="flex items-center gap-3 py-4 px-1 hover:bg-white/60 rounded-xl cursor-pointer text-left transition-colors"
                     >
                       <div className="flex items-start gap-3 min-w-0 flex-1">
                         {status.kind === 'won' && (
@@ -530,26 +519,62 @@ export default function Dashboard() {
                         <span className="text-sm font-semibold text-gray-700 tabular-nums">{a.views || 0}</span>
                         <button
                           type="button"
-                          className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
-                          aria-label="Copy share link"
+                          className="flex items-center gap-1 px-2 h-8 rounded-lg hover:bg-gray-100 text-gray-600"
+                          aria-label="Send package"
+                          title="Copy link and send to your client"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCopyShare(pkg);
                           }}
                         >
-                          <Share2 className="w-4 h-4" />
+                          <Send className="w-4 h-4" />
+                          <span className="text-xs font-semibold">Send</span>
+                          {(pkg.marked_sent_count || 0) > 0 && (
+                            <span className="text-[11px] font-semibold text-gray-500 tabular-nums">· {pkg.marked_sent_count}</span>
+                          )}
                         </button>
-                        <button
-                          type="button"
-                          className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
-                          aria-label="Edit package"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenResults(pkg.id);
-                          }}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+                              aria-label="Mark status"
+                              title="Mark won or lost"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-1" align="end" onClick={(e) => e.stopPropagation()}>
+                            {pkg.manual_status !== 'won' && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setPackageStatus(pkg.id, 'won'); }}
+                                className="flex items-center gap-2 w-full px-3 h-9 rounded-lg text-sm font-medium text-[#0F6E56] hover:bg-emerald-50"
+                              >
+                                <Trophy className="w-4 h-4" /> Mark as won
+                              </button>
+                            )}
+                            {pkg.manual_status !== 'lost' && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setPackageStatus(pkg.id, 'lost'); }}
+                                className="flex items-center gap-2 w-full px-3 h-9 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100"
+                              >
+                                <XIcon className="w-4 h-4" /> Mark as lost
+                              </button>
+                            )}
+                            {(pkg.manual_status === 'won' || pkg.manual_status === 'lost') && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setPackageStatus(pkg.id, null); }}
+                                className="flex items-center gap-2 w-full px-3 h-9 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100"
+                              >
+                                Clear status
+                              </button>
+                            )}
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                   );
@@ -568,6 +593,12 @@ export default function Dashboard() {
           </>
         )}
       </div>
+      <SendPackageDialog
+        open={sendDialog.open}
+        packageId={sendDialog.pkgId}
+        onClose={() => setSendDialog({ open: false, pkgId: null })}
+        onMarked={handleSendMarked}
+      />
     </div>
   );
 }
