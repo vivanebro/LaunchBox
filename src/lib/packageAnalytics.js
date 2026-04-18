@@ -108,6 +108,32 @@ export const logAddonSelect = async (viewId, packageId, addonId, addonLabel, mod
   } catch (e) { console.error('Analytics: failed to log addon select', e); }
 };
 
+export const logPricingModeSwitch = async (viewId, packageId, modeLabel) => {
+  if (!viewId || !packageId) return;
+  try {
+    await supabase.from('package_clicks').insert([{
+      package_id: packageId,
+      view_id: viewId,
+      tier: 'pricing_mode',
+      tier_label: modeLabel,
+      pricing_mode_label: modeLabel,
+    }]);
+  } catch (e) { console.error('Analytics: failed to log pricing mode switch', e); }
+};
+
+export const logCommitmentDiscountToggle = async (viewId, packageId, enabled, modeLabel) => {
+  if (!viewId || !packageId) return;
+  try {
+    await supabase.from('package_clicks').insert([{
+      package_id: packageId,
+      view_id: viewId,
+      tier: 'commitment_discount',
+      tier_label: enabled ? 'enabled' : 'disabled',
+      pricing_mode_label: modeLabel,
+    }]);
+  } catch (e) { console.error('Analytics: failed to log commitment discount toggle', e); }
+};
+
 function clickTimestamp(click, viewsById) {
   if (click?.created_at) return click.created_at;
   const v = viewsById.get(click.view_id);
@@ -175,8 +201,44 @@ export const fetchAnalyticsForPackages = async (packageIds) => {
         return tb - ta;
       });
 
-      const mostRecentClick = sortedClicks[0] || null;
-      const lastClickAt = mostRecentClick ? clickTimestamp(mostRecentClick, viewsById) : null;
+      const EVENT_TIERS = new Set(['addon', 'pricing_mode', 'commitment_discount']);
+      const tierOnlyClicks = pkgClicks.filter((c) => !EVENT_TIERS.has(c.tier));
+      const addonClicks = pkgClicks.filter((c) => c.tier === 'addon');
+      const pricingModeClicks = pkgClicks.filter((c) => c.tier === 'pricing_mode');
+      const commitmentClicks = pkgClicks.filter((c) => c.tier === 'commitment_discount');
+
+      const sortedTierClicks = tierOnlyClicks.slice().sort((a, b) => {
+        const ta = new Date(clickTimestamp(a, viewsById) || 0).getTime();
+        const tb = new Date(clickTimestamp(b, viewsById) || 0).getTime();
+        return tb - ta;
+      });
+      const mostRecentTierClick = sortedTierClicks[0] || sortedClicks[0] || null;
+      const lastTierClickAt = mostRecentTierClick ? clickTimestamp(mostRecentTierClick, viewsById) : null;
+
+      const addonBreakdown = {};
+      for (const c of addonClicks) {
+        if (!c.addon_id) continue;
+        if (!addonBreakdown[c.addon_id]) {
+          addonBreakdown[c.addon_id] = { id: c.addon_id, label: c.addon_label || c.addon_id, count: 0 };
+        }
+        addonBreakdown[c.addon_id].count += 1;
+      }
+      const addonsList = Object.values(addonBreakdown).sort((a, b) => b.count - a.count);
+
+      const pricingModeCounts = {};
+      for (const c of pricingModeClicks) {
+        const k = c.tier_label || c.pricing_mode_label || 'unknown';
+        pricingModeCounts[k] = (pricingModeCounts[k] || 0) + 1;
+      }
+
+      const commitmentCounts = { enabled: 0, disabled: 0 };
+      for (const c of commitmentClicks) {
+        const k = c.tier_label === 'enabled' ? 'enabled' : 'disabled';
+        commitmentCounts[k] += 1;
+      }
+
+      const mostRecentClick = mostRecentTierClick;
+      const lastClickAt = lastTierClickAt;
 
       const avgTime = pkgViews.length > 0
         ? Math.round(pkgViews.reduce((sum, v) => sum + (v.time_spent_seconds || 0), 0) / pkgViews.length)
@@ -193,7 +255,7 @@ export const fetchAnalyticsForPackages = async (packageIds) => {
 
       const tierClicks = {};
       const tierLabels = {};
-      for (const click of pkgClicks) {
+      for (const click of tierOnlyClicks) {
         const key = click.tier || 'unknown';
         tierClicks[key] = (tierClicks[key] || 0) + 1;
         if (click.tier_label) tierLabels[key] = click.tier_label;
@@ -208,24 +270,24 @@ export const fetchAnalyticsForPackages = async (packageIds) => {
       const viewsThisWeek = countInRange(pkgViews, 'viewed_at', startThisWeek, now);
       const viewsLastWeek = countInRange(pkgViews, 'viewed_at', startLastWeek, startThisWeek);
 
-      const clicksWithTs = pkgClicks.map((c) => ({
+      const tierClicksWithTs = tierOnlyClicks.map((c) => ({
         ...c,
         _ts: clickTimestamp(c, viewsById),
       }));
-      const clicksThisWeek = countInRange(clicksWithTs, '_ts', startThisWeek, now);
-      const clicksLastWeek = countInRange(clicksWithTs, '_ts', startLastWeek, startThisWeek);
+      const clicksThisWeek = countInRange(tierClicksWithTs, '_ts', startThisWeek, now);
+      const clicksLastWeek = countInRange(tierClicksWithTs, '_ts', startLastWeek, startThisWeek);
 
       const totalViewSeconds = pkgViews.reduce((s, v) => s + (v.time_spent_seconds || 0), 0);
 
       const clickRate = pkgViews.length > 0
-        ? Math.round((pkgClicks.length / pkgViews.length) * 1000) / 10
+        ? Math.round((tierOnlyClicks.length / pkgViews.length) * 1000) / 10
         : 0;
 
       result[id] = {
         views: pkgViews.length,
         avgTime,
         totalViewSeconds,
-        clicks: pkgClicks.length,
+        clicks: tierOnlyClicks.length,
         lastViewed: pkgViews[0]?.viewed_at || null,
         lastClickAt,
         mostRecentClick,
@@ -239,6 +301,9 @@ export const fetchAnalyticsForPackages = async (packageIds) => {
         clicksThisWeek,
         clicksLastWeek,
         clickRate,
+        addonsList,
+        pricingModeCounts,
+        commitmentCounts,
       };
     }
     return result;

@@ -50,6 +50,14 @@ export function PackageAnalyticsPanel({ isOpen, onClose, pkg, analytics, isMobil
     (a.deviceBreakdown?.desktop || 0);
   const showDevices = hasViews && totalDevices > 0;
 
+  const addonsList = a.addonsList || [];
+  const maxAddon = Math.max(1, ...addonsList.map((x) => x.count));
+  const pricingModeCounts = a.pricingModeCounts || {};
+  const pricingModeEntries = Object.entries(pricingModeCounts).sort((x, y) => y[1] - x[1]);
+  const maxMode = Math.max(1, ...pricingModeEntries.map(([, c]) => c));
+  const commitmentCounts = a.commitmentCounts || { enabled: 0, disabled: 0 };
+  const commitmentTotal = (commitmentCounts.enabled || 0) + (commitmentCounts.disabled || 0);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -163,6 +171,38 @@ export function PackageAnalyticsPanel({ isOpen, onClose, pkg, analytics, isMobil
                   <div className="flex justify-between text-[10px] text-gray-400 mt-2">
                     <span>30d ago</span>
                     <span>Today</span>
+                  </div>
+                </div>
+              )}
+
+              {hasViews && addonsList.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Add-ons selected</p>
+                  <div className="space-y-3">
+                    {addonsList.map((x) => (
+                      <TierBarRow key={x.id} label={x.label} count={x.count} max={maxAddon} barColor={brandColor} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hasViews && pricingModeEntries.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Pricing mode switches</p>
+                  <div className="space-y-3">
+                    {pricingModeEntries.map(([label, count]) => (
+                      <TierBarRow key={label} label={label} count={count} max={maxMode} barColor={brandColor} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hasViews && commitmentTotal > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Commitment discount</p>
+                  <div className="text-sm text-gray-700 space-y-1">
+                    <p>Turned on {commitmentCounts.enabled || 0} {(commitmentCounts.enabled || 0) === 1 ? 'time' : 'times'}</p>
+                    <p>Turned off {commitmentCounts.disabled || 0} {(commitmentCounts.disabled || 0) === 1 ? 'time' : 'times'}</p>
                   </div>
                 </div>
               )}

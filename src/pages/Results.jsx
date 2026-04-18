@@ -11,7 +11,7 @@ import { toPng } from 'html-to-image';
 import { exportPackageAsImages } from '@/lib/exportPackageImage';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
-import { logPackageView, startTimeTracking, logButtonClick, logAddonSelect } from '@/lib/packageAnalytics';
+import { logPackageView, startTimeTracking, logButtonClick, logAddonSelect, logPricingModeSwitch, logCommitmentDiscountToggle } from '@/lib/packageAnalytics';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPublicPreviewPath } from '@/lib/publicPackageUrl';
@@ -401,18 +401,38 @@ export default function Results() {
       }
 
       if (isPreview && idFromUrl) {
-        // Only track if viewer is NOT the owner (not logged in)
-        supabaseClient.auth.me().then(() => {
-          // logged in = owner, don't track
-        }).catch(() => {
-          // not logged in = real client, track it
+        const sessionKey = `lb_viewed_${idFromUrl}`;
+        const alreadyViewedThisSession = sessionStorage.getItem(sessionKey);
+
+        const startTracking = () => {
+          if (alreadyViewedThisSession) {
+            window.__analyticsViewId = alreadyViewedThisSession;
+            return;
+          }
           window.__analyticsViewId = null;
           window.__analyticsPending = logPackageView(idFromUrl).then(viewId => {
-            window.__analyticsViewId = viewId;
-            const cleanup = startTimeTracking(viewId);
-            window.__analyticsCleanup = cleanup;
+            if (viewId) {
+              sessionStorage.setItem(sessionKey, viewId);
+              window.__analyticsViewId = viewId;
+              const cleanup = startTimeTracking(viewId);
+              window.__analyticsCleanup = cleanup;
+            }
             return viewId;
           });
+        };
+
+        supabaseClient.auth.me().then(async (me) => {
+          try {
+            const ownerCheck = await supabaseClient.entities.PackageConfig.get(idFromUrl);
+            if (ownerCheck?.created_by && me?.id && ownerCheck.created_by === me.id) {
+              return;
+            }
+            startTracking();
+          } catch {
+            startTracking();
+          }
+        }).catch(() => {
+          startTracking();
         });
       }
 
@@ -5506,7 +5526,7 @@ export default function Results() {
               ) : (
                 <>
                   <button
-                    onClick={() => setPricingMode('one-time')}
+                    onClick={() => { setPricingMode('one-time'); if (isPreview && window.__analyticsViewId && pricingMode !== 'one-time') logPricingModeSwitch(window.__analyticsViewId, packageId, config.pricing_label_onetime || 'one-time'); }}
                     className={`px-8 py-3 rounded-full font-semibold text-sm transition-all ${
                       pricingMode === 'one-time' ? 'text-white shadow-lg' : 'text-gray-600 hover:text-gray-900'
                     }`}
@@ -5515,7 +5535,7 @@ export default function Results() {
                     {config.pricing_button_label_onetime || 'One-time'}
                   </button>
                   <button
-                    onClick={() => setPricingMode('retainer')}
+                    onClick={() => { setPricingMode('retainer'); if (isPreview && window.__analyticsViewId && pricingMode !== 'retainer') logPricingModeSwitch(window.__analyticsViewId, packageId, config.pricing_label_retainer || 'retainer'); }}
                     className={`px-8 py-3 rounded-full font-semibold text-sm transition-all ${
                       pricingMode === 'retainer' ? 'text-white shadow-lg' : 'text-gray-600 hover:text-gray-900'
                     }`}
@@ -5628,7 +5648,12 @@ export default function Results() {
                   updateConfigMultiple({ commitment_discount_enabled: true, commitment_discount_percent: 10, commitment_discount_label: 'Pay 3 months upfront' });
                   setShowDiscountConfig(true);
                 } else {
-                  setDiscountActive(!discountActive);
+                  const nextActive = !discountActive;
+                  setDiscountActive(nextActive);
+                  if (isPreview && window.__analyticsViewId) {
+                    const modeLabel = pricingMode === 'one-time' ? (config.pricing_label_onetime || 'one-time') : (config.pricing_label_retainer || 'retainer');
+                    logCommitmentDiscountToggle(window.__analyticsViewId, packageId, nextActive, modeLabel);
+                  }
                 }
               }}
               className={`flex items-center gap-3 px-5 py-2.5 rounded-full border transition-all ${
