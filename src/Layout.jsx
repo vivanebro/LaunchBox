@@ -78,6 +78,7 @@ export default function Layout({ children, currentPageName }) {
   
   const isWelcome = currentPageName === 'Welcome';
   const isResetPassword = currentPageName === 'ResetPassword';
+  const isSubscribe = currentPageName === 'Subscribe';
   
   // Use React.useMemo for URL parsing - native URLSearchParams is widely supported.
   const isPreview = React.useMemo(() => {
@@ -126,6 +127,26 @@ export default function Layout({ children, currentPageName }) {
           window.location.href = createPageUrl('Welcome');
           return;
         }
+
+        // Paywall: require active or trialing subscription
+        if (!isSubscribe) {
+          const justCheckedOut = new URLSearchParams(window.location.search).get('checkout') === 'success';
+          const userEmail = session.user?.email;
+          const isOwnerAdmin = userEmail === 'avivbenor1@gmail.com';
+
+          if (!justCheckedOut && !isOwnerAdmin) {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('subscription_status')
+              .eq('id', session.user.id)
+              .single();
+            const status = profile?.subscription_status;
+            if (status !== 'active' && status !== 'trialing') {
+              window.location.href = createPageUrl('Subscribe');
+              return;
+            }
+          }
+        }
       } catch (error) {
         console.error('Auth check failed:', error);
         // Don't redirect on network errors - just show the page
@@ -167,7 +188,7 @@ export default function Layout({ children, currentPageName }) {
     }
 
     return () => window.removeEventListener('resize', checkMobile);
-  }, [currentPageName, isPreview, isWelcome, isResultsPage, isPublicPrettyPreviewPath, isContractSignPage]);
+  }, [currentPageName, isPreview, isWelcome, isResultsPage, isPublicPrettyPreviewPath, isContractSignPage, isSubscribe]);
   
   const getDarkerBrandColor = (color) => {
     if (!color || typeof color !== 'string' || !color.startsWith('#')) return '#cc0033';
@@ -190,8 +211,8 @@ export default function Layout({ children, currentPageName }) {
 
   const darkerBrandColor = getDarkerBrandColor(brandColor);
 
-  // Don't show layout for welcome, contract sign, or preview
-  if (isWelcome || isResetPassword || isContractSignPage || (isResultsPage && (isPreview || isPublicPrettyPreviewPath))) {
+  // Don't show layout for welcome, contract sign, subscribe, or preview
+  if (isWelcome || isResetPassword || isSubscribe || isContractSignPage || (isResultsPage && (isPreview || isPublicPrettyPreviewPath))) {
     return <ErrorBoundary>{children}</ErrorBoundary>;
   }
 
