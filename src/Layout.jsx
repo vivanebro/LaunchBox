@@ -77,6 +77,7 @@ export default function Layout({ children, currentPageName }) {
   const [authError, setAuthError] = React.useState(null);
   
   const isWelcome = currentPageName === 'Welcome';
+  const isResetPassword = currentPageName === 'ResetPassword';
   
   // Use React.useMemo for URL parsing - native URLSearchParams is widely supported.
   const isPreview = React.useMemo(() => {
@@ -105,7 +106,7 @@ export default function Layout({ children, currentPageName }) {
   
   React.useEffect(() => {
     const checkAuthAndRedirect = async () => {
-      const isPublicAccessAllowed = isWelcome || isContractSignPage || (isResultsPage && (isPreview || isPublicPrettyPreviewPath));
+      const isPublicAccessAllowed = isWelcome || isResetPassword || isContractSignPage || (isResultsPage && (isPreview || isPublicPrettyPreviewPath));
 
       if (isPublicAccessAllowed) {
         setIsCheckingAuth(false);
@@ -190,7 +191,7 @@ export default function Layout({ children, currentPageName }) {
   const darkerBrandColor = getDarkerBrandColor(brandColor);
 
   // Don't show layout for welcome, contract sign, or preview
-  if (isWelcome || isContractSignPage || (isResultsPage && (isPreview || isPublicPrettyPreviewPath))) {
+  if (isWelcome || isResetPassword || isContractSignPage || (isResultsPage && (isPreview || isPublicPrettyPreviewPath))) {
     return <ErrorBoundary>{children}</ErrorBoundary>;
   }
 

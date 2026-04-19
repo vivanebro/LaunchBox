@@ -4,7 +4,7 @@ import { createPageUrl } from '@/utils';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 
 export default function Welcome() {
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [creatorSlug, setCreatorSlug] = useState('');
@@ -12,6 +12,13 @@ export default function Welcome() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+
+  const switchMode = (next) => {
+    setMode(next);
+    setError(null);
+    setMessage(null);
+    setCreatorSlug('');
+  };
 
   // If already logged in, go straight to Dashboard
   useEffect(() => {
@@ -31,6 +38,16 @@ export default function Welcome() {
     setSubmitting(true);
 
     try {
+      if (mode === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}${createPageUrl('ResetPassword')}`,
+        });
+        if (error) throw error;
+        setMessage('Check your email for a reset link.');
+        setSubmitting(false);
+        return;
+      }
+
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -107,16 +124,30 @@ export default function Welcome() {
         </div>
 
         <h2 style={{ textAlign: 'center', marginBottom: '8px', fontSize: '22px', fontWeight: '700', color: '#111' }}>
-          {mode === 'login' ? 'Sign in to LaunchBox' : 'Create your account'}
+          {mode === 'login' ? 'Sign in to LaunchBox' : mode === 'signup' ? 'Create your account' : 'Reset your password'}
         </h2>
         <p style={{ textAlign: 'center', color: '#666', marginBottom: '28px', fontSize: '14px' }}>
-          {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-          <button
-            onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(null); setMessage(null); setCreatorSlug(''); }}
-            style={{ color: '#ff0044', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: 0 }}
-          >
-            {mode === 'login' ? 'Sign up' : 'Log in'}
-          </button>
+          {mode === 'forgot' ? (
+            <>
+              Enter your email and we'll send you a reset link.{' '}
+              <button
+                onClick={() => switchMode('login')}
+                style={{ color: '#ff0044', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: 0 }}
+              >
+                Back to sign in
+              </button>
+            </>
+          ) : (
+            <>
+              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+              <button
+                onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
+                style={{ color: '#ff0044', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', padding: 0 }}
+              >
+                {mode === 'login' ? 'Sign up' : 'Log in'}
+              </button>
+            </>
+          )}
         </p>
 
         {error && (
@@ -176,22 +207,36 @@ export default function Welcome() {
             </div>
           )}
 
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              style={{
-                width: '100%', padding: '10px 14px', border: '1.5px solid #e5e7eb',
-                borderRadius: '8px', fontSize: '15px', outline: 'none', boxSizing: 'border-box'
-              }}
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div style={{ marginBottom: mode === 'login' ? '8px' : '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1.5px solid #e5e7eb',
+                  borderRadius: '8px', fontSize: '15px', outline: 'none', boxSizing: 'border-box'
+                }}
+              />
+            </div>
+          )}
+
+          {mode === 'login' && (
+            <div style={{ marginBottom: '20px', textAlign: 'right' }}>
+              <button
+                type="button"
+                onClick={() => switchMode('forgot')}
+                style={{ color: '#ff0044', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', padding: 0 }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -204,7 +249,7 @@ export default function Welcome() {
               opacity: submitting ? 0.7 : 1
             }}
           >
-            {submitting ? 'Please wait...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
+            {submitting ? 'Please wait...' : (mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send reset link')}
           </button>
         </form>
       </div>
