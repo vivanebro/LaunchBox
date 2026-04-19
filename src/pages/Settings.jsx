@@ -39,6 +39,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [slugError, setSlugError] = useState(null);
   const [slugChecking, setSlugChecking] = useState(false);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   // Password change
   const [newPassword, setNewPassword] = useState('');
@@ -428,6 +429,42 @@ export default function Settings() {
               )}
             </Button>
           </div>
+        </motion.div>
+
+        {/* Billing */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mt-6"
+        >
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Billing</h3>
+          <p className="text-sm text-gray-500 mb-4">Update payment method, view invoices, or cancel your plan.</p>
+          <Button
+            onClick={async () => {
+              setOpeningPortal(true);
+              try {
+                const { data, error } = await supabase.functions.invoke('create-portal-session', {
+                  body: { return_url: window.location.href },
+                });
+                if (error) throw error;
+                if (!data?.url) throw new Error('No portal URL');
+                window.location.href = data.url;
+              } catch (err) {
+                toast({ title: err.message || 'Could not open billing portal', variant: 'destructive' });
+                setOpeningPortal(false);
+              }
+            }}
+            disabled={openingPortal}
+            variant="outline"
+            className="h-10 px-6 font-semibold rounded-xl border-2"
+          >
+            {openingPortal ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening...</>
+            ) : (
+              'Manage subscription'
+            )}
+          </Button>
         </motion.div>
 
         {/* Danger Zone */}
