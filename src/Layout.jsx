@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Home, Settings, ChevronDown, ChevronRight, ChevronLeft, LayoutTemplate, Package, Plus, MessageSquare, FileSignature, Folder, ClipboardList, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient, { supabase } from '@/lib/supabaseClient';
+import { identifyUser } from '@/lib/posthog';
 import HelpButton from '@/components/HelpButton';
 
 // Error Boundary Component
@@ -127,6 +128,8 @@ export default function Layout({ children, currentPageName }) {
           window.location.href = createPageUrl('Welcome');
           return;
         }
+
+        identifyUser(session.user);
 
         // Paywall: require active or trialing subscription
         if (!isSubscribe) {
