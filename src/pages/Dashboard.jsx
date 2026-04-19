@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { Plus, Send, Sparkles, Trophy, X as XIcon, MoreHorizontal, ChevronRight } from 'lucide-react';
+import { Plus, Send, Eye, Zap, Sparkles, Trophy, X as XIcon, MoreHorizontal, ChevronRight } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { StatusDot, mapStatusToDotKind } from '@/components/packages/StatusDot';
 import { createPageUrl } from '@/utils';
@@ -87,7 +87,20 @@ export default function Dashboard() {
   const [sendDialog, setSendDialog] = useState({ open: false, pkgId: null });
 
   useEffect(() => {
-    setGreeting(pick(GREETINGS));
+    const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+    try {
+      const raw = localStorage.getItem('lb_greeting');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.text && parsed?.ts && Date.now() - parsed.ts < TWELVE_HOURS) {
+          setGreeting(parsed.text);
+          return;
+        }
+      }
+    } catch {}
+    const next = pick(GREETINGS);
+    setGreeting(next);
+    try { localStorage.setItem('lb_greeting', JSON.stringify({ text: next, ts: Date.now() })); } catch {}
   }, []);
 
   const loadData = useCallback(async () => {
@@ -345,6 +358,61 @@ export default function Dashboard() {
 
         {!loading && !error && (
           <>
+            {/* Pipeline — stat cards */}
+            {!zeroPackages && (
+              <section className="mb-10">
+                {pipeline.sent === 0 ? (
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+                    <p className="text-gray-500 text-sm mb-3">Nothing in the pipeline yet.</p>
+                    <button
+                      type="button"
+                      onClick={() => { window.location.href = createPageUrl('MyPackages'); }}
+                      className="text-sm font-semibold text-[#ff0044] hover:underline"
+                    >
+                      Send your first package →
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-4 gap-4">
+                      {[
+                        { label: 'Sent',       sub: 'Packages sent to clients',        value: pipeline.sent,    conv: null,                                convLabel: null,          icon: Send,   color: '#ff0044' },
+                        { label: 'Viewed',     sub: 'Times your packages were opened', value: pipeline.viewed,  conv: null,                                convLabel: null,          icon: Eye,    color: '#7c3aed' },
+                        { label: 'CTA Clicked',sub: 'Clients who showed intent',       value: pipeline.clicked, conv: pct(pipeline.clicked, pipeline.sent), convLabel: 'of sent',    icon: Zap,    color: '#ea580c' },
+                        { label: 'Closed',     sub: 'Deals marked won',                value: pipeline.won,     conv: pct(pipeline.won, pipeline.sent),     convLabel: 'close rate', icon: Trophy, color: '#059669' },
+                      ].map((s) => {
+                        const Icon = s.icon;
+                        return (
+                          <div key={s.label} className="relative group bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-start justify-between gap-3">
+                            <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs rounded-lg px-3 py-1.5 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                              {s.sub}
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-800 mb-3">{s.label}</p>
+                              <p className="text-4xl font-black text-gray-900 tabular-nums leading-none mb-2">{s.value}</p>
+                              {s.conv !== null
+                                ? <p className="text-xs font-semibold text-gray-500 tabular-nums"><span style={{ color: s.color }}>{s.conv}%</span> {s.convLabel}</p>
+                                : <p className="text-xs text-transparent select-none">—</p>
+                              }
+                            </div>
+                            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: s.color + '18' }}>
+                              <Icon className="w-5 h-5" style={{ color: s.color }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {pipeline.lost > 0 && (
+                      <p className="mt-3 text-xs text-gray-400 text-right tabular-nums">
+                        Lost: <span className="font-semibold text-gray-600">{pipeline.lost}</span>
+                      </p>
+                    )}
+                  </>
+                )}
+              </section>
+            )}
+
             {/* Attention */}
             {hasAttention && (
               <section className="mb-10">
@@ -395,44 +463,6 @@ export default function Dashboard() {
                     {attentionOverflow} more packages need attention
                   </button>
                 )}
-              </section>
-            )}
-
-            {/* Pipeline */}
-            {!zeroPackages && (
-              <section className="mb-10">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Pipeline</p>
-                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-                  <div className="flex items-center justify-between gap-1 md:gap-2">
-                    {[
-                      { label: 'Sent', value: pipeline.sent, conv: null },
-                      { label: 'Viewed', value: pipeline.viewed, conv: pct(pipeline.viewed, pipeline.sent) },
-                      { label: 'Clicked', value: pipeline.clicked, conv: pct(pipeline.clicked, pipeline.viewed) },
-                      { label: 'Won', value: pipeline.won, conv: pct(pipeline.won, pipeline.clicked) },
-                    ].map((step, i, arr) => (
-                      <React.Fragment key={step.label}>
-                        <div className="flex-1 text-center">
-                          <p className="text-xs text-gray-500 mb-1">{step.label}</p>
-                          <p className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">{step.value}</p>
-                        </div>
-                        {i < arr.length - 1 && (
-                          <div className="flex flex-col items-center shrink-0 w-10 md:w-14">
-                            <ChevronRight className="w-4 h-4 text-gray-300" />
-                            <span className="text-[10px] md:text-xs text-gray-400 font-medium tabular-nums mt-0.5">
-                              {arr[i + 1].conv !== null ? `${arr[i + 1].conv}%` : '—'}
-                            </span>
-                          </div>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                    <span>Lost: <span className="font-semibold text-gray-700 tabular-nums">{pipeline.lost}</span></span>
-                    {pipeline.sent === 0 && (
-                      <span className="text-gray-400">Send a package to start your pipeline.</span>
-                    )}
-                  </div>
-                </div>
               </section>
             )}
 
