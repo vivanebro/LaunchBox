@@ -65,6 +65,7 @@ import Templates from './pages/Templates';
 import Welcome from './pages/Welcome';
 import QuizManager from './pages/QuizManager';
 import ResetPassword from './pages/ResetPassword';
+import Subscribe from './pages/Subscribe';
 import __Layout from './Layout.jsx';
 
 
@@ -86,6 +87,7 @@ export const PAGES = {
     "Templates": Templates,
     "Welcome": Welcome,
     "ResetPassword": ResetPassword,
+    "Subscribe": Subscribe,
 }
 
 export const pagesConfig = {
