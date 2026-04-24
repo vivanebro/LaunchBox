@@ -61,6 +61,26 @@ export default function Admin() {
   const [grantResult, setGrantResult] = useState(null);
   const [grantError, setGrantError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [rowGranting, setRowGranting] = useState({});
+  const [rowGranted, setRowGranted] = useState({});
+  const [rowError, setRowError] = useState({});
+
+  const handleRowGrant = async (email) => {
+    if (!email) return;
+    setRowGranting((s) => ({ ...s, [email]: true }));
+    setRowError((s) => ({ ...s, [email]: null }));
+    try {
+      const { data, error } = await supabase.functions.invoke('grant-access', {
+        body: { email },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setRowGranted((s) => ({ ...s, [email]: true }));
+    } catch (err) {
+      setRowError((s) => ({ ...s, [email]: err.message || 'Failed' }));
+    }
+    setRowGranting((s) => ({ ...s, [email]: false }));
+  };
 
   const handleGrantAccess = async () => {
     if (!grantEmail) return;
@@ -698,6 +718,7 @@ export default function Admin() {
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Name</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Email</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Joined</th>
+                      <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Access</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -706,6 +727,29 @@ export default function Admin() {
                         <td className="py-3 px-4 text-sm text-gray-900">{user.name}</td>
                         <td className="py-3 px-4 text-sm text-gray-600">{user.email}</td>
                         <td className="py-3 px-4 text-sm text-gray-600">{user.joined}</td>
+                        <td className="py-3 px-4 text-right">
+                          {rowGranted[user.email] ? (
+                            <span className="inline-flex items-center gap-1 text-sm text-green-700">
+                              <Check className="w-4 h-4" /> Granted
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={rowGranting[user.email]}
+                              onClick={() => handleRowGrant(user.email)}
+                            >
+                              {rowGranting[user.email] ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                'Grant'
+                              )}
+                            </Button>
+                          )}
+                          {rowError[user.email] && (
+                            <div className="text-xs text-red-600 mt-1">{rowError[user.email]}</div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
