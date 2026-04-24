@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import supabaseClient from '@/lib/supabaseClient';
-import { Users, Package, LayoutTemplate, TrendingUp, Clock, Shield, Loader2, AlertCircle } from 'lucide-react';
+import { Users, Package, LayoutTemplate, TrendingUp, Clock, Shield, Loader2, AlertCircle, UserPlus, Copy, Check } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { supabase } from '@/lib/supabaseClient';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import RetentionHeatmap from '@/components/admin/RetentionHeatmap';
 import EngagementMetrics from '@/components/admin/EngagementMetrics';
@@ -52,6 +54,44 @@ export default function Admin() {
     },
     activeUsersTrend: []
   });
+
+  const [grantEmail, setGrantEmail] = useState('');
+  const [grantName, setGrantName] = useState('');
+  const [granting, setGranting] = useState(false);
+  const [grantResult, setGrantResult] = useState(null);
+  const [grantError, setGrantError] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleGrantAccess = async () => {
+    if (!grantEmail) return;
+    setGranting(true);
+    setGrantError(null);
+    setGrantResult(null);
+    setCopied(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('grant-access', {
+        body: { email: grantEmail.trim(), full_name: grantName.trim() || undefined },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setGrantResult(data);
+      setGrantEmail('');
+      setGrantName('');
+    } catch (err) {
+      setGrantError(err.message || 'Failed to grant access');
+    }
+    setGranting(false);
+  };
+
+  const copyCredentials = () => {
+    if (!grantResult) return;
+    const text = grantResult.password
+      ? `Email: ${grantResult.email}\nPassword: ${grantResult.password}`
+      : `Email: ${grantResult.email} (existing user, access granted)`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     checkAdminAndLoadData();
@@ -421,6 +461,9 @@ export default function Admin() {
             <TabsTrigger value="retention" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               Retention & Engagement
             </TabsTrigger>
+            <TabsTrigger value="access" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              Grant Access
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-12">{/* Keep existing overview content */}
@@ -730,6 +773,79 @@ export default function Admin() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="access" className="space-y-6">
+            <Card className="bg-white shadow-lg max-w-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-blue-600" />
+                  Grant Access
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Create an active account. Bypasses paywall. Use for comped users or testing.
+                </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="user@example.com"
+                    value={grantEmail}
+                    onChange={(e) => setGrantEmail(e.target.value)}
+                    disabled={granting}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full name (optional)</label>
+                  <Input
+                    type="text"
+                    placeholder="Jane Doe"
+                    value={grantName}
+                    onChange={(e) => setGrantName(e.target.value)}
+                    disabled={granting}
+                  />
+                </div>
+                <Button
+                  onClick={handleGrantAccess}
+                  disabled={granting || !grantEmail}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  {granting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+                  Grant Access
+                </Button>
+
+                {grantError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                    {grantError}
+                  </div>
+                )}
+
+                {grantResult && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded space-y-2">
+                    <div className="text-sm font-medium text-green-800">
+                      {grantResult.existed ? 'User already existed. Access granted.' : 'Account created.'}
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <div><span className="font-medium">Email:</span> {grantResult.email}</div>
+                      {grantResult.password && (
+                        <div><span className="font-medium">Password:</span> <code className="bg-white px-2 py-0.5 rounded border">{grantResult.password}</code></div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={copyCredentials}
+                      className="mt-2"
+                    >
+                      {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                      {copied ? 'Copied' : 'Copy credentials'}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
