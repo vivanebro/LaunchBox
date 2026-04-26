@@ -3836,7 +3836,7 @@ export default function Results() {
                               </div>
                               <X className="w-5 h-5 mt-0.5 text-gray-300 flex-shrink-0" />
                               <span className="text-sm text-gray-400 flex-1">
-                                {templateBonus}
+                                {getItemText(templateBonus)}
                               </span>
                             </div>
                           );
@@ -4008,13 +4008,25 @@ export default function Results() {
               <>
             {pkg.popular ? (
               <div
-                className="absolute -top-3 right-4 w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center text-gray-900 font-bold text-xs shadow-lg group/badge"
+                className="absolute left-1/2 z-30 whitespace-nowrap group/badge"
+                style={{
+                  top: 0,
+                  transform: 'translate(-50%, -50%)',
+                  background: 'rgba(255,255,255,0.65)',
+                  backdropFilter: 'blur(14px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+                  color: '#0F0F11',
+                  padding: '7px 14px',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(255,255,255,0.6)',
+                  boxShadow: '0 6px 20px -4px rgba(0,0,0,0.18)',
+                }}
               >
                 <EditableText
                   value={popularBadgeText}
                   onSave={(newValue) => updatePopularBadgeText(newValue)}
-                  className="text-center leading-tight text-xs"
-                  placeholder="Most Popular"
+                  className="text-[10px] font-bold uppercase tracking-[0.14em]"
+                  placeholder="Most Recommended"
                   darkMode={false}
                   brandColor="#000"
                 />
@@ -4023,7 +4035,7 @@ export default function Results() {
                     e.stopPropagation();
                     togglePopularPackage(index);
                   }}
-                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/badge:opacity-100 transition-opacity hover:bg-red-600"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/badge:opacity-100 transition-opacity hover:bg-red-600"
                   title="Remove popular badge"
                 >
                   <X className="w-3 h-3 text-white" />
@@ -4340,7 +4352,7 @@ export default function Results() {
                               </div>
                               <X className="w-5 h-5 mt-0.5 text-white/30 flex-shrink-0" />
                               <span className="text-sm text-white/40 flex-1">
-                                {templateBonus}
+                                {getItemText(templateBonus)}
                               </span>
                             </div>
                           );
