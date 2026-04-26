@@ -283,6 +283,7 @@ export default function Results() {
   const [showExportDropdown, setShowExportDropdown] = React.useState(false);
   const [showSettingsSidebar, setShowSettingsSidebar] = React.useState(false);
   const [selectedAddonIds, setSelectedAddonIds] = useState([]);
+  const [addonQuantities, setAddonQuantities] = useState({});
   const [discountActive, setDiscountActive] = React.useState(false);
   const [showDiscountConfig, setShowDiscountConfig] = React.useState(false);
   const [showPdfSubmenu, setShowPdfSubmenu] = React.useState(false);
@@ -2727,7 +2728,20 @@ export default function Results() {
     if (!isEditor && !hasAddons) return null;
 
     const selectedSet = new Set(selectedAddonIds);
-    const extrasTotal = addons.reduce((sum, a) => selectedSet.has(a.id) ? sum + (Number(a.price) || 0) : sum, 0);
+    const getAddonQty = (a) => {
+      const fromState = addonQuantities[a.id];
+      if (Number.isFinite(fromState) && fromState > 0) return fromState;
+      const fromConfig = Number(a.quantity);
+      return Number.isFinite(fromConfig) && fromConfig > 0 ? fromConfig : 1;
+    };
+    const extrasTotal = addons.reduce((sum, a) => {
+      if (!selectedSet.has(a.id)) return sum;
+      const qty = getAddonQty(a);
+      return sum + ((Number(a.price) || 0) * qty);
+    }, 0);
+    const setAddonQty = (id, next) => {
+      setAddonQuantities(prev => ({ ...prev, [id]: Math.max(1, Math.min(99, next)) }));
+    };
     const [totalPulse, setTotalPulse] = useState(false);
 
     const toggleAddon = (id) => {
@@ -2832,6 +2846,40 @@ export default function Results() {
                     <TooltipBadge tooltip={addon.tooltip} brandColor={brandColor} darkMode={false} />
                   </div>
 
+                  {/* Quantity stepper (client view, only when selected) */}
+                  {!isEditor && isChecked && (
+                    <div className="flex-shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white shadow-sm px-1 py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setAddonQty(addon.id, getAddonQty(addon) - 1)}
+                        className="w-6 h-6 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center text-base leading-none"
+                        aria-label="Decrease quantity"
+                      >−</button>
+                      <span className="min-w-[1.25rem] text-center text-sm font-semibold tabular-nums">{getAddonQty(addon)}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAddonQty(addon.id, getAddonQty(addon) + 1)}
+                        className="w-6 h-6 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center text-base leading-none"
+                        aria-label="Increase quantity"
+                      >+</button>
+                    </div>
+                  )}
+
+                  {/* Editor quantity input */}
+                  {isEditor && (
+                    <div className="flex-shrink-0 inline-flex items-center gap-1 text-xs text-gray-500">
+                      <span>×</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="99"
+                        value={Number(addon.quantity) || 1}
+                        onChange={(e) => updateAddon(addon.id, { quantity: Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1)) })}
+                        className="w-12 text-sm font-semibold text-gray-800 border border-gray-200 rounded px-1 py-0.5 text-center"
+                      />
+                    </div>
+                  )}
+
                   {/* Price */}
                   <div className="flex-shrink-0 text-right">
                     <span className={`text-base md:text-lg font-bold transition-all ${isChecked ? '' : 'text-gray-700'}`} style={isChecked ? { color: brandColor } : undefined}>
@@ -2844,7 +2892,7 @@ export default function Results() {
                           brandColor={brandColor}
                         />
                       ) : (
-                        <>{currencySymbol}{price.toLocaleString()}</>
+                        <>{currencySymbol}{(price * getAddonQty(addon)).toLocaleString()}</>
                       )}
                     </span>
                   </div>

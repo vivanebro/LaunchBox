@@ -29,10 +29,10 @@ const VIDEO_BRAND_COMMERCIAL = {
     desired_results: ['Increase sales'],
 
     core_deliverables: [
-      { type: 'Hero brand video', quantity: 4, length: '60-90s' },
-      { type: 'Short-form social clips', quantity: 20, length: '15-30s' },
-      { type: 'Behind-the-scenes content', quantity: 1, length: '' },
-      { type: 'Royalty-free B-roll library', quantity: 1, length: '' },
+      { type: 'Hero brand video', quantity: 4, length: '60-90s', tooltip: '60-90s anchor video for homepage, ads, and pinned posts.' },
+      { type: 'Short-form social clips', quantity: 20, length: '15-30s', tooltip: 'Quick cuts repurposed from your hero footage, ready to post anywhere.' },
+      { type: 'Behind-the-scenes content', quantity: 1, length: '', tooltip: 'Raw moments from the shoot that humanize your brand.' },
+      { type: 'Royalty-free B-roll library', quantity: 1, length: '', tooltip: 'Supplemental footage you own and can reuse for future content.' },
     ],
     additional_assets: [
       'Captions + sound design',
@@ -49,55 +49,38 @@ const VIDEO_BRAND_COMMERCIAL = {
     ],
 
     starter_deliverables: [
-      { type: 'Hero brand video', quantity: 1, length: '60-90s' },
-      { type: 'Vertical social clips', quantity: 3, length: '15-30s' },
+      { type: 'Hero brand video', quantity: 1, length: '60-90s', tooltip: '60-90s anchor video for homepage, ads, and pinned posts.' },
+      { type: 'Vertical social clips', quantity: 3, length: '15-30s', tooltip: '15-30s reels for IG/TikTok/Shorts, optimized for each platform.' },
     ],
-    starter_assets: [
-      'Captions + sound design',
-      '1 revision round',
-      'Delivered in 4 weeks',
-    ],
+    starter_assets: [],
     starter_bonuses: [
-      'Brand sound pack',
+      { text: 'Brand sound pack', tooltip: "Curated royalty-free music in your brand's tone, ready to drop into any video." },
     ],
 
     growth_deliverables: [
-      { type: 'Hero brand video', quantity: 2, length: '60-90s' },
-      { type: 'Short-form clips', quantity: 8, length: '15-30s' },
+      { type: 'Hero brand video', quantity: 2, length: '60-90s', tooltip: '60-90s anchor video for homepage, ads, and pinned posts.' },
+      { type: 'Short-form clips', quantity: 8, length: '15-30s', tooltip: 'Quick cuts repurposed from your hero footage, ready to post anywhere.' },
     ],
-    growth_assets: [
-      'Captions + sound design',
-      'Custom motion graphics',
-      'Brand strategy session (60 min)',
-      '2 revision rounds',
-      'Delivered in 2 weeks',
-    ],
+    growth_assets: [],
     growth_bonuses: [
-      'Brand sound pack',
-      'Custom edits for every platform',
-      'Brand video style guide',
+      { text: 'Brand sound pack', tooltip: "Curated royalty-free music in your brand's tone, ready to drop into any video." },
+      { text: 'Custom edits for every platform', tooltip: "Same content recut and resized for each platform's algorithm and audience." },
+      { text: 'Brand video style guide', tooltip: "A doc capturing your brand's video look and feel so future videos stay consistent." },
     ],
 
     premium_deliverables: [
-      { type: 'Hero brand video', quantity: 4, length: '60-90s' },
-      { type: 'Short-form clips', quantity: 20, length: '15-30s' },
-      { type: 'Behind-the-scenes content', quantity: 1, length: '' },
-      { type: 'Royalty-free B-roll library', quantity: 1, length: '' },
+      { type: 'Hero brand video', quantity: 4, length: '60-90s', tooltip: '60-90s anchor video for homepage, ads, and pinned posts.' },
+      { type: 'Short-form clips', quantity: 20, length: '15-30s', tooltip: 'Quick cuts repurposed from your hero footage, ready to post anywhere.' },
+      { type: 'Behind-the-scenes content', quantity: 1, length: '', tooltip: 'Raw moments from the shoot that humanize your brand.' },
+      { type: 'Royalty-free B-roll library', quantity: 1, length: '', tooltip: 'Supplemental footage you own and can reuse for future content.' },
     ],
-    premium_assets: [
-      'Captions + sound design',
-      'Custom motion graphics',
-      'Brand strategy session (60 min)',
-      'Quarterly strategy review',
-      'Unlimited revisions',
-      'Priority delivery in 10 days',
-    ],
+    premium_assets: [],
     premium_bonuses: [
-      'Brand sound pack',
-      'Custom edits for every platform',
-      'Brand video style guide',
-      'Lifetime usage rights',
-      'Source files',
+      { text: 'Brand sound pack', tooltip: "Curated royalty-free music in your brand's tone, ready to drop into any video." },
+      { text: 'Custom edits for every platform', tooltip: "Same content recut and resized for each platform's algorithm and audience." },
+      { text: 'Brand video style guide', tooltip: "A doc capturing your brand's video look and feel so future videos stay consistent." },
+      { text: 'Lifetime usage rights', tooltip: 'Repurpose, edit, republish forever. No relicensing, no fees.' },
+      { text: 'Source files', tooltip: 'The raw footage we shot, yours to keep.' },
     ],
 
     project_duration: '10 days - 4 weeks',
@@ -141,11 +124,11 @@ const VIDEO_BRAND_COMMERCIAL = {
     popularBadgeText: 'Most Recommended',
 
     addons: [
-      { id: 'addon-same-day', name: 'Same-day social cut', price: 300 },
-      { id: 'addon-localization', name: 'Voiceover and subtitles in another language', price: 600 },
-      { id: 'addon-ad-cuts', name: 'Performance ad cuts', price: 400 },
-      { id: 'addon-photo-day', name: 'Photography day during shoot', price: 600 },
-      { id: 'addon-thumbnails', name: 'Custom thumbnail design pack', price: 200 },
+      { id: 'addon-same-day', name: 'Same-day social cut', price: 300, quantity: 1, tooltip: 'Time-sensitive launches, edited and delivered the same day.' },
+      { id: 'addon-localization', name: 'Voiceover and subtitles in another language', price: 600, quantity: 1, tooltip: 'Full localization. Translated subtitles plus a voiceover artist in the target language.' },
+      { id: 'addon-ad-cuts', name: 'Performance ad cuts', price: 400, quantity: 1, tooltip: 'Video repackaged for paid ads (Meta, TikTok, YouTube) with hook variations to test.' },
+      { id: 'addon-photo-day', name: 'Photography day during shoot', price: 600, quantity: 1, tooltip: 'Branded stills for website, press, social. Captured the same day, no extra session.' },
+      { id: 'addon-thumbnails', name: 'Custom thumbnail design pack', price: 200, quantity: 1, tooltip: 'Scroll-stopping thumbnails so your videos actually get clicked.' },
     ],
     addons_label: 'Add-ons',
 
