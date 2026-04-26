@@ -31,6 +31,7 @@ import AssignFolderMenu from '@/components/folders/AssignFolderMenu';
 import CopyLinkFolderPrompt from '@/components/folders/CopyLinkFolderPrompt';
 import { SendPackageDialog } from '@/components/packages/SendPackageDialog';
 import { takePendingFolderId } from '@/lib/folderUtils';
+import { getTemplateById } from '@/lib/templates';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
 
@@ -239,6 +240,7 @@ export default function Results() {
   const [popularPackageIndex, setPopularPackageIndex] = useState({ onetime: 2, retainer: 2 });
   const [popularBadgeText, setPopularBadgeText] = useState('Most Popular');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [templatePreview, setTemplatePreview] = useState(null);
   const [isFreshReveal, setIsFreshReveal] = useState(false);
   const [isEmbedMode, setIsEmbedMode] = useState(false);
   const [previewNotFound, setPreviewNotFound] = useState(false);
@@ -361,9 +363,14 @@ export default function Results() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const isPrettyPreviewPath = Boolean(creator && slug);
-    const isPreview = urlParams.get('preview') === 'true' || isPrettyPreviewPath;
+    const templatePreviewId = urlParams.get('templatePreview');
+    const templatePreviewObj = templatePreviewId ? getTemplateById(templatePreviewId) : null;
+    const isPreview = urlParams.get('preview') === 'true' || isPrettyPreviewPath || Boolean(templatePreviewObj);
     const isEmbed = urlParams.get('embed') === 'true';
     let idFromUrl = urlParams.get('packageId');
+    if (templatePreviewObj) {
+      setTemplatePreview(templatePreviewObj);
+    }
     // Fresh from wizard: show packages in preview-first mode with a "Customize" button
     const isFreshBuild = localStorage.getItem('freshFromWizard') === 'true';
     if (isFreshBuild) {
@@ -387,7 +394,10 @@ export default function Results() {
       // Set initial pricing mode based on pricing_availability
       let loadedConfig = null;
       setPreviewNotFound(false);
-      if (!idFromUrl && isPrettyPreviewPath) {
+      if (templatePreviewObj) {
+        loadedConfig = JSON.parse(JSON.stringify(templatePreviewObj.packageConfig));
+      }
+      if (!loadedConfig && !idFromUrl && isPrettyPreviewPath) {
         try {
           const matchingPackages = await supabaseClient.entities.PackageConfig.filter({
             creator_slug: creator,
@@ -4935,9 +4945,32 @@ export default function Results() {
 
   const LAUNCHBOX_LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68e6df240580e3bf55058574/655c15688_LaunchBoxlogo_E3copy.png';
 
+  const useThisTemplate = () => {
+    if (!templatePreview) return;
+    localStorage.setItem('packageConfig', JSON.stringify(templatePreview.packageConfig));
+    window.location.href = createPageUrl('Results');
+  };
+
   if (isPreviewMode) {
     return (
-      <div className="min-h-screen py-6 md:py-12 relative" style={{ backgroundColor: '#F5F5F7' }}>
+      <div className="min-h-screen relative" style={{ backgroundColor: '#F5F5F7' }}>
+        {templatePreview && (
+          <div className="sticky top-0 z-50 bg-gray-900 text-white">
+            <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+              <div className="text-sm">
+                <span className="font-semibold">Previewing template:</span>{' '}
+                <span className="opacity-90">{templatePreview.name}</span>
+              </div>
+              <button
+                onClick={useThisTemplate}
+                className="text-xs font-bold text-gray-900 bg-white hover:bg-gray-100 px-4 py-2 rounded-lg shadow-sm"
+              >
+                Use this template
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="py-6 md:py-12">
         {/* Export loading overlay */}
         {(exporting || exportingPdf) && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/60 backdrop-blur-md">
@@ -5039,6 +5072,7 @@ export default function Results() {
             )}
           </div>
           </div>
+        </div>
         </div>
       </div>
     );
@@ -5164,6 +5198,23 @@ export default function Results() {
 
   return (
     <div className="min-h-screen py-12 relative" style={{ backgroundColor: '#F5F5F7' }}>
+      {templatePreview && (
+        <div className="sticky top-0 z-50 bg-gray-900 text-white">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+            <div className="text-sm">
+              <span className="font-semibold">Previewing template:</span>{' '}
+              <span className="opacity-90">{templatePreview.name}</span>
+            </div>
+            <button
+              onClick={useThisTemplate}
+              className="text-xs font-bold text-gray-900 bg-white hover:bg-gray-100 px-4 py-2 rounded-lg shadow-sm"
+            >
+              Use this template
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Export loading overlay */}
       {(exporting || exportingPdf) && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/60 backdrop-blur-md">
