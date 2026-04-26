@@ -45,20 +45,30 @@ export default function QuizResultCard({
 
     return (
         <div
-            className="relative flex flex-col bg-white rounded-3xl shadow-lg border-2 overflow-hidden transition-all duration-300"
+            className="relative flex flex-col bg-white rounded-3xl shadow-lg border-2 transition-all duration-300"
             style={{
                 borderColor: isPopular ? brandColor : '#e5e7eb',
                 transform: isPopular ? 'scale(1.03)' : 'scale(1)',
                 zIndex: isPopular ? 1 : 0,
+                marginTop: isPopular ? '12px' : 0,
             }}
         >
-            {/* Recommended badge */}
+            {/* Recommended glass tag */}
             {isPopular && (
                 <div
-                    className="text-white text-xs font-bold tracking-widest uppercase text-center py-2 px-4"
-                    style={{ background: `linear-gradient(135deg, ${brandColor}, ${darker})` }}
+                    className="absolute left-1/2 z-30 px-3.5 py-1.5 rounded-full whitespace-nowrap"
+                    style={{
+                        top: 0,
+                        transform: 'translate(-50%, -50%)',
+                        background: 'rgba(255,255,255,0.92)',
+                        backdropFilter: 'blur(14px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+                        color: '#0F0F11',
+                        border: `1px solid ${brandColor}`,
+                        boxShadow: `0 6px 20px -4px ${brandColor}40`,
+                    }}
                 >
-                    ★ Recommended
+                    <span className="text-[10px] font-bold uppercase tracking-[0.14em]">★ Recommended</span>
                 </div>
             )}
 

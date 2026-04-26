@@ -20,7 +20,7 @@ const VIDEO_BRAND_COMMERCIAL = {
   industry: 'videography',
   name: 'Brand & Commercial',
   icon: '🎬',
-  brand_color: '#1F2937',
+  brand_color: '#ff0044',
   price_range_display: '$2,500 — $15,000',
   packageConfig: {
     business_name: 'Your Studio',
@@ -133,11 +133,11 @@ const VIDEO_BRAND_COMMERCIAL = {
 
     guarantee: "We deliver on time. If we don't, you get two add-ons free on us.",
     urgency: '1 spot left for this month. Next slot opens in 2 weeks.',
-    brand_color: '#1F2937',
+    brand_color: '#ff0044',
     logo_url: '',
     from_template: true,
 
-    popularPackageIndex: { onetime: 2, retainer: 2 },
+    popularPackageIndex: { onetime: 1, retainer: 1 },
     popularBadgeText: 'Most Recommended',
 
     addons: [
@@ -148,6 +148,31 @@ const VIDEO_BRAND_COMMERCIAL = {
       { id: 'addon-thumbnails', name: 'Custom thumbnail design pack', price: 200 },
     ],
     addons_label: 'Add-ons',
+
+    button_links: {
+      onetime: {
+        starter: 'https://your-calendar-link.com',
+        starter_type: 'book_a_call',
+        starter_label: 'Book a call',
+        growth: 'https://your-calendar-link.com',
+        growth_type: 'book_a_call',
+        growth_label: 'Book a call',
+        premium: 'https://your-calendar-link.com',
+        premium_type: 'book_a_call',
+        premium_label: 'Book a call',
+      },
+      retainer: {
+        starter: 'https://your-calendar-link.com',
+        starter_type: 'book_a_call',
+        starter_label: 'Book a call',
+        growth: 'https://your-calendar-link.com',
+        growth_type: 'book_a_call',
+        growth_label: 'Book a call',
+        premium: 'https://your-calendar-link.com',
+        premium_type: 'book_a_call',
+        premium_label: 'Book a call',
+      },
+    },
   },
 };
 

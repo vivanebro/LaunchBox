@@ -4460,10 +4460,19 @@ export default function Results() {
         >
           {pkg.popular && (
             <div
-              className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full font-bold text-white whitespace-nowrap text-sm`}
-              style={{ backgroundColor: brandColor }}
+              className="absolute left-1/2 z-30 px-3.5 py-1.5 rounded-full whitespace-nowrap"
+              style={{
+                top: 0,
+                transform: 'translate(-50%, -50%)',
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'blur(14px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+                color: '#0F0F11',
+                border: `1px solid ${brandColor}`,
+                boxShadow: `0 6px 20px -4px ${brandColor}40`,
+              }}
             >
-              {popularBadgeText}
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em]">{popularBadgeText}</span>
             </div>
           )}
 
@@ -4716,7 +4725,40 @@ export default function Results() {
         }
 
         return (
-        <div key={index} className="flex-1 overflow-visible" style={{ zIndex: pkg.popular ? 10 : 1 }}>
+        <div key={index} className="flex-1 overflow-visible relative" style={{ zIndex: pkg.popular ? 10 : 1 }}>
+        {pkg.popular && (
+          <>
+            <div
+              aria-hidden="true"
+              className="absolute pointer-events-none rounded-[28px]"
+              style={{
+                top: '-19px',
+                bottom: '-19px',
+                left: '-5px',
+                right: '-5px',
+                background: `linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.05) 60%, ${brandColor}40 100%)`,
+                border: '1px solid rgba(255,255,255,0.35)',
+                boxShadow: `0 30px 60px -15px ${brandColor}33, inset 0 1px 0 rgba(255,255,255,0.6)`,
+                zIndex: 0,
+              }}
+            />
+            <div
+              className="absolute left-1/2 z-30 px-3.5 py-1.5 rounded-full whitespace-nowrap"
+              style={{
+                top: '-19px',
+                transform: 'translate(-50%, -50%)',
+                background: 'rgba(255,255,255,0.95)',
+                backdropFilter: 'blur(14px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+                color: '#0F0F11',
+                border: `1px solid ${brandColor}`,
+                boxShadow: `0 8px 24px -6px ${brandColor}55, 0 0 0 1px rgba(255,255,255,0.6) inset`,
+              }}
+            >
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em]">{popularBadgeText}</span>
+            </div>
+          </>
+        )}
         <motion.div
           {...getPreviewMotionProps(index)}
           className={`relative rounded-3xl text-white shadow-2xl flex flex-col transition-all duration-[400ms] ease-out ${
@@ -4724,13 +4766,8 @@ export default function Results() {
               ? ''
               : 'bg-gradient-to-br from-gray-800 to-gray-900'
           } p-6`}
-          style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: '38px 24px' } : {}}
+          style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: '38px 24px', zIndex: 1 } : {}}
         >
-          {pkg.popular && (
-            <div className={`absolute -top-2 right-3 bg-yellow-400 rounded-full flex items-center justify-center text-gray-900 font-bold shadow-lg w-16 h-16 text-xs`}>
-              <span className="text-center leading-tight">{popularBadgeText}</span>
-            </div>
-          )}
 
           <div className="flex-grow flex flex-col">
               <div className="text-center mb-3">
