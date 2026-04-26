@@ -2843,7 +2843,7 @@ export default function Results() {
                         />
                       ) : addon.name}
                     </div>
-                    <TooltipBadge tooltip={addon.tooltip} brandColor={brandColor} darkMode={false} />
+                    <TooltipBadge tooltip={addon.tooltip} brandColor="#9CA3AF" darkMode={false} />
                   </div>
 
                   {/* Quantity stepper (client view, only when selected) */}
@@ -3053,7 +3053,14 @@ export default function Results() {
         <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${getIconClasses()}`} style={getIconInlineStyle()} />
         <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-700'}`}>
           {displayText}
-          <TooltipBadge tooltip={getTooltip(deliverable)} brandColor={brandColor} darkMode={darkMode} />
+          <span className="inline-flex items-center align-middle ml-1">
+            <TooltipEditor
+              tooltip={getTooltip(deliverable)}
+              onSave={(t) => onSaveTooltip && onSaveTooltip(t)}
+              darkMode={darkMode}
+              brandColor={brandColor}
+            />
+          </span>
         </span>
         <div className="flex items-center gap-1">
           <Button
@@ -3068,12 +3075,6 @@ export default function Results() {
           >
             <Copy className="w-3 h-3" />
           </Button>
-          <TooltipEditor
-            tooltip={getTooltip(deliverable)}
-            onSave={(t) => onSaveTooltip && onSaveTooltip(t)}
-            darkMode={darkMode}
-            brandColor={brandColor}
-          />
           <Button
             variant="ghost"
             size="icon"
@@ -3192,18 +3193,19 @@ export default function Results() {
         <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${getIconClasses()}`} style={getIconInlineStyle()} />
         <span className={`text-sm flex-1 ${darkMode ? 'text-white' : 'text-gray-700'}`}>
           {value}
-          <TooltipBadge tooltip={tooltip} brandColor={brandColor} darkMode={darkMode} />
+          {onSaveTooltip && (
+            <span className="inline-flex items-center align-middle ml-1">
+              <TooltipEditor
+                tooltip={tooltip}
+                onSave={(t) => onSaveTooltip(t)}
+                darkMode={darkMode}
+                brandColor={brandColor}
+              />
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-1">
           <Edit2 className={`w-3 h-3 opacity-0 group-hover:opacity-100 mt-0.5 transition-opacity ${darkMode ? 'text-white/70' : ''}`} style={!darkMode ? { color: brandColor } : {}} />
-          {onSaveTooltip && (
-            <TooltipEditor
-              tooltip={tooltip}
-              onSave={(t) => onSaveTooltip(t)}
-              darkMode={darkMode}
-              brandColor={brandColor}
-            />
-          )}
           <Button
             variant="ghost"
             size="icon"
@@ -3929,7 +3931,23 @@ export default function Results() {
         const originalPrice = config[originalPriceKey];
 
         return (
-          <div key={index} className="overflow-visible flex flex-col h-full" style={{ zIndex: pkg.popular ? 10 : 1 }}>
+          <div key={index} className="overflow-visible flex flex-col h-full relative" style={{ zIndex: pkg.popular ? 10 : 1 }}>
+          {pkg.popular && (
+            <div
+              aria-hidden="true"
+              className="absolute pointer-events-none rounded-[28px]"
+              style={{
+                top: '-19px',
+                bottom: '-19px',
+                left: '-5px',
+                right: '-5px',
+                background: `linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.05) 60%, ${brandColor}40 100%)`,
+                border: '1px solid rgba(255,255,255,0.35)',
+                boxShadow: `0 30px 60px -15px ${brandColor}33, inset 0 1px 0 rgba(255,255,255,0.6)`,
+                zIndex: 0,
+              }}
+            />
+          )}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -3939,7 +3957,7 @@ export default function Results() {
                 ? ''
                 : 'bg-gradient-to-br from-gray-800 to-gray-900'
             } p-8`}
-            style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: '46px 32px' } : {}}
+            style={pkg.popular ? { background: `linear-gradient(to bottom right, ${brandColor}, ${darkerBrandColor})`, marginTop: '-14px', marginBottom: '-14px', padding: '46px 32px', zIndex: 1 } : {}}
           >
             {packages.length > 1 && (
               <button
