@@ -17,7 +17,18 @@ import {
   X,
   Code,
   BarChart3,
+  Plus,
+  MoreHorizontal,
+  Trophy,
+  XCircle,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import AssignFolderMenu from '@/components/folders/AssignFolderMenu';
 import CopyLinkFolderPrompt from '@/components/folders/CopyLinkFolderPrompt';
 import { createPageUrl } from '@/utils';
@@ -341,10 +352,22 @@ export default function MyPackages() {
   return (
     <TooltipProvider>
       <div className="min-h-screen" style={{ backgroundColor: '#F5F5F7' }}>
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="text-center mb-16">
-            <h1 className="text-5xl font-bold mb-4 text-gray-900">My Packages</h1>
-            <p className="text-gray-600 text-xl">All your saved pricing packages in one place</p>
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-3xl font-bold text-gray-900">My Packages</h1>
+              {packages.length > 0 && (
+                <span className="text-sm text-gray-500">{packages.length} total</span>
+              )}
+            </div>
+            <Button
+              onClick={() => { window.location.href = createPageUrl('PackageBuilder'); }}
+              className="text-white rounded-full font-semibold shadow-md hover:shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)' }}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              New package
+            </Button>
           </div>
 
           {packages.length === 0 ? (
@@ -352,19 +375,20 @@ export default function MyPackages() {
               <div className="inline-block bg-white rounded-3xl p-12 border-2 border-gray-200 shadow-lg">
                 <h3 className="text-2xl font-bold text-gray-900 mb-3">No packages yet</h3>
                 <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                  Create your first pricing package to get started
+                  Build your first package and send it to a client. Watch what happens.
                 </p>
                 <Button
                   onClick={() => { window.location.href = createPageUrl('PackageBuilder'); }}
                   className="text-white rounded-full"
                   style={{ background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)' }}
                 >
-                  Create Package
+                  <Plus className="w-4 h-4 mr-1" />
+                  Build my first package
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               <AnimatePresence>
                 {sortedPackages.map((pkg) => {
                   const a = analytics[pkg.id] || {};
@@ -384,11 +408,40 @@ export default function MyPackages() {
                   const manual = pkg.manual_status;
                   const hasAnalyticsOpen = !!panelOpenId;
                   const isAnalyticsSelected = panelOpenId === pkg.id;
+                  const brandColor = pkg.brand_color || '#ff0044';
                   const cardClassName = hasAnalyticsOpen
                     ? isAnalyticsSelected
-                      ? 'bg-white rounded-3xl shadow-2xl transition-all duration-300 overflow-hidden border-2 border-[#ff0044]'
-                      : 'bg-white rounded-3xl shadow-md transition-all duration-300 overflow-hidden border-2 border-gray-200 opacity-60'
-                    : 'bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border-2 border-gray-100 hover:border-[#ff0044]';
+                      ? 'bg-white rounded-2xl shadow-lg transition-all duration-200 overflow-hidden border-2 border-[#ff0044]'
+                      : 'bg-white rounded-2xl shadow-sm transition-all duration-200 overflow-hidden border border-gray-200 opacity-60'
+                    : 'bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden border border-gray-200';
+
+                  // Activity hero: tells the story
+                  let heroText = 'Not sent yet';
+                  let heroClass = 'text-gray-400';
+                  let subText = `Created ${formatRelativeTimeNatural(pkg.created_date)}`;
+                  if (manual === 'won') {
+                    heroText = '🏆 Won';
+                    heroClass = 'text-emerald-600';
+                    subText = pkg.manual_status_updated_at
+                      ? `Closed ${formatRelativeTimeNatural(pkg.manual_status_updated_at)}`
+                      : '';
+                  } else if (manual === 'lost') {
+                    heroText = 'Lost';
+                    heroClass = 'text-gray-500';
+                    subText = pkg.manual_status_updated_at
+                      ? `Closed ${formatRelativeTimeNatural(pkg.manual_status_updated_at)}`
+                      : '';
+                  } else if ((a.views || 0) > 0) {
+                    heroText = `Viewed ${formatRelativeTimeNatural(a.lastViewed)}`;
+                    heroClass = 'text-gray-900';
+                    subText = `${a.views} ${a.views === 1 ? 'view' : 'views'}${(pkg.marked_sent_count || 0) > 0 ? ` · ${pkg.marked_sent_count} sent` : ''}`;
+                  } else if ((pkg.marked_sent_count || 0) > 0) {
+                    heroText = 'Sent · awaiting view';
+                    heroClass = 'text-amber-600';
+                    subText = pkg.last_marked_sent_at
+                      ? `Sent ${formatRelativeTimeNatural(pkg.last_marked_sent_at)}`
+                      : `${pkg.marked_sent_count} sent`;
+                  }
 
                   return (
                     <motion.div
@@ -398,282 +451,153 @@ export default function MyPackages() {
                       exit={{ opacity: 0, scale: 0.9 }}
                       className={cardClassName}
                     >
-                      <div
-                        className="p-6 text-white relative overflow-hidden"
-                        style={{
-                          background: pkg.brand_color
-                            ? `linear-gradient(135deg, ${pkg.brand_color} 0%, ${pkg.brand_color}dd 100%)`
-                            : 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)',
-                        }}
-                      >
-                        <div className="absolute inset-0 bg-white opacity-0 hover:opacity-10 transition-opacity" />
-                        <div className="relative z-10">
-                          {editingName === pkg.id ? (
-                            <div className="flex items-center gap-2 mb-2">
-                              <Input
-                                value={editedName}
-                                onChange={(e) => setEditedName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleSaveName(pkg.id);
-                                  if (e.key === 'Escape') handleCancelEditName();
-                                }}
-                                className="bg-white text-gray-900 border-white/30"
-                                autoFocus
-                              />
-                              <Button
-                                onClick={() => handleSaveName(pkg.id)}
-                                size="icon"
-                                className="h-8 w-8 bg-white/20 hover:bg-white/30 text-white"
-                              >
-                                <Check className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                onClick={handleCancelEditName}
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 bg-white/20 hover:bg-white/30 text-white"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 mb-2 group/title">
-                              <h3 className="text-xl font-bold">{pkg.package_set_name || pkg.business_name || 'Untitled Package'}</h3>
+                      <div className="p-4">
+                        {editingName === pkg.id ? (
+                          <div className="flex items-center gap-2 mb-3">
+                            <Input
+                              value={editedName}
+                              onChange={(e) => setEditedName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveName(pkg.id);
+                                if (e.key === 'Escape') handleCancelEditName();
+                              }}
+                              className="h-8 text-base font-bold"
+                              autoFocus
+                            />
+                            <Button onClick={() => handleSaveName(pkg.id)} size="icon" className="h-7 w-7">
+                              <Check className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button onClick={handleCancelEditName} size="icon" variant="ghost" className="h-7 w-7">
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <h3 className="text-base font-bold truncate text-gray-900">{pkg.package_set_name || pkg.business_name || 'Untitled Package'}</h3>
                               <button
                                 type="button"
                                 onClick={() => handleStartEditName(pkg)}
-                                className="opacity-0 group-hover/title:opacity-100 transition-opacity p-1 hover:bg-white/20 rounded"
+                                className="p-0.5 rounded text-gray-300 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+                                title="Rename"
                               >
-                                <Edit className="w-4 h-4" />
+                                <Edit className="w-3 h-3" />
                               </button>
                             </div>
-                          )}
-                          <div className="flex flex-wrap gap-2">
-                            {pkg.niches?.map((niche, idx) => (
-                              <Badge key={idx} className="bg-white/20 text-white border-white/30 text-xs">
-                                {niche}
-                              </Badge>
-                            ))}
-                            {pkg.from_template && (
-                              <Badge className="bg-yellow-400/80 text-yellow-900 border-yellow-500/30 text-xs">
-                                From Template
-                              </Badge>
-                            )}
                           </div>
-                        </div>
-                      </div>
+                        )}
 
-                      <div className="p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="text-center">
-                            <div className="text-lg font-bold text-gray-900">
-                              {currencySymbol}
-                              {starterPrice.toLocaleString()}
+                        <button
+                          type="button"
+                          onClick={() => setPanelOpenId(pkg.id)}
+                          className="block text-left w-full mb-3 -mx-1 px-1 py-1 rounded hover:bg-gray-50 transition-colors"
+                          title="View analytics"
+                        >
+                          <div className={`text-sm font-semibold leading-tight ${heroClass}`}>{heroText}</div>
+                          {subText && <div className="text-[11px] text-gray-500 mt-0.5 tabular-nums">{subText}</div>}
+                        </button>
+
+                        <div className="grid grid-cols-3 gap-1 text-center mb-4 bg-gray-50 rounded-lg p-2">
+                          <div>
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wide truncate">{getTierLabel(pkg, 'starter')}</div>
+                            <div className="text-xs font-semibold text-gray-700 tabular-nums">
+                              {currencySymbol}{starterPrice.toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-500">{getTierLabel(pkg, 'starter')}</div>
                           </div>
-                          <div className="text-center">
-                            <div className="text-lg font-bold" style={{ color: pkg.brand_color || '#ff0044' }}>
-                              {currencySymbol}
-                              {growthPrice.toLocaleString()}
+                          <div className="border-l border-r border-gray-200">
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wide truncate">{getTierLabel(pkg, 'growth')}</div>
+                            <div className="text-xs font-bold tabular-nums" style={{ color: brandColor }}>
+                              {currencySymbol}{growthPrice.toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-500">{getTierLabel(pkg, 'growth')}</div>
                           </div>
-                          <div className="text-center">
-                            <div className="text-lg font-bold text-gray-900">
-                              {currencySymbol}
-                              {premiumPrice.toLocaleString()}
+                          <div>
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wide truncate">{getTierLabel(pkg, 'premium')}</div>
+                            <div className="text-xs font-semibold text-gray-700 tabular-nums">
+                              {currencySymbol}{premiumPrice.toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-500">{getTierLabel(pkg, 'premium')}</div>
                           </div>
                         </div>
 
-                        <p className="text-xs text-gray-500 text-center">
-                          Created {new Date(pkg.created_date).toLocaleDateString()}
-                        </p>
-
-                        {/* Status + quick stats */}
-                        <div className="flex flex-wrap items-center gap-3 px-1 min-h-[28px]">
-                          {manual === 'won' && (
-                            <span className="inline-flex items-center gap-2 text-xs font-semibold px-2 py-1 rounded-full bg-emerald-50 text-[#0F6E56] border border-emerald-100">
-                              Won
-                              <button
-                                type="button"
-                                className="underline font-medium"
-                                onClick={() => clearManualStatus(pkg.id)}
-                              >
-                                Undo
-                              </button>
-                            </span>
-                          )}
-                          {manual === 'lost' && (
-                            <span className="inline-flex items-center gap-2 text-xs font-semibold px-2 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
-                              Lost
-                              <button
-                                type="button"
-                                className="underline font-medium"
-                                onClick={() => clearManualStatus(pkg.id)}
-                              >
-                                Undo
-                              </button>
-                            </span>
-                          )}
-                          {!manual && (
-                            <div className="flex items-center gap-2">
-                              {dotKind && <StatusDot kind={dotKind} />}
-                              <span className="text-sm text-gray-600">
-                                {(a.views || 0) === 0
-                                  ? 'No views yet'
-                                  : `${a.views} views · ${formatRelativeTimeNatural(a.lastViewed)}`}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {manual !== 'won' && manual !== 'lost' && (
-                            <>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="rounded-full text-xs h-8"
-                                onClick={() => setConfirmWonLost({ id: pkg.id, type: 'won' })}
-                              >
-                                Won
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="rounded-full text-xs h-8"
-                                onClick={() => setConfirmWonLost({ id: pkg.id, type: 'lost' })}
-                              >
-                                Lost
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="rounded-full text-xs h-8 gap-1"
-                            onClick={() => setPanelOpenId(pkg.id)}
-                          >
-                            <BarChart3 className="w-3.5 h-3.5" />
-                            View data
-                          </Button>
-                        </div>
-
-                        <div className="space-y-2 pt-2">
-                          <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
                             <Button
-                              onClick={() => handleEdit(pkg)}
-                              className="h-10 text-white font-semibold rounded-full text-sm"
-                              style={{ background: 'linear-gradient(135deg, #ff0044 0%, #ff3366 100%)' }}
+                              onClick={() => handleCopyLink(pkg)}
+                              disabled={copying === pkg.id}
+                              className="flex-1 h-9 text-white font-bold rounded-lg text-xs shadow-sm hover:shadow-md"
+                              style={{ background: brandColor }}
                             >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
+                              {copying === pkg.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  Send
+                                  {(pkg.marked_sent_count || 0) > 0 && (
+                                    <span className="ml-1.5 text-[10px] font-semibold tabular-nums opacity-90">· {pkg.marked_sent_count}</span>
+                                  )}
+                                </>
+                              )}
                             </Button>
                             <Button
                               onClick={() => handlePreview(pkg)}
                               variant="outline"
-                              className="h-10 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 rounded-full text-sm"
+                              className="flex-1 h-9 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-lg text-xs font-medium"
                             >
-                              <Eye className="w-4 h-4 mr-1" />
                               Preview
                             </Button>
-                          </div>
-
-                          {/* Hidden for launch — folder system parked
-                          <div className="w-full flex justify-center py-1">
-                            <AssignFolderMenu
-                              packageId={pkg.id}
-                              userId={currentUser?.id}
-                              initialFolderId={pkg.folder_id}
-                              onFolderChange={() => loadPackages()}
-                              variant="outline"
-                              className="w-full justify-between max-w-full"
-                            />
-                          </div>
-                          */}
-
-                          <div className="grid grid-cols-4 gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
                                 <Button
-                                  onClick={() => handleCopyLink(pkg)}
-                                  disabled={copying === pkg.id}
-                                  variant="outline"
-                                  className="h-10 border-2 border-blue-200 text-blue-600 hover:bg-blue-50 rounded-full text-sm relative"
+                                  variant="ghost"
+                                  className="h-9 px-3 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                                  title="More actions"
                                 >
-                                  {copying === pkg.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-4 h-4" />}
-                                  {(pkg.marked_sent_count || 0) > 0 && (
-                                    <span className="ml-1 text-[11px] font-semibold tabular-nums">· {pkg.marked_sent_count}</span>
-                                  )}
+                                  <MoreHorizontal className="w-4 h-4" />
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Copy link and send to your client</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  onClick={() => handleCopyEmbed(pkg)}
-                                  disabled={copying === `embed-${pkg.id}`}
-                                  variant="outline"
-                                  className="h-10 border-2 border-purple-200 text-purple-600 hover:bg-purple-50 rounded-full text-sm"
-                                >
-                                  {copying === `embed-${pkg.id}` ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <Code className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Embed</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  onClick={() => handleDuplicate(pkg)}
-                                  disabled={duplicating === pkg.id}
-                                  variant="outline"
-                                  className="h-10 border-2 border-green-200 text-green-600 hover:bg-green-50 rounded-full text-sm"
-                                >
-                                  {duplicating === pkg.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Copy className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Duplicate</p>
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => handleEdit(pkg)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit package
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {manual !== 'won' && (
+                                  <DropdownMenuItem onClick={() => setConfirmWonLost({ id: pkg.id, type: 'won' })}>
+                                    <Trophy className="w-4 h-4 mr-2 text-emerald-600" />
+                                    Mark as Won
+                                  </DropdownMenuItem>
+                                )}
+                                {manual !== 'lost' && (
+                                  <DropdownMenuItem onClick={() => setConfirmWonLost({ id: pkg.id, type: 'lost' })}>
+                                    <XCircle className="w-4 h-4 mr-2 text-gray-500" />
+                                    Mark as Lost
+                                  </DropdownMenuItem>
+                                )}
+                                {manual && (
+                                  <DropdownMenuItem onClick={() => clearManualStatus(pkg.id)}>
+                                    <X className="w-4 h-4 mr-2 text-gray-500" />
+                                    Clear status
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleCopyEmbed(pkg)} disabled={copying === `embed-${pkg.id}`}>
+                                  <Code className="w-4 h-4 mr-2" />
+                                  {copying === `embed-${pkg.id}` ? 'Copying...' : 'Copy embed code'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicate(pkg)} disabled={duplicating === pkg.id}>
+                                  <Copy className="w-4 h-4 mr-2" />
+                                  {duplicating === pkg.id ? 'Duplicating...' : 'Duplicate'}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
                                   onClick={() => handleDelete(pkg.id)}
                                   disabled={deleting === pkg.id}
-                                  variant="outline"
-                                  className="h-10 border-2 border-red-200 text-red-600 hover:bg-red-50 rounded-full text-sm"
+                                  className="text-red-600 focus:text-red-700 focus:bg-red-50"
                                 >
-                                  {deleting === pkg.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Delete</p>
-                              </TooltipContent>
-                            </Tooltip>
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  {deleting === pkg.id ? 'Deleting...' : 'Delete'}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       </div>
