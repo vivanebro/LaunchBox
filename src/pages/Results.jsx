@@ -1542,7 +1542,7 @@ export default function Results() {
     const modeKey = getCurrentModeKey();
     return config.button_links?.[modeKey]?.[`${tier}_example_label`] || '';
   };
-  const MAX_ADDONS = 3;
+  const MAX_ADDONS = 5;
   const getAddons = () => Array.isArray(config?.addons) ? config.addons : [];
   const addAddon = () => {
     const list = getAddons();
