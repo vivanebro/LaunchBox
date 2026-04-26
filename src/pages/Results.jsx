@@ -4460,16 +4460,18 @@ export default function Results() {
         >
           {pkg.popular && (
             <div
-              className="absolute left-1/2 z-30 px-3.5 py-1.5 rounded-full whitespace-nowrap"
+              className="absolute left-1/2 z-30 whitespace-nowrap"
               style={{
                 top: 0,
                 transform: 'translate(-50%, -50%)',
-                background: 'rgba(255,255,255,0.92)',
+                background: 'rgba(255,255,255,0.65)',
                 backdropFilter: 'blur(14px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(14px) saturate(180%)',
                 color: '#0F0F11',
-                border: `1px solid ${brandColor}`,
-                boxShadow: `0 6px 20px -4px ${brandColor}40`,
+                padding: '7px 14px',
+                borderRadius: '999px',
+                border: '1px solid rgba(255,255,255,0.6)',
+                boxShadow: '0 6px 20px -4px rgba(0,0,0,0.18)',
               }}
             >
               <span className="text-[10px] font-bold uppercase tracking-[0.14em]">{popularBadgeText}</span>
@@ -4743,16 +4745,18 @@ export default function Results() {
               }}
             />
             <div
-              className="absolute left-1/2 z-30 px-3.5 py-1.5 rounded-full whitespace-nowrap"
+              className="absolute left-1/2 z-30 whitespace-nowrap"
               style={{
                 top: '-19px',
                 transform: 'translate(-50%, -50%)',
-                background: 'rgba(255,255,255,0.95)',
+                background: 'rgba(255,255,255,0.65)',
                 backdropFilter: 'blur(14px) saturate(180%)',
                 WebkitBackdropFilter: 'blur(14px) saturate(180%)',
                 color: '#0F0F11',
-                border: `1px solid ${brandColor}`,
-                boxShadow: `0 8px 24px -6px ${brandColor}55, 0 0 0 1px rgba(255,255,255,0.6) inset`,
+                padding: '7px 14px',
+                borderRadius: '999px',
+                border: '1px solid rgba(255,255,255,0.6)',
+                boxShadow: '0 6px 20px -4px rgba(0,0,0,0.18)',
               }}
             >
               <span className="text-[10px] font-bold uppercase tracking-[0.14em]">{popularBadgeText}</span>
