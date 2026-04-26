@@ -20,10 +20,12 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('devbypass_active', '1');
       (async () => {
         try {
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email: 'dana@launchbox.dev',
-            password: 'devpreview2026',
-          });
+          const email = import.meta.env.VITE_DEVBYPASS_EMAIL;
+          const password = import.meta.env.VITE_DEVBYPASS_PASSWORD;
+          if (!email || !password) {
+            throw new Error('Dev bypass credentials missing. Set VITE_DEVBYPASS_EMAIL and VITE_DEVBYPASS_PASSWORD in .env.local');
+          }
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) throw error;
           setUser({ id: data.user.id, email: data.user.email, full_name: 'Dana (Dev Preview)' });
           setIsAuthenticated(true);

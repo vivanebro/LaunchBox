@@ -15,6 +15,9 @@ node_modules
 dist
 dist-ssr
 *.local
+.vercel
+supabase/.temp
+public/preview-mockup.html
 
 # Editor directories and files
 .vscode/*

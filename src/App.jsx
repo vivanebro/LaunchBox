@@ -9,6 +9,8 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import Quiz from './pages/Quiz';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ClientsProjects from './pages/ClientsProjects';
 
@@ -95,6 +97,8 @@ function App() {
           <NavigationTracker />
           <Routes>
             <Route path="/quiz/:quizId" element={<Quiz />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="*" element={<AuthenticatedApp />} />
           </Routes>
         </Router>

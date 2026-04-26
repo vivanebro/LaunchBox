@@ -251,6 +251,15 @@ export default function Welcome() {
           >
             {submitting ? 'Please wait...' : (mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send reset link')}
           </button>
+
+          {mode === 'signup' && (
+            <p style={{ marginTop: '12px', fontSize: '12px', color: '#6b7280', textAlign: 'center', lineHeight: '1.5' }}>
+              By creating an account, you agree to our{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#ff0044', textDecoration: 'underline' }}>Terms of Service</a>
+              {' '}and{' '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#ff0044', textDecoration: 'underline' }}>Privacy Policy</a>.
+            </p>
+          )}
         </form>
       </div>
     </div>
