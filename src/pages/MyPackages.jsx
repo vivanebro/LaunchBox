@@ -21,6 +21,8 @@ import {
   MoreHorizontal,
   Trophy,
   XCircle,
+  Search,
+  ArrowUpDown,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -91,6 +93,9 @@ export default function MyPackages() {
   const [isMobile, setIsMobile] = useState(false);
   const [copyPromptPkg, setCopyPromptPkg] = useState(null);
   const [sendDialog, setSendDialog] = useState({ open: false, pkgId: null });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -126,31 +131,37 @@ export default function MyPackages() {
   };
 
   const sortedPackages = useMemo(() => {
-    return packages.slice().sort((pa, pb) => {
-      const aa = analytics[pa.id] || {};
-      const ab = analytics[pb.id] || {};
-      const sa = computeEngagementStatus({
-        pkg: pa,
-        manualStatus: pa.manual_status || null,
-        views: aa.views || 0,
-        lastViewedAt: aa.lastViewed || null,
-        lastClickAt: aa.lastClickAt || null,
-        mostRecentClick: aa.mostRecentClick || null,
-      });
-      const sb = computeEngagementStatus({
-        pkg: pb,
-        manualStatus: pb.manual_status || null,
-        views: ab.views || 0,
-        lastViewedAt: ab.lastViewed || null,
-        lastClickAt: ab.lastClickAt || null,
-        mostRecentClick: ab.mostRecentClick || null,
-      });
-      const ra = getStatusSortRank(sa);
-      const rb = getStatusSortRank(sb);
-      if (ra !== rb) return ra - rb;
-      return latestActivityMs(ab) - latestActivityMs(aa);
+    const isSent = (pkg) => {
+      const a = analytics[pkg.id] || {};
+      return (pkg.marked_sent_count || 0) > 0 || (a.views || 0) > 0 || pkg.manual_status === 'won' || pkg.manual_status === 'lost';
+    };
+    const nameOf = (pkg) => (pkg.package_set_name || pkg.business_name || 'Untitled Package').toLowerCase();
+    const editedMs = (pkg) => {
+      const u = pkg.updated_date ? new Date(pkg.updated_date).getTime() : 0;
+      const c = pkg.created_date ? new Date(pkg.created_date).getTime() : 0;
+      return Math.max(u, c);
+    };
+
+    const q = searchQuery.trim().toLowerCase();
+    let list = packages.filter((pkg) => {
+      if (q && !nameOf(pkg).includes(q)) return false;
+      if (statusFilter === 'sent' && !isSent(pkg)) return false;
+      if (statusFilter === 'not_sent' && isSent(pkg)) return false;
+      return true;
     });
-  }, [packages, analytics]);
+
+    list = list.sort((pa, pb) => {
+      if (sortBy === 'most_viewed') {
+        return ((analytics[pb.id]?.views) || 0) - ((analytics[pa.id]?.views) || 0);
+      }
+      if (sortBy === 'az') {
+        return nameOf(pa).localeCompare(nameOf(pb));
+      }
+      return editedMs(pb) - editedMs(pa);
+    });
+
+    return list;
+  }, [packages, analytics, searchQuery, statusFilter, sortBy]);
 
   const handleEdit = (pkg) => {
     localStorage.setItem('packageConfig', JSON.stringify(pkg));
@@ -388,6 +399,64 @@ export default function MyPackages() {
               </div>
             </div>
           ) : (
+            <>
+            <div className="flex flex-wrap items-center gap-3 mb-5">
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search packages"
+                  className="pl-9 h-9 rounded-lg border-gray-200 bg-white text-sm"
+                />
+              </div>
+
+              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-full p-1">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'sent', label: 'Sent' },
+                  { key: 'not_sent', label: 'Not sent' },
+                ].map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => setStatusFilter(c.key)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+                      statusFilter === c.key
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="ml-auto">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="h-9 rounded-lg border-gray-200 text-sm font-medium gap-2">
+                      <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
+                      {sortBy === 'newest' && 'Newest'}
+                      {sortBy === 'most_viewed' && 'Most viewed'}
+                      {sortBy === 'az' && 'A–Z'}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem onClick={() => setSortBy('newest')}>Newest</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('most_viewed')}>Most viewed</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('az')}>A–Z</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            {sortedPackages.length === 0 ? (
+              <div className="text-center py-16 text-sm text-gray-500">
+                No packages match your filters.
+              </div>
+            ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               <AnimatePresence>
                 {sortedPackages.map((pkg) => {
@@ -606,6 +675,8 @@ export default function MyPackages() {
                 })}
               </AnimatePresence>
             </div>
+            )}
+            </>
           )}
         </div>
 
