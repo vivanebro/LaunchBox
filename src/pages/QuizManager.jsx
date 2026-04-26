@@ -798,6 +798,40 @@ function QuizBuilder({ initialDraft, editingId, onSave, onCancel }) {
 // ─── QuizManager (main page) ──────────────────────────────────────────────────
 
 export default function QuizManager() {
+    return <AutoPackagesComingSoon />;
+}
+
+function AutoPackagesComingSoon() {
+    return (
+        <div className="min-h-screen flex items-center justify-center px-6 py-16" style={{ backgroundColor: '#F5F5F7' }}>
+            <div className="max-w-2xl w-full bg-white rounded-3xl shadow-lg border border-gray-100 p-10 text-center">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 text-[#ff0044] text-xs font-semibold tracking-wide uppercase mb-6">
+                    Coming Soon
+                </div>
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">Auto Packages</h1>
+                <p className="text-lg text-gray-700 mb-8 leading-relaxed">
+                    Your client builds their own package. You close while you sleep.
+                </p>
+                <ul className="text-left space-y-3 max-w-md mx-auto">
+                    <li className="flex items-start gap-3 text-gray-700">
+                        <Check className="w-5 h-5 text-[#ff0044] mt-0.5 flex-shrink-0" />
+                        <span>No more discovery calls for small jobs</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-gray-700">
+                        <Check className="w-5 h-5 text-[#ff0044] mt-0.5 flex-shrink-0" />
+                        <span>Qualify leads 24/7</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-gray-700">
+                        <Check className="w-5 h-5 text-[#ff0044] mt-0.5 flex-shrink-0" />
+                        <span>Clients book themselves</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    );
+}
+
+function QuizManagerOriginal() {
     const [quizzes, setQuizzes] = useState([]);
     const [submissionCounts, setSubmissionCounts] = useState({});
     const [loading, setLoading] = useState(true);
