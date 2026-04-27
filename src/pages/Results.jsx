@@ -104,6 +104,8 @@ const DISCOUNT_TEMPLATES = [
 const calcDiscountPrice = (price, percent) => {
   if (!price || !percent) return price;
   const discounted = price * (1 - percent / 100);
+  if (discounted < 100) return Math.round(discounted);
+  if (discounted < 1000) return Math.round(discounted / 5) * 5;
   return Math.ceil(discounted / 50) * 50;
 };
 
@@ -3435,7 +3437,7 @@ export default function Results() {
             className={`relative bg-white rounded-3xl border-2 flex flex-col flex-grow group/package transition-all duration-[400ms] ease-out ${
               pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
             } p-8`}
-            style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: '46px 32px' } : {}}
+            style={pkg.popular ? { borderColor: `${brandColor}66`, marginTop: '-14px', marginBottom: '-14px', padding: '46px 32px' } : {}}
           >
             {packages.length > 1 && (
               <button
@@ -3942,7 +3944,7 @@ export default function Results() {
                 left: '-5px',
                 right: '-5px',
                 background: `linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.05) 60%, ${brandColor}40 100%)`,
-                border: '1px solid rgba(255,255,255,0.35)',
+                border: `1px solid ${brandColor}66`,
                 boxShadow: `0 30px 60px -15px ${brandColor}33, inset 0 1px 0 rgba(255,255,255,0.6)`,
                 zIndex: 0,
               }}
@@ -4036,7 +4038,7 @@ export default function Results() {
                   color: '#0F0F11',
                   padding: '7px 14px',
                   borderRadius: '999px',
-                  border: '1px solid rgba(255,255,255,0.6)',
+                  border: `1.5px solid ${brandColor}`,
                   boxShadow: '0 6px 20px -4px rgba(0,0,0,0.18)',
                 }}
               >
@@ -4534,7 +4536,7 @@ export default function Results() {
           className={`relative bg-white rounded-3xl border-2 flex flex-col transition-all duration-[400ms] ease-out ${
             pkg.popular ? 'shadow-xl' : 'border-gray-200 shadow-lg'
           } p-6`}
-          style={pkg.popular ? { borderColor: brandColor, marginTop: '-14px', marginBottom: '-14px', padding: '38px 24px' } : {}}
+          style={pkg.popular ? { borderColor: `${brandColor}66`, marginTop: '-14px', marginBottom: '-14px', padding: '38px 24px' } : {}}
         >
           {pkg.popular && (
             <div
@@ -4646,9 +4648,9 @@ export default function Results() {
                             style={{ color: brandColor }}
                           />
                         ) : (
-                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 w-5 h-5`} />
+                          <X className={`flex-shrink-0 mt-0.5 text-gray-200 w-5 h-5`} />
                         )}
-                        <span className={`${isIncluded ? 'text-gray-700' : 'text-gray-400'} text-sm`}>
+                        <span className={`${isIncluded ? 'text-gray-700' : 'text-gray-300'} text-sm`}>
                           {label}
                           {isIncluded && <TooltipBadge tooltip={getTooltip(deliverable)} brandColor={brandColor} darkMode={false} />}
                         </span>
@@ -4674,9 +4676,9 @@ export default function Results() {
                         {hasBonus ? (
                           <Plus className={`flex-shrink-0 mt-0.5 text-green-500 w-5 h-5`} />
                         ) : (
-                          <X className={`flex-shrink-0 mt-0.5 text-gray-300 w-5 h-5`} />
+                          <X className={`flex-shrink-0 mt-0.5 text-gray-200 w-5 h-5`} />
                         )}
-                        <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-400'} text-sm`}>
+                        <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-300'} text-sm`}>
                           {bonusLabel}
                           {hasBonus && <TooltipBadge tooltip={getTooltip(bonus)} brandColor={brandColor} darkMode={false} />}
                         </span>
@@ -4817,7 +4819,7 @@ export default function Results() {
                 left: '-5px',
                 right: '-5px',
                 background: `linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.05) 60%, ${brandColor}40 100%)`,
-                border: '1px solid rgba(255,255,255,0.35)',
+                border: `1px solid ${brandColor}66`,
                 boxShadow: `0 30px 60px -15px ${brandColor}33, inset 0 1px 0 rgba(255,255,255,0.6)`,
                 zIndex: 0,
               }}
@@ -4935,9 +4937,9 @@ export default function Results() {
                         {isIncluded ? (
                           <Check className={`flex-shrink-0 mt-0.5 text-white w-5 h-5`} />
                         ) : (
-                          <X className={`flex-shrink-0 mt-0.5 text-white/30 w-5 h-5`} />
+                          <X className={`flex-shrink-0 mt-0.5 text-white/20 w-5 h-5`} />
                         )}
-                        <span className={`${isIncluded ? 'text-white' : 'text-white/40'} text-sm`}>
+                        <span className={`${isIncluded ? 'text-white' : 'text-white/25'} text-sm`}>
                           {label}
                           {isIncluded && <TooltipBadge tooltip={getTooltip(deliverable)} brandColor={brandColor} darkMode={true} />}
                         </span>
@@ -4963,9 +4965,9 @@ export default function Results() {
                         {hasBonus ? (
                           <Plus className={`flex-shrink-0 mt-0.5 text-yellow-400 w-5 h-5`} />
                         ) : (
-                          <X className={`flex-shrink-0 mt-0.5 text-white/30 w-5 h-5`} />
+                          <X className={`flex-shrink-0 mt-0.5 text-white/20 w-5 h-5`} />
                         )}
-                        <span className={`${hasBonus ? 'text-white' : 'text-white/40'} text-sm`}>
+                        <span className={`${hasBonus ? 'text-white' : 'text-white/25'} text-sm`}>
                           {bonusLabel}
                           {hasBonus && <TooltipBadge tooltip={getTooltip(bonus)} brandColor={brandColor} darkMode={true} />}
                         </span>
