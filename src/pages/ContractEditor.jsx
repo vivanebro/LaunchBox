@@ -16,6 +16,7 @@ import {
   ArrowLeft, Save, Share2, AlertTriangle, Upload, Eye,
   LayoutTemplate, Info, X, CheckCircle2, Loader2, CalendarDays
 } from 'lucide-react';
+import { posthog } from '@/lib/posthog';
 
 export default function ContractEditor() {
   const navigate = useNavigate();
@@ -35,11 +36,12 @@ export default function ContractEditor() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef(null);
 
-  const [name, setName] = useState('Untitled Contract');
+  const [name, setName] = useState('');
   const [body, setBody] = useState('');
   const [accentColor, setAccentColor] = useState('#ff0044');
   const [logoUrl, setLogoUrl] = useState('');
   const [logoHeight, setLogoHeight] = useState(80);
+  const [introMessage, setIntroMessage] = useState('');
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [buttonLabel, setButtonLabel] = useState('');
   const [buttonLink, setButtonLink] = useState('');
@@ -77,7 +79,7 @@ export default function ContractEditor() {
       setLoading(false);
     };
     load();
-  }, [contractId, templateEditId, fromTemplateId]);
+  }, [contractId, templateEditId, fromTemplateId, isTemplate]);
 
   const populateFromContract = (c) => {
     setContract(c);
@@ -90,6 +92,7 @@ export default function ContractEditor() {
     setButtonLabel(c.custom_button_label || '');
     setButtonLink(c.custom_button_link || '');
     setConsentText(c.consent_text ?? 'By clicking "Sign Document", you agree that your signature is the legal equivalent of your handwritten signature.');
+    setIntroMessage(c.intro_message || '');
     setMergeFieldDefs(c.merge_field_definitions || []);
     setShareableLink(c.shareable_link || '');
     setStatus(c.status || 'draft');
@@ -107,6 +110,7 @@ export default function ContractEditor() {
     setConfirmationMessage(t.custom_confirmation_message || '');
     setButtonLabel(t.custom_button_label || '');
     setButtonLink(t.custom_button_link || '');
+    setIntroMessage(t.intro_message || '');
     setMergeFieldDefs(t.merge_field_definitions || []);
     if (!createNew) {
       savedIdRef.current = t.id;
@@ -124,6 +128,7 @@ export default function ContractEditor() {
     custom_confirmation_message: confirmationMessage,
     custom_button_label: buttonLabel,
     custom_button_link: buttonLink,
+    intro_message: introMessage,
     updated_at: new Date().toISOString(),
   });
 
@@ -137,6 +142,7 @@ export default function ContractEditor() {
     custom_button_label: buttonLabel,
     custom_button_link: buttonLink,
     consent_text: consentText,
+    intro_message: introMessage,
     merge_field_definitions: mergeFieldDefs,
     expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
     updated_at: new Date().toISOString(),
@@ -168,6 +174,7 @@ export default function ContractEditor() {
           savedIdRef.current = created.id;
           isNewRef.current = false;
           setContract(created);
+          posthog.capture('contract_created', { contract_id: created.id });
         } else {
           await supabaseClient.entities.Contract.update(savedIdRef.current, buildPayload());
         }
@@ -179,7 +186,7 @@ export default function ContractEditor() {
       toast({ title: 'Failed to save contract. Please try again.', variant: 'destructive' });
     }
     setSaving(false);
-  }, [name, body, accentColor, logoUrl, logoHeight, confirmationMessage, buttonLabel, buttonLink, mergeFieldDefs, expiresAt, isTemplate]);
+  }, [name, body, accentColor, logoUrl, logoHeight, confirmationMessage, buttonLabel, buttonLink, introMessage, consentText, mergeFieldDefs, expiresAt, isTemplate]);
 
   const triggerAutoSave = useCallback(() => {
     clearTimeout(autoSaveTimer.current);
@@ -203,6 +210,17 @@ export default function ContractEditor() {
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    if (!allowed.includes(file.type)) {
+      toast({ title: 'Logo must be PNG, JPG, WEBP, or SVG.', variant: 'destructive' });
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'Logo must be under 2 MB.', variant: 'destructive' });
+      e.target.value = '';
+      return;
+    }
     setUploadingLogo(true);
     try {
       const { supabase } = await import('@/lib/supabaseClient');
@@ -217,6 +235,7 @@ export default function ContractEditor() {
       triggerAutoSave();
     } catch (err) {
       console.error('Logo upload failed:', err);
+      toast({ title: 'Logo upload failed. Please try again.', variant: 'destructive' });
     }
     setUploadingLogo(false);
   };
@@ -238,6 +257,7 @@ export default function ContractEditor() {
       });
       setStatus('shared');
       setShareableLink(link);
+      posthog.capture('contract_shared', { contract_id: savedIdRef.current });
     }
     const url = `${window.location.origin}${createPageUrl('ContractSign')}?shareId=${link}`;
     setShareLink(url);
@@ -245,7 +265,16 @@ export default function ContractEditor() {
   };
 
   const copyShareLink = async () => {
-    await navigator.clipboard.writeText(shareLink);
+    try {
+      await navigator.clipboard.writeText(shareLink);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = shareLink;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+      document.body.removeChild(ta);
+    }
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
   };
@@ -481,6 +510,26 @@ export default function ContractEditor() {
             </div>
           )}
           <div>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Intro to Client</h3>
+            <div className="flex items-center gap-1 mb-1">
+              <label className="text-xs font-medium text-gray-600">Personal Note</label>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Intro note info">
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[240px] text-xs leading-relaxed">
+                    Shown above the contract on the sign page. Warms the cold link with a friendly message.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <Textarea value={introMessage} onChange={(e) => { setIntroMessage(e.target.value); triggerAutoSave(); }} placeholder="Hey Sarah, here's the agreement we discussed. Should take 2 minutes to sign." rows={3} className="text-sm resize-none mb-6" />
+          </div>
+
+          <div>
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Post-Signature</h3>
             <div className="space-y-3">
               <div>
@@ -583,8 +632,8 @@ export default function ContractEditor() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-3xl mx-auto">
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+          <div className="max-w-4xl mx-auto">
             <TipTapEditor value={body} onChange={handleBodyChange} onMergeFieldsChange={handleMergeFieldsChange} accentColor={accentColor} />
           </div>
         </div>

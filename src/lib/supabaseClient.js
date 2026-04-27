@@ -86,14 +86,14 @@ const TABLE_COLUMNS = {
   contracts: new Set([
     'id', 'created_by', 'name', 'body', 'merge_field_definitions',
     'logo_url', 'logo_height', 'accent_color', 'custom_confirmation_message',
-    'custom_button_label', 'custom_button_link', 'consent_text', 'status',
+    'custom_button_label', 'custom_button_link', 'consent_text', 'intro_message', 'status',
     'shareable_link', 'linked_package_id', 'folder_id', 'expires_at',
     'created_at', 'updated_at',
   ]),
   contract_templates: new Set([
     'id', 'created_by', 'name', 'body',
     'logo_url', 'logo_height', 'accent_color', 'custom_confirmation_message',
-    'custom_button_label', 'custom_button_link',
+    'custom_button_label', 'custom_button_link', 'intro_message',
     'created_at', 'updated_at',
   ]),
   signed_contracts: new Set([

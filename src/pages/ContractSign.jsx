@@ -9,6 +9,7 @@ import { CheckCircle2, Download, Loader2, RotateCcw, AlertCircle, FileDown } fro
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { logContractView, updateContractTimeSpent } from '@/lib/contractAnalytics';
+import { posthog } from '@/lib/posthog';
 
 export default function ContractSign() {
   const [searchParams] = useSearchParams();
@@ -16,6 +17,7 @@ export default function ContractSign() {
   const isPreviewMode = searchParams.get('preview') === 'true';
 
   const [contract, setContract] = useState(null);
+  const [ownerName, setOwnerName] = useState('');
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [step, setStep] = useState('view');
@@ -38,14 +40,13 @@ export default function ContractSign() {
     if (!shareId) { setNotFound(true); setLoading(false); return; }
     const load = async () => {
       try {
-        const { data, error } = await supabase
-          .from('contracts')
-          .select('*')
-          .eq('shareable_link', shareId)
-          .single();
+        const { data: payload, error } = await supabase
+          .rpc('get_shared_contract', { link: shareId });
+        const data = payload?.contract;
         if (error || !data) { setNotFound(true); }
         else {
           setContract(data);
+          setOwnerName(payload?.owner_name || '');
           if (data.status === 'signed') {
             const { data: signedList } = await supabase
               .from('signed_contracts')
@@ -73,6 +74,7 @@ export default function ContractSign() {
       if (!active) return;
       viewIdRef.current = viewId;
     });
+    posthog.capture('contract_viewed', { contract_id: contract.id });
 
     const flush = () => {
       const started = viewStartedAtRef.current;
@@ -221,6 +223,7 @@ export default function ContractSign() {
       }
 
       setStep('complete');
+      posthog.capture('contract_signed', { contract_id: contract.id });
       generatePdf(frozenHtml, signatureDataUrl);
     } catch (e) {
       console.error('Signing failed:', e);
@@ -334,14 +337,17 @@ export default function ContractSign() {
     };
 
     return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
+      <div className="min-h-screen bg-gray-50 flex flex-col py-8 px-4">
+        <div className="flex-1 max-w-3xl mx-auto w-full bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-8 sm:px-12 py-10">
           <div className="flex items-start justify-between mb-8 gap-4">
             {contract.logo_url && (
               <img src={contract.logo_url} alt="Logo" className="object-contain" style={{ height: `${logoHeight}px` }} />
             )}
-            <div className="text-right">
-              {contract.name && <h1 className="text-lg font-semibold text-gray-700">{contract.name}</h1>}
+            <div className="text-right min-w-0">
+              {ownerName && (
+                <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">From {ownerName}</p>
+              )}
+              {contract.name && <h1 className="text-lg font-semibold text-gray-700 truncate">{contract.name}</h1>}
               <p className="text-sm text-green-600 font-medium mt-1 flex items-center justify-end gap-1">
                 <CheckCircle2 className="w-4 h-4" /> Signed
               </p>
@@ -390,8 +396,8 @@ export default function ContractSign() {
 
   if (isExpired && !isSigned) {
     return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="min-h-screen bg-gray-50 flex flex-col py-8 px-4">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center max-w-md mx-auto w-full bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
           {contract.logo_url && (
             <img src={contract.logo_url} alt="Logo" className="object-contain mb-8" style={{ height: `${logoHeight}px` }} />
           )}
@@ -421,8 +427,8 @@ export default function ContractSign() {
     const nextStepUrl = normalizeExternalUrl(contract.custom_button_link);
     const hasNextStepCta = Boolean(nextStepUrl && (contract.custom_button_label || '').trim());
     return (
-      <div className="min-h-screen bg-white flex flex-col">
-        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="min-h-screen bg-gray-50 flex flex-col py-8 px-4">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-16 text-center max-w-md mx-auto w-full bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
           {contract.logo_url && (
             <img src={contract.logo_url} alt="Logo" className="object-contain mb-8" style={{ height: `${logoHeight}px` }} />
           )}
@@ -434,13 +440,13 @@ export default function ContractSign() {
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Document Signed!</h1>
           <p className="text-gray-600 max-w-md mb-8">{msg}</p>
 
-          <div className={`flex flex-col sm:flex-row gap-3 w-full max-w-xs ${hasNextStepCta ? '' : 'justify-center mx-auto'}`}>
+          <div className="flex flex-col items-center gap-3 w-full max-w-sm">
             {hasNextStepCta && (
               <a
                 href={nextStepUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-3 px-6 rounded-xl font-semibold text-center transition-opacity hover:opacity-90"
+                className="w-full py-4 px-6 rounded-xl font-semibold text-center transition-opacity hover:opacity-90 text-base"
                 style={{ backgroundColor: accentColor, color: buttonTextColor }}
               >
                 {contract.custom_button_label || 'Book Your Kickoff Call'}
@@ -450,14 +456,14 @@ export default function ContractSign() {
               <a
                 href={pdfUrl}
                 download={`${contract.name}-signed.pdf`}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
               >
-                <Download className="w-4 h-4" />
-                Download Copy
+                <Download className="w-3.5 h-3.5" />
+                Download a copy
               </a>
             ) : signedContractId ? (
-              <span className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-gray-200 text-gray-400 text-sm">
-                <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 Preparing PDF…
               </span>
             ) : null}
@@ -479,15 +485,18 @@ export default function ContractSign() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
+    <div className="min-h-screen bg-gray-50 flex flex-col py-8 px-4">
+      <div className="flex-1 max-w-3xl mx-auto w-full bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] px-8 sm:px-12 py-10">
         <div className="flex items-start justify-between mb-8 gap-4">
           {contract.logo_url && (
             <img src={contract.logo_url} alt="Logo" className="object-contain" style={{ height: `${logoHeight}px` }} />
           )}
-          <div className="text-right">
+          <div className="text-right min-w-0">
+            {ownerName && (
+              <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">From {ownerName}</p>
+            )}
             {contract.name && (
-              <h1 className="text-lg font-semibold text-gray-700">{contract.name}</h1>
+              <h1 className="text-lg font-semibold text-gray-700 truncate">{contract.name}</h1>
             )}
             {contract.expires_at && (
               <p className="text-sm text-gray-500 mt-1">
@@ -496,6 +505,12 @@ export default function ContractSign() {
             )}
           </div>
         </div>
+
+        {contract.intro_message && (
+          <div className="mb-8 px-5 py-4 rounded-2xl bg-gray-50 border border-gray-100">
+            <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{contract.intro_message}</p>
+          </div>
+        )}
 
         <div
           ref={contractBodyRef}
@@ -569,8 +584,8 @@ export default function ContractSign() {
 
           <Button
             onClick={handleSign}
-            disabled={submitting || isPreviewMode}
-            className="w-full sm:w-auto mt-3 py-3 px-8 rounded-xl font-semibold text-base"
+            disabled={submitting || isPreviewMode || !clientName.trim() || signatureEmpty}
+            className="w-full sm:w-auto mt-3 py-3 px-8 rounded-xl font-semibold text-base disabled:opacity-50"
             style={{ backgroundColor: accentColor, color: buttonTextColor, minWidth: 200 }}
           >
             {submitting ? (
