@@ -1541,6 +1541,11 @@ export default function Results() {
     return item.tooltip || '';
   };
 
+  const getLink = (item) => {
+    if (!item || typeof item === 'string') return '';
+    return item.link || '';
+  };
+
   const getItemText = (item) => {
     if (!item) return '';
     if (typeof item === 'string') return item;
@@ -1617,6 +1622,48 @@ export default function Results() {
     const trimmed = (tooltipText || '').trim();
     if (trimmed) asObj.tooltip = trimmed;
     else delete asObj.tooltip;
+    const updatedBonuses = [...currentBonuses];
+    updatedBonuses[index] = asObj;
+    updateConfig('package_data', {
+      ...c.package_data,
+      [modeKey]: {
+        ...c.package_data[modeKey],
+        [tier]: { ...c.package_data[modeKey][tier], bonuses: updatedBonuses }
+      }
+    });
+  };
+
+  const updateDeliverableLink = (tier, index, linkUrl) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const currentDeliverables = c.package_data?.[modeKey]?.[tier]?.deliverables || [];
+    if (index < 0 || index >= currentDeliverables.length) return;
+    const current = currentDeliverables[index];
+    const asObj = typeof current === 'string' ? { type: current } : { ...current };
+    const cleaned = sanitizeExternalUrl(linkUrl || '');
+    if (cleaned) asObj.link = cleaned;
+    else delete asObj.link;
+    const updatedDeliverables = [...currentDeliverables];
+    updatedDeliverables[index] = asObj;
+    updateConfig('package_data', {
+      ...c.package_data,
+      [modeKey]: {
+        ...c.package_data[modeKey],
+        [tier]: { ...c.package_data[modeKey][tier], deliverables: updatedDeliverables }
+      }
+    });
+  };
+
+  const updateBonusLink = (tier, index, linkUrl) => {
+    const modeKey = getCurrentModeKey();
+    const c = configRef.current || config;
+    const currentBonuses = c.package_data?.[modeKey]?.[tier]?.bonuses || [];
+    if (index < 0 || index >= currentBonuses.length) return;
+    const current = currentBonuses[index];
+    const asObj = typeof current === 'string' ? { text: current } : { ...current };
+    const cleaned = sanitizeExternalUrl(linkUrl || '');
+    if (cleaned) asObj.link = cleaned;
+    else delete asObj.link;
     const updatedBonuses = [...currentBonuses];
     updatedBonuses[index] = asObj;
     updateConfig('package_data', {
@@ -2517,6 +2564,73 @@ export default function Results() {
     );
   };
 
+  const LinkEditor = ({ link, onSave, darkMode, brandColor }) => {
+    const [open, setOpen] = useState(false);
+    const [val, setVal] = useState(link || '');
+    const ref = useRef(null);
+    useEffect(() => { setVal(link || ''); }, [link]);
+    useEffect(() => {
+      if (!open) return;
+      const onOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) { onSave(val); setOpen(false); } };
+      document.addEventListener('mousedown', onOutside);
+      return () => document.removeEventListener('mousedown', onOutside);
+    }, [open, val]);
+    const hasLink = !!(link && link.trim());
+    return (
+      <div className="relative" ref={ref}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-5 w-5 transition-opacity ${hasLink ? 'opacity-100' : 'opacity-30 group-hover:opacity-100'} ${darkMode ? 'text-white/70 hover:text-white hover:bg-white/10' : 'hover:bg-gray-100'}`}
+          style={hasLink && !darkMode ? { color: brandColor } : undefined}
+          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+          title={hasLink ? 'Edit link' : 'Add link'}
+        >
+          <LinkIcon className="w-3 h-3" />
+        </Button>
+        {open && (
+          <div
+            className="absolute right-0 top-6 z-50 w-64 bg-white rounded-lg shadow-xl border border-gray-200 p-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="url"
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { setVal(link || ''); setOpen(false); }
+                if (e.key === 'Enter') { e.preventDefault(); onSave(val); setOpen(false); }
+              }}
+              className="w-full text-sm text-gray-800 border border-gray-200 rounded p-2 focus:outline-none focus:ring-1"
+              style={{ borderColor: brandColor }}
+              placeholder="https://"
+              autoFocus
+            />
+            <div className="flex items-center justify-between mt-2">
+              {hasLink ? (
+                <button
+                  type="button"
+                  onClick={() => { onSave(''); setOpen(false); }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  Remove
+                </button>
+              ) : <span />}
+              <button
+                type="button"
+                onClick={() => { onSave(val); setOpen(false); }}
+                className="text-xs font-semibold px-3 py-1 rounded text-white"
+                style={{ backgroundColor: brandColor }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const TooltipBadge = ({ tooltip, brandColor, darkMode }) => {
     const [open, setOpen] = useState(false);
     const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -2843,7 +2957,20 @@ export default function Results() {
                           placeholder="Add-on name"
                           brandColor={brandColor}
                         />
-                      ) : addon.name}
+                      ) : (
+                        addon.link ? (
+                          <a
+                            href={addon.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline"
+                            style={{ color: brandColor }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {addon.name}
+                          </a>
+                        ) : addon.name
+                      )}
                     </div>
                     <TooltipBadge tooltip={addon.tooltip} brandColor="#9CA3AF" darkMode={false} />
                   </div>
@@ -2908,6 +3035,12 @@ export default function Results() {
                         darkMode={false}
                         brandColor={brandColor}
                       />
+                      <LinkEditor
+                        link={addon.link || ''}
+                        onSave={(u) => updateAddon(addon.id, { link: sanitizeExternalUrl(u) })}
+                        darkMode={false}
+                        brandColor={brandColor}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
@@ -2954,7 +3087,7 @@ export default function Results() {
     );
   };
 
-  const EditableDeliverableItem = ({ deliverable, onSave, onDuplicate, onDelete, onSaveTooltip, darkMode, brandColor, dragHandleProps }) => {
+  const EditableDeliverableItem = ({ deliverable, onSave, onDuplicate, onDelete, onSaveTooltip, onSaveLink, darkMode, brandColor, dragHandleProps }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(typeof deliverable === 'string' ? deliverable : deliverable.type || '');
     const [isHovered, setIsHovered] = useState(false);
@@ -3063,6 +3196,14 @@ export default function Results() {
               brandColor={brandColor}
             />
           </span>
+          <span className="inline-flex items-center align-middle ml-0.5">
+            <LinkEditor
+              link={getLink(deliverable)}
+              onSave={(u) => onSaveLink && onSaveLink(u)}
+              darkMode={darkMode}
+              brandColor={brandColor}
+            />
+          </span>
         </span>
         <div className="flex items-center gap-1">
           <Button
@@ -3093,7 +3234,7 @@ export default function Results() {
     );
   };
 
-  const EditableListItem = ({ value, onSave, onDelete, onSaveTooltip, tooltip, icon: Icon, iconClassName, darkMode, brandColor, dragHandleProps }) => {
+  const EditableListItem = ({ value, onSave, onDelete, onSaveTooltip, tooltip, onSaveLink, link, icon: Icon, iconClassName, darkMode, brandColor, dragHandleProps }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(value);
     const [isHovered, setIsHovered] = useState(false);
@@ -3200,6 +3341,16 @@ export default function Results() {
               <TooltipEditor
                 tooltip={tooltip}
                 onSave={(t) => onSaveTooltip(t)}
+                darkMode={darkMode}
+                brandColor={brandColor}
+              />
+            </span>
+          )}
+          {onSaveLink && (
+            <span className="inline-flex items-center align-middle ml-0.5">
+              <LinkEditor
+                link={link}
+                onSave={(u) => onSaveLink(u)}
                 darkMode={darkMode}
                 brandColor={brandColor}
               />
@@ -3777,6 +3928,7 @@ export default function Results() {
                                    onDuplicate={() => duplicateDeliverable(tierName, idx)}
                                    onDelete={() => deleteDeliverable(tierName, idx)}
                                    onSaveTooltip={(t) => updateDeliverableTooltip(tierName, idx, t)}
+                                   onSaveLink={(u) => updateDeliverableLink(tierName, idx, u)}
                                    darkMode={false}
                                    brandColor={brandColor}
                                    dragHandleProps={provided.dragHandleProps}
@@ -3853,9 +4005,11 @@ export default function Results() {
                                 <EditableListItem
                                   value={getItemText(bonus)}
                                   tooltip={getTooltip(bonus)}
+                                  link={getLink(bonus)}
                                   onSave={(newValue) => updateBonus(tierName, idx, newValue)}
                                   onDelete={() => deleteBonus(tierName, idx)}
                                   onSaveTooltip={(t) => updateBonusTooltip(tierName, idx, t)}
+                                  onSaveLink={(u) => updateBonusLink(tierName, idx, u)}
                                   icon={Plus}
                                   iconClassName="text-green-500"
                                   brandColor={brandColor}
@@ -4311,6 +4465,7 @@ export default function Results() {
                                    onDuplicate={() => duplicateDeliverable(tierName, idx)}
                                    onDelete={() => deleteDeliverable(tierName, idx)}
                                    onSaveTooltip={(t) => updateDeliverableTooltip(tierName, idx, t)}
+                                   onSaveLink={(u) => updateDeliverableLink(tierName, idx, u)}
                                    darkMode={true}
                                    brandColor={brandColor}
                                    dragHandleProps={provided.dragHandleProps}
@@ -4385,9 +4540,11 @@ export default function Results() {
                                 <EditableListItem
                                   value={getItemText(bonus)}
                                   tooltip={getTooltip(bonus)}
+                                  link={getLink(bonus)}
                                   onSave={(newValue) => updateBonus(tierName, idx, newValue)}
                                   onDelete={() => deleteBonus(tierName, idx)}
                                   onSaveTooltip={(t) => updateBonusTooltip(tierName, idx, t)}
+                                  onSaveLink={(u) => updateBonusLink(tierName, idx, u)}
                                   icon={Plus}
                                   iconClassName="text-yellow-400"
                                   darkMode={true}
@@ -4651,7 +4808,17 @@ export default function Results() {
                           <X className={`flex-shrink-0 mt-0.5 text-gray-200 w-5 h-5`} />
                         )}
                         <span className={`${isIncluded ? 'text-gray-700' : 'text-gray-300'} text-sm`}>
-                          {label}
+                          {isIncluded && getLink(deliverable) ? (
+                            <a
+                              href={getLink(deliverable)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                              style={{ color: brandColor }}
+                            >
+                              {label}
+                            </a>
+                          ) : label}
                           {isIncluded && <TooltipBadge tooltip={getTooltip(deliverable)} brandColor={brandColor} darkMode={false} />}
                         </span>
                       </div>
@@ -4679,7 +4846,17 @@ export default function Results() {
                           <X className={`flex-shrink-0 mt-0.5 text-gray-200 w-5 h-5`} />
                         )}
                         <span className={`${hasBonus ? 'text-gray-700' : 'text-gray-300'} text-sm`}>
-                          {bonusLabel}
+                          {hasBonus && getLink(bonus) ? (
+                            <a
+                              href={getLink(bonus)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                              style={{ color: brandColor }}
+                            >
+                              {bonusLabel}
+                            </a>
+                          ) : bonusLabel}
                           {hasBonus && <TooltipBadge tooltip={getTooltip(bonus)} brandColor={brandColor} darkMode={false} />}
                         </span>
                       </div>
@@ -4940,7 +5117,16 @@ export default function Results() {
                           <X className={`flex-shrink-0 mt-0.5 text-white/20 w-5 h-5`} />
                         )}
                         <span className={`${isIncluded ? 'text-white' : 'text-white/25'} text-sm`}>
-                          {label}
+                          {isIncluded && getLink(deliverable) ? (
+                            <a
+                              href={getLink(deliverable)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline text-white"
+                            >
+                              {label}
+                            </a>
+                          ) : label}
                           {isIncluded && <TooltipBadge tooltip={getTooltip(deliverable)} brandColor={brandColor} darkMode={true} />}
                         </span>
                       </div>
@@ -4968,7 +5154,16 @@ export default function Results() {
                           <X className={`flex-shrink-0 mt-0.5 text-white/20 w-5 h-5`} />
                         )}
                         <span className={`${hasBonus ? 'text-white' : 'text-white/25'} text-sm`}>
-                          {bonusLabel}
+                          {hasBonus && getLink(bonus) ? (
+                            <a
+                              href={getLink(bonus)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline text-white"
+                            >
+                              {bonusLabel}
+                            </a>
+                          ) : bonusLabel}
                           {hasBonus && <TooltipBadge tooltip={getTooltip(bonus)} brandColor={brandColor} darkMode={true} />}
                         </span>
                       </div>

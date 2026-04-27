@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Settings, ChevronDown, ChevronRight, ChevronLeft, LayoutTemplate, Package, Plus, MessageSquare, FileSignature, Folder, ClipboardList, PanelLeftClose, PanelLeftOpen, Zap } from 'lucide-react';
+import { Home, Settings, ChevronDown, ChevronRight, ChevronLeft, LayoutTemplate, Package, Plus, MessageSquare, FileSignature, Folder, ClipboardList, PanelLeftClose, PanelLeftOpen, Workflow } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient, { supabase } from '@/lib/supabaseClient';
 import { identifyUser } from '@/lib/posthog';
@@ -402,9 +402,8 @@ export default function Layout({ children, currentPageName }) {
                         : 'text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    <Zap className="w-4 h-4" />
+                    <Workflow className="w-4 h-4" />
                     <span>Auto Packages</span>
-                    <span className="ml-auto text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full border bg-red-50 border-red-200 text-[#ff0044] font-semibold">Soon</span>
                   </Link>
                 </div>
               )}
