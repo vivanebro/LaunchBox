@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import Quiz from './pages/Quiz';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
+import Landing from './pages/Landing';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ClientsProjects from './pages/ClientsProjects';
 
@@ -96,6 +97,7 @@ function App() {
         <Router>
           <NavigationTracker />
           <Routes>
+            <Route path="/" element={<Landing />} />
             <Route path="/quiz/:quizId" element={<Quiz />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />

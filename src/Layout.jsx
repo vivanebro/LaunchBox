@@ -131,7 +131,10 @@ export default function Layout({ children, currentPageName }) {
 
         identifyUser(session.user);
 
-        // Paywall: require active or trialing subscription
+        // Paywall: DISABLED for migration launch (Apr 29 2026).
+        // All logged-in users get full access (effectively Growth-tier features).
+        // Re-enable when Stripe checkout is wired into the landing page.
+        /*
         if (!isSubscribe) {
           const justCheckedOut = new URLSearchParams(window.location.search).get('checkout') === 'success';
           const userEmail = session.user?.email;
@@ -150,6 +153,7 @@ export default function Layout({ children, currentPageName }) {
             }
           }
         }
+        */
       } catch (error) {
         console.error('Auth check failed:', error);
         // Don't redirect on network errors - just show the page

@@ -4,7 +4,8 @@ import { createPageUrl } from '@/utils';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 
 export default function Welcome() {
-  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
+  const initialMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('signup') === '1' ? 'signup' : 'login';
+  const [mode, setMode] = useState(initialMode); // 'login' | 'signup' | 'forgot'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [creatorSlug, setCreatorSlug] = useState('');
