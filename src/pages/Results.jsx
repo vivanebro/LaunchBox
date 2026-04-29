@@ -394,6 +394,18 @@ export default function Results() {
     window.addEventListener('resize', checkMobile);
 
     const loadPackageConfig = async () => {
+      // Translate legacy Base44 ID (24-char hex) to Supabase UUID for old shared/embedded links
+      if (idFromUrl && /^[0-9a-f]{24}$/i.test(idFromUrl)) {
+        try {
+          const legacyMatches = await supabaseClient.entities.PackageConfig.filter({ legacy_base44_id: idFromUrl });
+          if (legacyMatches.length > 0 && legacyMatches[0].id) {
+            idFromUrl = legacyMatches[0].id;
+          }
+        } catch (e) {
+          console.warn('Legacy ID translation failed:', e);
+        }
+      }
+
       // Set initial pricing mode based on pricing_availability
       let loadedConfig = null;
       setPreviewNotFound(false);
