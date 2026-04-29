@@ -1,6 +1,8 @@
 {
+  "redirects": [
+    { "source": "/", "destination": "/bg-test.html", "statusCode": 302 }
+  ],
   "rewrites": [
-    { "source": "/", "destination": "/bg-test.html" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]
 }
