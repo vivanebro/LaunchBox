@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Copy, Check, ExternalLink, Trash2, Edit, ChevronDown, ChevronRight, X } from 'lucide-react';
 import supabaseClient from '@/lib/supabaseClient';
-import { useUnsavedChangesGuard } from '@/lib/useUnsavedChangesGuard';
+import UnsavedChangesGuard from '@/lib/UnsavedChangesGuard';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -538,7 +538,6 @@ function QuizBuilder({ initialDraft, editingId, onSave, onCancel }) {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const initialSnapshotRef = useRef(JSON.stringify(initialDraft || BLANK_UI_DRAFT));
     const isDirty = !saving && JSON.stringify(draft) !== initialSnapshotRef.current;
-    useUnsavedChangesGuard(isDirty);
 
     const set = (field, value) => setDraft(d => ({ ...d, [field]: value }));
 
@@ -591,6 +590,7 @@ function QuizBuilder({ initialDraft, editingId, onSave, onCancel }) {
 
     return (
         <div className="max-w-2xl mx-auto py-8 px-4 flex flex-col gap-8">
+            <UnsavedChangesGuard isDirty={isDirty} brandColor={draft.brand_color || '#ff0044'} />
             {/* Back */}
             <button onClick={onCancel} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors w-fit">
                 <ChevronRight className="w-4 h-4 rotate-180" /> My Quizzes

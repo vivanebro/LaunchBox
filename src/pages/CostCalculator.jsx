@@ -35,7 +35,7 @@ import { EXAMPLE_TEMPLATE, EXAMPLE_TEMPLATE_ID } from '@/components/CostCalculat
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import supabaseClient from '@/lib/supabaseClient';
 import { getCurrencySymbol as currencySymbol } from '@/lib/currency';
-import { useUnsavedChangesGuard } from '@/lib/useUnsavedChangesGuard';
+import UnsavedChangesGuard from '@/lib/UnsavedChangesGuard';
 
 const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'AUD', 'ILS'];
 
@@ -77,7 +77,6 @@ export default function CostCalculator() {
   const initialEditorSnapshotRef = useRef('');
   const editorSnapshot = JSON.stringify({ templateName, linkedPackageId, currency, costBody, manualRefPrice });
   const isDirty = isEditing && !saving && initialEditorSnapshotRef.current !== '' && editorSnapshot !== initialEditorSnapshotRef.current;
-  useUnsavedChangesGuard(isDirty);
 
   const linkedPkg = useMemo(
     () => packages.find((p) => p.id === linkedPackageId) || null,
@@ -267,6 +266,7 @@ export default function CostCalculator() {
 
     return (
       <div className="min-h-screen pb-16" style={{ backgroundColor: '#F5F5F7' }}>
+        <UnsavedChangesGuard isDirty={isDirty} />
         <div className="max-w-3xl mx-auto px-6 py-10">
           <button
             type="button"

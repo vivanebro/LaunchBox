@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
-import { useUnsavedChangesGuard } from '@/lib/useUnsavedChangesGuard';
+import UnsavedChangesGuard from '@/lib/UnsavedChangesGuard';
 
 import StepIndicator from '../components/builder/StepIndicator';
 import Step1Name from '../components/builder/Step1Name';
@@ -64,7 +64,6 @@ export default function PackageBuilder() {
 
   const initialConfigSnapshotRef = useRef(JSON.stringify(config));
   const isDirty = !isProcessing && JSON.stringify(config) !== initialConfigSnapshotRef.current;
-  useUnsavedChangesGuard(isDirty);
 
   // Load user's default currency for new packages
   useEffect(() => {
@@ -312,6 +311,7 @@ export default function PackageBuilder() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F5F5F7' }}>
+      <UnsavedChangesGuard isDirty={isDirty} brandColor={brandColor} />
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Step Indicator */}
         <StepIndicator currentStep={actualToVisual(step)} totalSteps={totalSteps} onStepClick={(vis) => setStep(visualToActual(vis))} />

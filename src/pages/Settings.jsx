@@ -14,7 +14,7 @@ import { createPageUrl } from '@/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 import { CURRENCIES } from '@/lib/currency';
-import { useUnsavedChangesGuard } from '@/lib/useUnsavedChangesGuard';
+import UnsavedChangesGuard from '@/lib/UnsavedChangesGuard';
 
 export default function Settings() {
   const { logout } = useAuth();
@@ -48,7 +48,6 @@ export default function Settings() {
       creator_slug: user.creator_slug,
       hide_copy_link_folder_prompt: user.hide_copy_link_folder_prompt,
     }) !== initialUserSnapshotRef.current;
-  useUnsavedChangesGuard(isDirty);
 
   const loadUser = async () => {
     setLoading(true);
@@ -210,6 +209,7 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen p-8" style={{ backgroundColor: '#F5F5F7' }}>
+      <UnsavedChangesGuard isDirty={isDirty} />
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Settings</h1>
