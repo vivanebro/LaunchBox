@@ -45,6 +45,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import supabaseClient from '@/lib/supabaseClient';
 import { createPageUrl } from '@/utils';
+import { getCurrencySymbol } from '@/lib/currency';
 import {
   folderIconStyle,
   formatFolderCounts,
@@ -734,8 +735,7 @@ function FolderDetailRoute() {
     );
   }
 
-  const currencySymbol = (c) =>
-    ({ USD: '$', EUR: '€', GBP: '£', AUD: 'A$', ILS: '₪' }[c] || '$');
+  const currencySymbol = getCurrencySymbol;
 
   return (
     <div className="min-h-screen p-8" style={{ backgroundColor: '#F5F5F7' }}>

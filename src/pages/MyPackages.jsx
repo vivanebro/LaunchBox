@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import supabaseClient from '@/lib/supabaseClient';
+import { getCurrencySymbol } from '@/lib/currency';
 import {
   Trash2,
   Edit,
@@ -72,11 +73,6 @@ function latestActivityMs(a) {
   const lc = a?.lastClickAt ? new Date(a.lastClickAt).getTime() : 0;
   return Math.max(lv, lc);
 }
-
-const getCurrencySymbol = (currency) => {
-  const symbols = { USD: '$', EUR: '€', GBP: '£', AUD: 'A$', ILS: '₪' };
-  return symbols[currency] || '$';
-};
 
 export default function MyPackages() {
   const [packages, setPackages] = useState([]);

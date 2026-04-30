@@ -32,6 +32,7 @@ import CopyLinkFolderPrompt from '@/components/folders/CopyLinkFolderPrompt';
 import { SendPackageDialog } from '@/components/packages/SendPackageDialog';
 import { takePendingFolderId } from '@/lib/folderUtils';
 import { getTemplateById } from '@/lib/templates';
+import { CURRENCIES, getCurrencySymbol } from '@/lib/currency';
 
 const getBrandColor = (config) => config?.brand_color || '#ff0044';
 
@@ -63,27 +64,6 @@ const roundToNearest50IfNeeded = (price) => {
 };
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Currency symbol helper
-const getCurrencySymbol = (currency) => {
-  const symbols = {
-    'USD': '$',
-    'EUR': '€',
-    'GBP': '£',
-    'AUD': 'A$',
-    'ILS': '₪'
-  };
-  return symbols[currency] || '$';
-};
-
-// Currency data
-const CURRENCIES = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
-  { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' }
-];
 
 // Button configuration options for Get Started
 const BUTTON_OPTIONS = [

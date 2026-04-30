@@ -3,15 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ArrowRight } from 'lucide-react';
+import { getCurrencySymbol, formatPrice } from '@/lib/currency';
 
-const QUICK_PRICES = [
-  { label: '$1,000', value: 1000 },
-  { label: '$2,500', value: 2500 },
-  { label: '$5,000', value: 5000 },
-  { label: '$10,000', value: 10000 },
-  { label: '$30,000', value: 30000 },
-  { label: '$50,000', value: 50000 },
-];
+const QUICK_PRICE_VALUES = [1000, 2500, 5000, 10000, 30000, 50000];
 
 const roundToNearest50IfNeeded = (price) => {
   const remainder = price % 50;
@@ -46,13 +40,15 @@ const calculateStrategyB = (typicalPrice) => {
 export default function Step5Pricing({ data, onChange, onNext }) {
   const [customPrice, setCustomPrice] = React.useState('');
   const typicalPrice = data.typical_price;
+  const currency = data.currency;
+  const symbol = getCurrencySymbol(currency);
 
   const selectPrice = (value) => {
     const rounded = roundToNearest50IfNeeded(value);
     const prices = calculateStrategyB(rounded);
     onChange({
       typical_price: rounded,
-      price_range: `$${rounded.toLocaleString()}`,
+      price_range: formatPrice(rounded, currency),
       ...prices,
     });
   };
@@ -76,7 +72,7 @@ export default function Step5Pricing({ data, onChange, onNext }) {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        {QUICK_PRICES.map(({ label, value }) => (
+        {QUICK_PRICE_VALUES.map((value) => (
           <Badge
             key={value}
             onClick={() => selectPrice(value)}
@@ -87,7 +83,7 @@ export default function Step5Pricing({ data, onChange, onNext }) {
                 : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
             )}
           >
-            {label}
+            {formatPrice(value, currency)}
           </Badge>
         ))}
       </div>
@@ -97,7 +93,7 @@ export default function Step5Pricing({ data, onChange, onNext }) {
           value={customPrice}
           onChange={(e) => setCustomPrice(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && applyCustom()}
-          placeholder="Or type your price (e.g., 3500)"
+          placeholder={`Or type your price (e.g., ${symbol}3500)`}
           className="flex-1 h-12 bg-gray-100 border-0 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:ring-1 focus:ring-gray-300 rounded-full px-5"
         />
         <button
@@ -114,17 +110,17 @@ export default function Step5Pricing({ data, onChange, onNext }) {
           <div className="grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-xl">
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-2">Starter</div>
-              <div className="text-2xl font-bold text-gray-900">${data.price_starter?.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-gray-900">{formatPrice(data.price_starter, currency)}</div>
               <div className="text-xs text-gray-400 mt-1">Entry option</div>
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-2">Growth</div>
-              <div className="text-2xl font-bold text-indigo-600">${data.price_growth?.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-indigo-600">{formatPrice(data.price_growth, currency)}</div>
               <div className="text-xs text-gray-400 mt-1">Your typical price</div>
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 mb-2">Premium</div>
-              <div className="text-2xl font-bold text-gray-900">${data.price_premium?.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-gray-900">{formatPrice(data.price_premium, currency)}</div>
               <div className="text-xs text-gray-400 mt-1">Best value</div>
             </div>
           </div>
@@ -135,15 +131,15 @@ export default function Step5Pricing({ data, onChange, onNext }) {
               <div className="grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-xl">
                 <div className="text-center">
                   <div className="text-xs text-gray-400 mb-2">Starter /mo</div>
-                  <div className="text-2xl font-bold text-gray-900">${data.price_starter_retainer?.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-gray-900">{formatPrice(data.price_starter_retainer, currency)}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-gray-400 mb-2">Growth /mo</div>
-                  <div className="text-2xl font-bold text-indigo-600">${data.price_growth_retainer?.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-indigo-600">{formatPrice(data.price_growth_retainer, currency)}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-gray-400 mb-2">Premium /mo</div>
-                  <div className="text-2xl font-bold text-gray-900">${data.price_premium_retainer?.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-gray-900">{formatPrice(data.price_premium_retainer, currency)}</div>
                 </div>
               </div>
             </>

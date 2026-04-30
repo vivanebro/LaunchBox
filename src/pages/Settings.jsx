@@ -13,24 +13,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
-
-const CURRENCIES = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'CAD', symbol: 'CA$', name: 'Canadian Dollar' },
-  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
-  { code: 'ILS', symbol: '₪', name: 'Israeli Shekel' },
-  { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc' },
-  { code: 'SEK', symbol: 'kr', name: 'Swedish Krona' },
-  { code: 'NOK', symbol: 'kr', name: 'Norwegian Krone' },
-  { code: 'DKK', symbol: 'kr', name: 'Danish Krone' },
-  { code: 'NZD', symbol: 'NZ$', name: 'New Zealand Dollar' },
-  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
-  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
-  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
-  { code: 'BRL', symbol: 'R$', name: 'Brazilian Real' },
-];
+import { CURRENCIES } from '@/lib/currency';
 
 export default function Settings() {
   const { logout } = useAuth();

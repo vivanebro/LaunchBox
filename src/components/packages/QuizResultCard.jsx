@@ -1,10 +1,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
-
-const getCurrencySymbol = (currency) => {
-    const symbols = { USD: '$', EUR: '€', GBP: '£', AUD: 'A$', ILS: '₪' };
-    return symbols[currency] || '$';
-};
+import { getCurrencySymbol } from '@/lib/currency';
 
 const getDarkerColor = (color) => {
     if (!color || !color.startsWith('#')) return '#cc0033';

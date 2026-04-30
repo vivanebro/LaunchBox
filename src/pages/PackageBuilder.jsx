@@ -64,11 +64,13 @@ export default function PackageBuilder() {
   // Load user's default currency for new packages
   useEffect(() => {
     if (config.currency) return; // Already has currency (editing existing)
-    supabaseClient.auth.me().then((u) => {
-      if (u?.default_currency) {
-        setConfig((prev) => ({ ...prev, currency: u.default_currency }));
-      }
-    }).catch(() => {});
+    supabaseClient.auth.me()
+      .then((u) => {
+        setConfig((prev) => ({ ...prev, currency: u?.default_currency || 'USD' }));
+      })
+      .catch(() => {
+        setConfig((prev) => ({ ...prev, currency: 'USD' }));
+      });
   }, []);
 
   useEffect(() => {

@@ -34,6 +34,7 @@ import { CostCalculatorPanel } from '@/components/CostCalculator/CostCalculatorP
 import { EXAMPLE_TEMPLATE, EXAMPLE_TEMPLATE_ID } from '@/components/CostCalculator/exampleTemplate';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import supabaseClient from '@/lib/supabaseClient';
+import { getCurrencySymbol as currencySymbol } from '@/lib/currency';
 
 const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'AUD', 'ILS'];
 
@@ -44,10 +45,6 @@ function getReferencePriceFromPackage(pkg) {
   const fallback = retainer ? 'price_premium' : 'price_premium_retainer';
   const n = Number(pkg[key] ?? pkg[fallback] ?? pkg.price_growth ?? 0);
   return Number.isFinite(n) ? n : 0;
-}
-
-function currencySymbol(c) {
-  return { USD: '$', EUR: '€', GBP: '£', AUD: 'A$', ILS: '₪' }[c] || '$';
 }
 
 function parseMoneyInput(v) {
