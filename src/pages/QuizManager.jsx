@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Copy, Check, ExternalLink, Trash2, Edit, ChevronDown, ChevronRight, X } from 'lucide-react';
 import supabaseClient from '@/lib/supabaseClient';
+import { useUnsavedChangesGuard } from '@/lib/useUnsavedChangesGuard';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -535,6 +536,9 @@ function QuizBuilder({ initialDraft, editingId, onSave, onCancel }) {
     const [error, setError] = useState('');
     const [showCustomize, setShowCustomize] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const initialSnapshotRef = useRef(JSON.stringify(initialDraft || BLANK_UI_DRAFT));
+    const isDirty = !saving && JSON.stringify(draft) !== initialSnapshotRef.current;
+    useUnsavedChangesGuard(isDirty);
 
     const set = (field, value) => setDraft(d => ({ ...d, [field]: value }));
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { createPageUrl } from '@/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { slugify, validateCreatorSlug, isCreatorSlugAvailable } from '@/lib/publicPackageUrl';
 import { CURRENCIES } from '@/lib/currency';
+import { useUnsavedChangesGuard } from '@/lib/useUnsavedChangesGuard';
 
 export default function Settings() {
   const { logout } = useAuth();
@@ -39,11 +40,27 @@ export default function Settings() {
     loadUser();
   }, []);
 
+  const initialUserSnapshotRef = useRef('');
+  const isDirty = !saving && user && initialUserSnapshotRef.current !== '' &&
+    JSON.stringify({
+      full_name: user.full_name,
+      default_currency: user.default_currency,
+      creator_slug: user.creator_slug,
+      hide_copy_link_folder_prompt: user.hide_copy_link_folder_prompt,
+    }) !== initialUserSnapshotRef.current;
+  useUnsavedChangesGuard(isDirty);
+
   const loadUser = async () => {
     setLoading(true);
     try {
       const currentUser = await supabaseClient.auth.me();
       setUser(currentUser);
+      initialUserSnapshotRef.current = JSON.stringify({
+        full_name: currentUser?.full_name,
+        default_currency: currentUser?.default_currency,
+        creator_slug: currentUser?.creator_slug,
+        hide_copy_link_folder_prompt: currentUser?.hide_copy_link_folder_prompt,
+      });
     } catch (error) {
       console.error('Error loading user:', error);
     }
@@ -107,7 +124,14 @@ export default function Settings() {
           await supabaseClient.entities.PackageConfig.update(pkg.id, { creator_slug: updates.creator_slug });
         }
       }
-      setUser({ ...user, ...updates });
+      const next = { ...user, ...updates };
+      setUser(next);
+      initialUserSnapshotRef.current = JSON.stringify({
+        full_name: next.full_name,
+        default_currency: next.default_currency,
+        creator_slug: next.creator_slug,
+        hide_copy_link_folder_prompt: next.hide_copy_link_folder_prompt,
+      });
       toast({ title: 'Settings saved.' });
     } catch (error) {
       console.error('Error updating profile:', error);

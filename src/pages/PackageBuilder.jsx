@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import supabaseClient from '@/lib/supabaseClient';
+import { useUnsavedChangesGuard } from '@/lib/useUnsavedChangesGuard';
 
 import StepIndicator from '../components/builder/StepIndicator';
 import Step1Name from '../components/builder/Step1Name';
@@ -61,15 +62,27 @@ export default function PackageBuilder() {
 
   const brandColor = config?.brand_color || '#ff0044';
 
+  const initialConfigSnapshotRef = useRef(JSON.stringify(config));
+  const isDirty = !isProcessing && JSON.stringify(config) !== initialConfigSnapshotRef.current;
+  useUnsavedChangesGuard(isDirty);
+
   // Load user's default currency for new packages
   useEffect(() => {
     if (config.currency) return; // Already has currency (editing existing)
     supabaseClient.auth.me()
       .then((u) => {
-        setConfig((prev) => ({ ...prev, currency: u?.default_currency || 'USD' }));
+        setConfig((prev) => {
+          const next = { ...prev, currency: u?.default_currency || 'USD' };
+          initialConfigSnapshotRef.current = JSON.stringify(next);
+          return next;
+        });
       })
       .catch(() => {
-        setConfig((prev) => ({ ...prev, currency: 'USD' }));
+        setConfig((prev) => {
+          const next = { ...prev, currency: 'USD' };
+          initialConfigSnapshotRef.current = JSON.stringify(next);
+          return next;
+        });
       });
   }, []);
 

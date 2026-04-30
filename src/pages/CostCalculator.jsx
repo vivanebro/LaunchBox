@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -35,6 +35,7 @@ import { EXAMPLE_TEMPLATE, EXAMPLE_TEMPLATE_ID } from '@/components/CostCalculat
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import supabaseClient from '@/lib/supabaseClient';
 import { getCurrencySymbol as currencySymbol } from '@/lib/currency';
+import { useUnsavedChangesGuard } from '@/lib/useUnsavedChangesGuard';
 
 const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'AUD', 'ILS'];
 
@@ -72,6 +73,11 @@ export default function CostCalculator() {
   const [loadError, setLoadError] = useState(null);
 
   const isEditing = editParam === 'new' || editParam === 'example' || (editParam && editParam.length > 10);
+
+  const initialEditorSnapshotRef = useRef('');
+  const editorSnapshot = JSON.stringify({ templateName, linkedPackageId, currency, costBody, manualRefPrice });
+  const isDirty = isEditing && !saving && initialEditorSnapshotRef.current !== '' && editorSnapshot !== initialEditorSnapshotRef.current;
+  useUnsavedChangesGuard(isDirty);
 
   const linkedPkg = useMemo(
     () => packages.find((p) => p.id === linkedPackageId) || null,
@@ -121,6 +127,7 @@ export default function CostCalculator() {
         setCurrency('USD');
         setCostBody(null);
         setManualRefPrice('');
+        initialEditorSnapshotRef.current = JSON.stringify({ templateName: '', linkedPackageId: '', currency: 'USD', costBody: null, manualRefPrice: '' });
         setLoading(false);
         return;
       }
@@ -130,6 +137,7 @@ export default function CostCalculator() {
         setCurrency(EXAMPLE_TEMPLATE.currency);
         setCostBody(EXAMPLE_TEMPLATE.body);
         setManualRefPrice('');
+        initialEditorSnapshotRef.current = JSON.stringify({ templateName: EXAMPLE_TEMPLATE.name, linkedPackageId: '', currency: EXAMPLE_TEMPLATE.currency, costBody: EXAMPLE_TEMPLATE.body, manualRefPrice: '' });
         setLoading(false);
         return;
       }
@@ -144,11 +152,17 @@ export default function CostCalculator() {
       setCurrency(row.currency || 'USD');
       const body = row.body && typeof row.body === 'object' ? row.body : null;
       setCostBody(body);
-      if (!row.linked_package_id && body?.referencePrice != null && body.referencePrice !== '') {
-        setManualRefPrice(String(body.referencePrice));
-      } else {
-        setManualRefPrice('');
-      }
+      const nextManualRef = !row.linked_package_id && body?.referencePrice != null && body.referencePrice !== ''
+        ? String(body.referencePrice)
+        : '';
+      setManualRefPrice(nextManualRef);
+      initialEditorSnapshotRef.current = JSON.stringify({
+        templateName: row.name || '',
+        linkedPackageId: row.linked_package_id || '',
+        currency: row.currency || 'USD',
+        costBody: body,
+        manualRefPrice: nextManualRef,
+      });
     } catch (e) {
       console.error(e);
       setLoadError('Template not found.');
@@ -193,6 +207,7 @@ export default function CostCalculator() {
       } else {
         await supabaseClient.entities.CostCalculatorTemplate.update(editParam, payload);
       }
+      initialEditorSnapshotRef.current = JSON.stringify({ templateName: name, linkedPackageId, currency: displayCurrency, costBody: bodyPayload, manualRefPrice });
       setSearchParams({});
       await loadList();
     } catch (e) {
