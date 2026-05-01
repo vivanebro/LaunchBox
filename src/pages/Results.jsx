@@ -3912,21 +3912,24 @@ export default function Results() {
 
                          return (
                            <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
-                             {(provided) => (
-                               <div ref={provided.innerRef} {...provided.draggableProps}>
-                                 <EditableDeliverableItem
-                                   deliverable={deliverable}
-                                   onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
-                                   onDuplicate={() => duplicateDeliverable(tierName, idx)}
-                                   onDelete={() => deleteDeliverable(tierName, idx)}
-                                   onSaveTooltip={(t) => updateDeliverableTooltip(tierName, idx, t)}
-                                   onSaveLink={(u) => updateDeliverableLink(tierName, idx, u)}
-                                   darkMode={false}
-                                   brandColor={brandColor}
-                                   dragHandleProps={provided.dragHandleProps}
-                                 />
-                               </div>
-                             )}
+                             {(provided, snapshot) => {
+                               const child = (
+                                 <div ref={provided.innerRef} {...provided.draggableProps} style={{ ...provided.draggableProps.style, zIndex: snapshot.isDragging ? 9999 : undefined }}>
+                                   <EditableDeliverableItem
+                                     deliverable={deliverable}
+                                     onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
+                                     onDuplicate={() => duplicateDeliverable(tierName, idx)}
+                                     onDelete={() => deleteDeliverable(tierName, idx)}
+                                     onSaveTooltip={(t) => updateDeliverableTooltip(tierName, idx, t)}
+                                     onSaveLink={(u) => updateDeliverableLink(tierName, idx, u)}
+                                     darkMode={false}
+                                     brandColor={brandColor}
+                                     dragHandleProps={provided.dragHandleProps}
+                                   />
+                                 </div>
+                               );
+                               return snapshot.isDragging ? createPortal(child, document.body) : child;
+                             }}
                            </Draggable>
                          );
                        })}
@@ -3992,23 +3995,26 @@ export default function Results() {
 
                         return (
                           <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
-                            {(provided) => (
-                              <div ref={provided.innerRef} {...provided.draggableProps}>
-                                <EditableListItem
-                                  value={getItemText(bonus)}
-                                  tooltip={getTooltip(bonus)}
-                                  link={getLink(bonus)}
-                                  onSave={(newValue) => updateBonus(tierName, idx, newValue)}
-                                  onDelete={() => deleteBonus(tierName, idx)}
-                                  onSaveTooltip={(t) => updateBonusTooltip(tierName, idx, t)}
-                                  onSaveLink={(u) => updateBonusLink(tierName, idx, u)}
-                                  icon={Plus}
-                                  iconClassName="text-green-500"
-                                  brandColor={brandColor}
-                                  dragHandleProps={provided.dragHandleProps}
-                                />
-                              </div>
-                            )}
+                            {(provided, snapshot) => {
+                              const child = (
+                                <div ref={provided.innerRef} {...provided.draggableProps} style={{ ...provided.draggableProps.style, zIndex: snapshot.isDragging ? 9999 : undefined }}>
+                                  <EditableListItem
+                                    value={getItemText(bonus)}
+                                    tooltip={getTooltip(bonus)}
+                                    link={getLink(bonus)}
+                                    onSave={(newValue) => updateBonus(tierName, idx, newValue)}
+                                    onDelete={() => deleteBonus(tierName, idx)}
+                                    onSaveTooltip={(t) => updateBonusTooltip(tierName, idx, t)}
+                                    onSaveLink={(u) => updateBonusLink(tierName, idx, u)}
+                                    icon={Plus}
+                                    iconClassName="text-green-500"
+                                    brandColor={brandColor}
+                                    dragHandleProps={provided.dragHandleProps}
+                                  />
+                                </div>
+                              );
+                              return snapshot.isDragging ? createPortal(child, document.body) : child;
+                            }}
                           </Draggable>
                         );
                       })}
@@ -4449,21 +4455,24 @@ export default function Results() {
 
                          return (
                            <Draggable key={`deliv-${tierName}-${idx}`} draggableId={`deliv-${tierName}-${idx}`} index={idx}>
-                             {(provided) => (
-                               <div ref={provided.innerRef} {...provided.draggableProps}>
-                                 <EditableDeliverableItem
-                                   deliverable={deliverable}
-                                   onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
-                                   onDuplicate={() => duplicateDeliverable(tierName, idx)}
-                                   onDelete={() => deleteDeliverable(tierName, idx)}
-                                   onSaveTooltip={(t) => updateDeliverableTooltip(tierName, idx, t)}
-                                   onSaveLink={(u) => updateDeliverableLink(tierName, idx, u)}
-                                   darkMode={true}
-                                   brandColor={brandColor}
-                                   dragHandleProps={provided.dragHandleProps}
-                                 />
-                               </div>
-                             )}
+                             {(provided, snapshot) => {
+                               const child = (
+                                 <div ref={provided.innerRef} {...provided.draggableProps} style={{ ...provided.draggableProps.style, zIndex: snapshot.isDragging ? 9999 : undefined }}>
+                                   <EditableDeliverableItem
+                                     deliverable={deliverable}
+                                     onSave={(newVal) => updateDeliverable(tierName, idx, newVal)}
+                                     onDuplicate={() => duplicateDeliverable(tierName, idx)}
+                                     onDelete={() => deleteDeliverable(tierName, idx)}
+                                     onSaveTooltip={(t) => updateDeliverableTooltip(tierName, idx, t)}
+                                     onSaveLink={(u) => updateDeliverableLink(tierName, idx, u)}
+                                     darkMode={true}
+                                     brandColor={brandColor}
+                                     dragHandleProps={provided.dragHandleProps}
+                                   />
+                                 </div>
+                               );
+                               return snapshot.isDragging ? createPortal(child, document.body) : child;
+                             }}
                            </Draggable>
                          );
                        })}
@@ -4527,24 +4536,27 @@ export default function Results() {
 
                         return (
                           <Draggable key={`bonus-${tierName}-${idx}`} draggableId={`bonus-${tierName}-${idx}`} index={idx}>
-                            {(provided) => (
-                              <div ref={provided.innerRef} {...provided.draggableProps}>
-                                <EditableListItem
-                                  value={getItemText(bonus)}
-                                  tooltip={getTooltip(bonus)}
-                                  link={getLink(bonus)}
-                                  onSave={(newValue) => updateBonus(tierName, idx, newValue)}
-                                  onDelete={() => deleteBonus(tierName, idx)}
-                                  onSaveTooltip={(t) => updateBonusTooltip(tierName, idx, t)}
-                                  onSaveLink={(u) => updateBonusLink(tierName, idx, u)}
-                                  icon={Plus}
-                                  iconClassName="text-yellow-400"
-                                  darkMode={true}
-                                  brandColor={brandColor}
-                                  dragHandleProps={provided.dragHandleProps}
-                                />
-                              </div>
-                            )}
+                            {(provided, snapshot) => {
+                              const child = (
+                                <div ref={provided.innerRef} {...provided.draggableProps} style={{ ...provided.draggableProps.style, zIndex: snapshot.isDragging ? 9999 : undefined }}>
+                                  <EditableListItem
+                                    value={getItemText(bonus)}
+                                    tooltip={getTooltip(bonus)}
+                                    link={getLink(bonus)}
+                                    onSave={(newValue) => updateBonus(tierName, idx, newValue)}
+                                    onDelete={() => deleteBonus(tierName, idx)}
+                                    onSaveTooltip={(t) => updateBonusTooltip(tierName, idx, t)}
+                                    onSaveLink={(u) => updateBonusLink(tierName, idx, u)}
+                                    icon={Plus}
+                                    iconClassName="text-yellow-400"
+                                    darkMode={true}
+                                    brandColor={brandColor}
+                                    dragHandleProps={provided.dragHandleProps}
+                                  />
+                                </div>
+                              );
+                              return snapshot.isDragging ? createPortal(child, document.body) : child;
+                            }}
                           </Draggable>
                         );
                       })}
