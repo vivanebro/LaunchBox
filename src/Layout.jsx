@@ -253,34 +253,6 @@ export default function Layout({ children, currentPageName }) {
     );
   }
 
-  // Show mobile message
-  if (isMobileView) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#F5F5F7' }}>
-        <div className="bg-white rounded-3xl p-8 shadow-lg max-w-sm mx-auto border-2 border-gray-200 text-center">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg"
-            style={{ background: `linear-gradient(135deg, ${brandColor} 0%, ${darkerBrandColor} 100%)` }}
-          >
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Mobile Not Supported</h2>
-          <p className="text-gray-600 mb-6 leading-relaxed">
-            LaunchBox is optimized for desktop use. Please switch to a laptop or desktop computer for the best experience.
-          </p>
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full border border-gray-200">
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            <span className="text-sm font-medium text-gray-700">Desktop Required</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Main layout
   return (
     <ErrorBoundary>

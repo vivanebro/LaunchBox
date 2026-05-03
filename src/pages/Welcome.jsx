@@ -91,7 +91,10 @@ export default function Welcome() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { creator_slug: normalized } }
+          options: {
+            data: { creator_slug: normalized },
+            emailRedirectTo: `${window.location.origin}${createPageUrl('Dashboard')}`,
+          },
         });
         if (error) throw error;
         setMessage('Account created! Check your email to confirm, then log in.');
