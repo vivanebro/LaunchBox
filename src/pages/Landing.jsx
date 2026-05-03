@@ -187,8 +187,9 @@ body.landing-active { margin: 0; font-family: 'Onest', sans-serif; background: #
 .landing-root .tier-addon { font-size: 13px; color: #5C6076; padding: 10px 0 4px; border-top: 1px dashed #E2E5EB; margin-top: 4px; }
 .landing-root .tier-addon strong { color: #18181B; font-weight: 700; }
 .landing-root .tier-feats { list-style: none; padding: 0; margin: 0 0 8px; }
-.landing-root .tier-feats li { font-size: 14px; color: #18181B; padding: 8px 0; border-bottom: 1px solid #E2E5EB; position: relative; padding-left: 22px; }
-.landing-root .tier-feats li::before { content: "✓"; position: absolute; left: 0; color: #ff0044; font-weight: 800; }
+.landing-root .tier-feats li { font-size: 14px; color: #18181B; padding: 8px 0; border-bottom: 1px solid #E2E5EB; position: relative; padding-left: 26px; }
+.landing-root .tier-feats li::before { content: ""; position: absolute; left: 0; top: 11px; width: 18px; height: 18px; background-color: #ff0044; -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>"); mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>"); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+.landing-root .price-card.popular .tier-feats li::before { background-color: #fff; }
 .landing-root .price-card.popular .tier-feats li { color: rgba(255,255,255,0.85); border-color: rgba(255,255,255,0.1); }
 .landing-root .price-foot { margin-top: 32px; font-size: 13px; color: #5C6076; }
 
@@ -441,44 +442,45 @@ const HTML = `
         <div class="tier-was">Regular $29/mo</div>
         <ul class="tier-feats">
           <li>5 packages per month</li>
-          <li>Embed on your website</li>
-          <li>Contracts + e-signature</li>
-          <li>Real-time view alerts</li>
-          <li>Cost calculator</li>
-          <li>All templates + custom branding</li>
+          <li>Industry templates <span class="tt" data-tip="Research-based templates using your industry's jargon and the value language your clients respond to.">${TT_SVG}</span></li>
+          <li>Cost calculator <span class="tt" data-tip="Know your costs on each package so your profits stay high.">${TT_SVG}</span></li>
+          <li>Embed on your website <span class="tt" data-tip="Drop packages on any page. Clients pick and pay without leaving your site.">${TT_SVG}</span></li>
+          <li>Custom branding <span class="tt" data-tip="Add your logo and brand colors to every package.">${TT_SVG}</span></li>
+          <li>Pricing benchmarks <span class="tt" data-tip="See what others in your niche charge so you stop underpricing.">${TT_SVG}</span> <span class="cs-tag">soon</span></li>
         </ul>
         <a class="btn btn-2 btn-full" href="/Welcome?signup=1&plan=starter">Start free trial</a>
       </div>
       <div class="price-card popular" data-monthly="39" data-annual="390" data-regular="49">
         <div class="card-top-slot"><div class="popular-flag">Most popular</div></div>
         <div class="tier-name">Growth</div>
-        <div class="tier-tagline">Build packages with AI in 60 seconds</div>
+        <div class="tier-tagline">For working pros who quote weekly</div>
         <div class="tier-price"><span class="tp-num">$39</span><span class="tp-mo">/mo</span></div>
         <div class="tier-was">Regular $49/mo</div>
         <ul class="tier-feats">
           <li>Everything in Starter</li>
           <li>Unlimited packages</li>
-          <li>Smart pricing alerts <span class="tt" data-tip="Real-time warnings when your tier ratios break the psychology of anchored pricing — stops you from underpricing your premium tier.">${TT_SVG}</span></li>
-          <li>Auto Packages <span class="tt" data-tip="Your client takes a quick quiz, and packages auto-generate based on their answers.">${TT_SVG}</span> <span class="cs-tag">soon</span></li>
-          <li>AI Package Generator <span class="tt" data-tip="Generate a 3-tier package from a sentence, a Zoom call transcript, or your existing quote file.">${TT_SVG}</span> <span class="cs-tag">soon</span></li>
-          <li>Pricing benchmarks <span class="tt" data-tip="See how your prices compare to others in your industry.">${TT_SVG}</span> <span class="cs-tag">soon</span></li>
-          <li>CRM integration <span class="tt" data-tip="Push won deals into GoHighLevel, HubSpot, or Pipedrive.">${TT_SVG}</span> <span class="cs-tag">soon</span></li>
+          <li>Contracts + e-sign <span class="tt" data-tip="Lock the deal the moment they say yes. No more chasing signatures.">${TT_SVG}</span></li>
+          <li>1-click upsell <span class="tt" data-tip="After a client picks a package, give them the option to add extras.">${TT_SVG}</span> <span class="cs-tag">soon</span></li>
+          <li>Client self-packaging <span class="tt" data-tip="A quiz on your site gives clients custom packages, so you close deals while you sleep.">${TT_SVG}</span> <span class="cs-tag">soon</span></li>
         </ul>
         <a class="btn btn-full" href="/Welcome?signup=1&plan=growth">Start free trial</a>
       </div>
       <div class="price-card" data-monthly="199" data-annual="1990">
-        <div class="card-top-slot"><div class="seats-badge">5 team seats included</div></div>
+        <div class="card-top-slot"></div>
         <div class="tier-name">Pro</div>
-        <div class="tier-tagline">For agencies and teams</div>
+        <div class="tier-tagline">Concierge support + AI coaching</div>
         <div class="tier-price"><span class="tp-num">$199</span><span class="tp-mo">/mo</span></div>
         <div class="tier-was tier-was-empty">&nbsp;</div>
         <ul class="tier-feats">
           <li>Everything in Growth</li>
-          <li>Multi-brand workspaces <span class="tt" data-tip="Manage packages for multiple brands or clients from one account.">${TT_SVG}</span></li>
-          <li>A/B package testing <span class="tt" data-tip="Send two versions of a package and see which closes better.">${TT_SVG}</span> <span class="cs-tag">soon</span></li>
-          <li>Your designated packaging expert — monthly 1-on-1 call</li>
+          <li>1-on-1 coaching calls with founder</li>
+          <li>Done-for-you onboarding</li>
+          <li>Priority support</li>
+          <li>Early access to new features</li>
+          <li>Launchy AI agent <span class="tt" data-tip="Your AI co-founder. Makes your packages 10X better so you close more at higher prices. Spots when you're leaving money on the table, rewrites boring lines so clients feel the value, suggests what to add based on your industry, warns you when a package looks weak, and gets smarter every week.">${TT_SVG}</span> <span class="cs-tag">future</span></li>
+          <li>Multi-brand workspaces <span class="tt" data-tip="Manage packages for multiple brands or clients from one account.">${TT_SVG}</span> <span class="cs-tag">future</span></li>
+          <li>A/B package testing <span class="tt" data-tip="Send two versions of a package and see which closes better.">${TT_SVG}</span> <span class="cs-tag">future</span></li>
         </ul>
-        <div class="tier-addon">Need more? <strong>+$30/seat/mo</strong></div>
         <a class="btn btn-2 btn-full" href="/Welcome?signup=1&plan=pro">Start free trial</a>
       </div>
     </div>
